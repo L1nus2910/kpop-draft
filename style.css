@@ -2480,3 +2480,173 @@ footer span:first-child {
     grid-column: auto;
   }
 }
+
+/* Member details and the first-round lottery reveal. */
+.pick-reveal-team-band[hidden],
+.lottery-board[hidden] {
+  display: none !important;
+}
+
+.pick-reveal-agency {
+  max-width: 100%;
+  color: #28658f;
+  font-size: clamp(13px, 3.2vw, 17px);
+  font-weight: 800;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.pick-reveal-group {
+  max-width: 100%;
+  font-weight: 700;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.lottery-board {
+  width: 100%;
+  margin: 20px auto 18px;
+  padding: 16px;
+  color: #e8f2fa;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(190, 220, 241, 0.22);
+  border-radius: 18px;
+}
+
+.lottery-board-title {
+  margin: 0 0 12px;
+  color: #c8e3f6;
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+}
+
+.lottery-ticket-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(112px, 1fr));
+  gap: 10px;
+}
+
+.lottery-ticket {
+  min-width: 0;
+  height: 78px;
+  perspective: 850px;
+}
+
+.lottery-ticket-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+  transition: transform 650ms cubic-bezier(0.18, 0.75, 0.22, 1) var(--ticket-delay, 0ms);
+}
+
+.lottery-ticket.is-revealed .lottery-ticket-inner {
+  transform: rotateY(180deg);
+}
+
+.lottery-ticket-face {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 5px;
+  padding: 8px;
+  overflow: hidden;
+  border-radius: 12px;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.lottery-ticket-face strong {
+  max-width: 100%;
+  font-size: 13px;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.lottery-ticket-face small {
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.lottery-ticket-cover {
+  color: #183b5a;
+  background: linear-gradient(145deg, #fff, #e4f1fa);
+  border: 1px solid rgba(186, 220, 242, 0.85);
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.95), 0 5px 12px rgba(0, 0, 0, 0.16);
+}
+
+.lottery-ticket-result {
+  transform: rotateY(180deg);
+  color: #193d5c;
+  background: linear-gradient(145deg, #f7fbff, #dbeaf5);
+  border: 1px solid rgba(186, 220, 242, 0.85);
+}
+
+.lottery-ticket-result.is-winner {
+  color: #fff;
+  background: linear-gradient(145deg, #258bc4, #155d99);
+  border-color: #8cd3fa;
+  box-shadow: 0 0 22px rgba(86, 186, 239, 0.38), inset 0 1px rgba(255, 255, 255, 0.3);
+}
+
+.lottery-ticket-result.is-loser {
+  color: #556b7c;
+  background: linear-gradient(145deg, #edf2f6, #d7e0e7);
+}
+
+.lottery-outcome {
+  min-height: 26px;
+  margin: 14px 0 0;
+  color: #b6e7ff;
+  font-size: 16px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+}
+
+.lottery-board.is-revealed .lottery-outcome {
+  animation: lottery-outcome-pop 520ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@keyframes lottery-outcome-pop {
+  from { opacity: 0; transform: translateY(8px) scale(0.94); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@media (max-width: 650px) {
+  .lottery-board {
+    margin: 14px auto;
+    padding: 12px;
+  }
+
+  .lottery-ticket-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .lottery-ticket {
+    height: 68px;
+  }
+
+  .lottery-ticket-face strong {
+    font-size: 12px;
+  }
+
+  .lottery-outcome {
+    margin-top: 10px;
+    font-size: 14px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lottery-ticket-inner {
+    transition-duration: 1ms;
+    transition-delay: 0ms;
+  }
+
+  .lottery-board.is-revealed .lottery-outcome {
+    animation: none;
+  }
+}

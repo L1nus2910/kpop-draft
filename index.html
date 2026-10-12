@@ -154,6 +154,10 @@
             <select id="nationalityFilter"><option value="">すべて</option></select>
           </label>
           <label>
+            <span>所属事務所</span>
+            <select id="agencyFilter"><option value="">すべて</option></select>
+          </label>
+          <label>
             <span>グループ</span>
             <select id="groupFilter"><option value="">すべて</option></select>
           </label>
@@ -216,16 +220,16 @@
     </footer>
   </main>
 
-  <div class="pick-reveal" id="pickReveal" hidden role="dialog" aria-modal="true" aria-labelledby="pickRevealName" aria-describedby="pickRevealGroup">
+  <div class="pick-reveal" id="pickReveal" hidden role="dialog" aria-modal="true" aria-labelledby="pickRevealName" aria-describedby="pickRevealAgency pickRevealGroup">
     <button class="pick-reveal-skip" id="pickRevealSkip" type="button">スキップ</button>
     <div class="pick-reveal-card" id="pickRevealCard">
       <p class="pick-reveal-round" id="pickRevealRound">1巡目</p>
       <p class="pick-reveal-label" id="pickRevealLabel">指名が確定しました</p>
-      <div class="pick-reveal-team-band">
-        <span>指名チーム</span>
+      <div class="pick-reveal-team-band" id="pickRevealTeamBand">
+        <span id="pickRevealTeamLabel">指名チーム</span>
         <h2 class="pick-reveal-team" id="pickRevealTeam"></h2>
       </div>
-      <p class="pick-reveal-caption">選ばれたメンバーは…</p>
+      <p class="pick-reveal-caption" id="pickRevealCaption">選ばれたメンバーは…</p>
       <div class="pick-flip-card" id="pickRevealFlipCard">
         <div class="pick-flip-inner">
           <div class="pick-flip-face pick-flip-back">
@@ -235,10 +239,16 @@
           </div>
           <div class="pick-flip-face pick-flip-front">
             <span class="pick-reveal-name" id="pickRevealName"></span>
+            <span class="pick-reveal-agency" id="pickRevealAgency"></span>
             <span class="pick-reveal-group" id="pickRevealGroup"></span>
           </div>
         </div>
       </div>
+      <section class="lottery-board" id="lotteryBoard" hidden aria-live="polite">
+        <p class="lottery-board-title">抽選に参加するチーム</p>
+        <div class="lottery-ticket-grid" id="lotteryTickets"></div>
+        <p class="lottery-outcome" id="lotteryOutcome">抽選中…</p>
+      </section>
       <button class="pick-reveal-next" id="pickRevealNext" type="button">指名を見る</button>
     </div>
   </div>
