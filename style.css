@@ -193,9 +193,55 @@ select {
 
 .stats {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 14px;
   margin: 18px 0;
+}
+
+.mode-panel {
+  margin-top: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.mode-panel h2 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.mode-copy {
+  margin: 7px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.mode-controls {
+  display: flex;
+  align-items: end;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.mode-controls label {
+  min-width: 190px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.mode-controls select {
+  min-height: 40px;
+  padding: 9px 11px;
+  color: var(--ink);
+  background: #fbf9fb;
+  border: 1px solid var(--line);
+  border-radius: 10px;
 }
 
 .stat-card {
@@ -623,6 +669,7 @@ footer span:first-child {
   }
 
   .stats {
+    grid-template-columns: repeat(2, 1fr);
     gap: 7px;
   }
 
@@ -643,6 +690,17 @@ footer span:first-child {
 
   .panel {
     padding: 16px;
+  }
+
+  .mode-panel {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .mode-controls,
+  .mode-controls label,
+  .mode-controls .button {
+    width: 100%;
   }
 
   .filter-grid {

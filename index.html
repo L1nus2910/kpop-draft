@@ -34,10 +34,42 @@
       </div>
     </section>
 
+    <section class="mode-panel panel" aria-labelledby="modeTitle">
+      <div>
+        <p class="eyebrow">PLAY MODE</p>
+        <h2 id="modeTitle">遊び方</h2>
+        <p class="mode-copy" id="modeDescription">今までどおり、同じ画面で4チームのドラフトを遊べます。</p>
+      </div>
+      <div class="mode-controls">
+        <label>
+          <span>プレイ形式</span>
+          <select id="playMode">
+            <option value="local">友達と同じ画面で（4人）</option>
+            <option value="ai">ひとりでAIと対戦</option>
+          </select>
+        </label>
+        <label id="aiCountWrap" hidden>
+          <span>AI相手の人数（自分を含まない）</span>
+          <select id="aiCount">
+            <option value="1">1人</option><option value="2">2人</option>
+            <option value="3" selected>3人</option><option value="4">4人</option>
+            <option value="5">5人</option><option value="6">6人</option>
+            <option value="7">7人</option><option value="8">8人</option>
+            <option value="9">9人</option><option value="10">10人</option>
+          </select>
+        </label>
+        <button class="button button-primary" id="startGame" type="button" hidden>AI対戦を始める</button>
+      </div>
+    </section>
+
     <section class="stats" aria-label="候補の状況">
       <article class="stat-card">
         <span>登録メンバー</span>
         <strong id="rosterTotal">—</strong>
+      </article>
+      <article class="stat-card">
+        <span>登録グループ</span>
+        <strong id="groupTotal">—</strong>
       </article>
       <article class="stat-card accent-card">
         <span>現在の候補</span>
@@ -64,7 +96,7 @@
         <div class="filter-grid">
           <label class="search-field">
             <span>名前で検索</span>
-            <input id="searchInput" type="search" placeholder="例：Momo">
+            <input id="searchInput" type="search" placeholder="例：モモ / Momo">
           </label>
           <label>
             <span>世代</span>
@@ -133,7 +165,7 @@
 
     <footer>
       <span>STAGE PICK</span>
-      <span>メンバー情報はこのページ内のデータを編集して更新できます。</span>
+    <span>グループ一覧を参考に、活動中・活動休止中のグループを順次追加しています。メンバー名はカタカナでも検索できます。</span>
     </footer>
   </main>
 </body>
