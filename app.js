@@ -615,6 +615,8 @@ const japaneseNameOverrides = Object.fromEntries(
 );
 
 Object.assign(japaneseNameOverrides, {
+  "juun": "ジュウン",
+  "a-na": "エイナ",
   "chloe young": "クロエ・ヤング",
   "chanelle moon": "シャネル・ムン",
   "moon sua": "ムン・スア",
@@ -942,6 +944,18 @@ $("candidateList").addEventListener("click", event => {
 });
 
 $("searchInput").addEventListener("input", renderCandidates);
+
+$("resetFilters").addEventListener("click", () => {
+  $("searchInput").value = "";
+  ["generationFilter", "nationalityFilter", "groupFilter", "activityFilter"].forEach(id => {
+    $(id).value = "";
+  });
+  $("hideDrafted").checked = true;
+  $("showExcluded").checked = false;
+  $("presetSelect").value = "";
+  $("randomResult").hidden = true;
+  renderCandidates();
+});
 [
   "generationFilter",
   "nationalityFilter",
