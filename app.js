@@ -848,7 +848,6 @@ let turnIndex = 0;
 let lotterySummary = "";
 let pickLimit = 5;
 let orderMode = "snake";
-let activePickReveal = null;
 
 const aiStrategies = [
   { label: "バランス型", group: 5, generation: 5, nationality: 4, activity: 3 },
