@@ -2650,3 +2650,236 @@ footer span:first-child {
     animation: none;
   }
 }
+
+.lottery-envelope {
+  position: relative;
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  height: 108px;
+  padding: 8px 6px;
+  overflow: hidden;
+  color: #183c5d;
+  background: linear-gradient(145deg, #fff, #e8f2fa);
+  border: 1px solid rgba(168, 207, 232, 0.9);
+  border-radius: 14px;
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.95), 0 7px 16px rgba(0, 20, 40, 0.17);
+  font: inherit;
+  text-align: center;
+  cursor: pointer;
+  transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+}
+
+.lottery-envelope:not(:disabled):hover {
+  transform: translateY(-3px);
+  border-color: #79b9e1;
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.95), 0 11px 23px rgba(0, 20, 40, 0.25);
+}
+
+.lottery-envelope:focus-visible {
+  outline: 3px solid #8bd5ff;
+  outline-offset: 3px;
+}
+
+.lottery-envelope:disabled {
+  opacity: 1;
+}
+
+.lottery-envelope-paper {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-rows: auto 36px auto;
+  align-items: center;
+  justify-items: center;
+  gap: 2px;
+  width: 100%;
+  height: 100%;
+  transition: opacity 260ms ease, transform 340ms ease;
+}
+
+.lottery-envelope-team {
+  max-width: 100%;
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+
+.lottery-envelope-art {
+  position: relative;
+  display: block;
+  width: 56px;
+  height: 34px;
+  overflow: hidden;
+  background: linear-gradient(145deg, #69b1df, #2c78ad);
+  border: 1px solid #1f6699;
+  border-radius: 6px;
+  box-shadow: 0 4px 9px rgba(24, 87, 132, 0.24);
+  perspective: 350px;
+}
+
+.lottery-envelope-art::before,
+.lottery-envelope-art::after {
+  position: absolute;
+  inset: 0;
+  content: "";
+}
+
+.lottery-envelope-art::before {
+  background: rgba(231, 247, 255, 0.86);
+  clip-path: polygon(0 0, 50% 61%, 100% 0);
+}
+
+.lottery-envelope-art::after {
+  background: linear-gradient(35deg, transparent 48%, rgba(13, 73, 117, 0.36) 49% 51%, transparent 52%),
+    linear-gradient(-35deg, transparent 48%, rgba(13, 73, 117, 0.28) 49% 51%, transparent 52%);
+}
+
+.lottery-envelope-letter {
+  position: absolute;
+  top: 1px;
+  left: 50%;
+  color: #176ba4;
+  font-size: 17px;
+  transform: translateX(-50%);
+}
+
+.lottery-envelope-flap {
+  position: absolute;
+  z-index: 2;
+  inset: 0 0 auto;
+  height: 21px;
+  background: linear-gradient(145deg, #dff4ff, #a4d9f6);
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
+  transform-origin: 50% 0;
+  transition: transform 420ms cubic-bezier(0.2, 0.75, 0.2, 1);
+}
+
+.lottery-envelope-seal {
+  position: absolute;
+  z-index: 3;
+  top: 13px;
+  left: 50%;
+  padding: 2px 5px;
+  color: #fff;
+  background: #d74756;
+  border: 1px solid rgba(255, 255, 255, 0.78);
+  border-radius: 999px;
+  font-size: 7px;
+  font-weight: 1000;
+  letter-spacing: 0.05em;
+  transform: translateX(-50%);
+  transition: opacity 160ms ease, transform 200ms ease;
+}
+
+.lottery-envelope-hint {
+  color: #56748a;
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.lottery-envelope-result {
+  position: absolute;
+  z-index: 2;
+  inset: 6px;
+  display: grid;
+  place-items: center;
+  padding: 8px;
+  color: #31516b;
+  background: linear-gradient(145deg, #f9fcff, #dbe9f4);
+  border: 1px solid rgba(158, 195, 218, 0.8);
+  border-radius: 10px;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(8px) scale(0.94);
+  transition: opacity 300ms ease, transform 360ms cubic-bezier(0.2, 0.75, 0.2, 1), visibility 0ms linear 360ms;
+}
+
+.lottery-envelope-result > span {
+  display: grid;
+  gap: 5px;
+  text-align: center;
+}
+
+.lottery-envelope-result strong {
+  max-width: 100%;
+  font-size: 12px;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.lottery-envelope-result small {
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.lottery-envelope-result.is-winner {
+  color: #fff;
+  background: linear-gradient(145deg, #278ec4, #165b95);
+  border-color: #8ad7ff;
+  box-shadow: 0 0 22px rgba(86, 186, 239, 0.42), inset 0 1px rgba(255, 255, 255, 0.3);
+}
+
+.lottery-envelope-result.is-loser {
+  color: #566e80;
+  background: linear-gradient(145deg, #edf2f6, #d8e0e7);
+}
+
+.lottery-envelope.is-opening .lottery-envelope-flap,
+.lottery-envelope.is-open .lottery-envelope-flap {
+  transform: rotateX(180deg);
+}
+
+.lottery-envelope.is-opening .lottery-envelope-seal,
+.lottery-envelope.is-open .lottery-envelope-seal {
+  opacity: 0;
+  transform: translateX(-50%) scale(0.55);
+}
+
+.lottery-envelope.is-open .lottery-envelope-paper {
+  opacity: 0;
+  transform: translateY(-5px) scale(0.94);
+}
+
+.lottery-envelope.is-open .lottery-envelope-result {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0) scale(1);
+  transition-delay: 100ms, 100ms, 0ms;
+}
+
+.lottery-envelope.is-open.is-winner {
+  border-color: #86d7ff;
+  box-shadow: 0 0 24px rgba(78, 184, 239, 0.35);
+}
+
+.lottery-envelope.is-open.is-loser {
+  border-color: #cbd7e0;
+}
+
+@media (max-width: 650px) {
+  .lottery-envelope {
+    height: 96px;
+  }
+
+  .lottery-envelope-paper {
+    grid-template-rows: auto 32px auto;
+  }
+
+  .lottery-envelope-art {
+    width: 52px;
+    height: 30px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lottery-envelope,
+  .lottery-envelope-paper,
+  .lottery-envelope-flap,
+  .lottery-envelope-seal,
+  .lottery-envelope-result {
+    transition-duration: 1ms;
+    transition-delay: 0ms;
+  }
+}

@@ -840,6 +840,7 @@ let round = 1;
 let r1Started = false;
 let r1NominationOrder = [];
 let r1NominationIndex = 0;
+let r1NominationAttempt = 1;
 let r1Nominations = [];
 let r1Queue = [];
 let waiverOrder = teamNames.slice().reverse();
@@ -889,14 +890,12 @@ fillFilter("generationFilter", idols.map(idol => idol.generation));
 fillFilter("nationalityFilter", idols.map(idol => idol.nationality));
 fillFilter("agencyFilter", idols.map(idol => idol.agency));
 fillFilter("groupFilter", idols.map(idol => idol.group));
-fillFilter("activityFilter", idols.map(idol => idol.activity));
 
 const dependentFilters = [
   { id: "generationFilter", field: "generation" },
   { id: "nationalityFilter", field: "nationality" },
   { id: "agencyFilter", field: "agency" },
-  { id: "groupFilter", field: "group" },
-  { id: "activityFilter", field: "activity" }
+  { id: "groupFilter", field: "group" }
 ];
 
 function getCandidates(ignoreFilter = "") {
@@ -905,7 +904,6 @@ function getCandidates(ignoreFilter = "") {
   const nationality = ignoreFilter === "nationalityFilter" ? "" : $("nationalityFilter").value;
   const agency = ignoreFilter === "agencyFilter" ? "" : $("agencyFilter").value;
   const group = ignoreFilter === "groupFilter" ? "" : $("groupFilter").value;
-  const activity = ignoreFilter === "activityFilter" ? "" : $("activityFilter").value;
   const hideDrafted = $("hideDrafted").checked;
 
   return idols.filter(idol => {
@@ -917,7 +915,6 @@ function getCandidates(ignoreFilter = "") {
       (!nationality || idol.nationality === nationality) &&
       (!agency || idol.agency === agency) &&
       (!group || idol.group === group) &&
-      (!activity || idol.activity === activity) &&
       (!hideDrafted || !drafted.has(idol.id)) &&
       ($("showExcluded").checked || !excluded.has(idol.id));
   });
@@ -1053,7 +1050,7 @@ $("searchInput").addEventListener("input", renderCandidates);
 
 $("resetFilters").addEventListener("click", () => {
   $("searchInput").value = "";
-  ["generationFilter", "nationalityFilter", "agencyFilter", "groupFilter", "activityFilter"].forEach(id => {
+  ["generationFilter", "nationalityFilter", "agencyFilter", "groupFilter"].forEach(id => {
     $(id).value = "";
   });
   $("hideDrafted").checked = true;
@@ -1067,7 +1064,6 @@ $("resetFilters").addEventListener("click", () => {
   "nationalityFilter",
   "agencyFilter",
   "groupFilter",
-  "activityFilter",
   "hideDrafted",
   "showExcluded"
 ].forEach(id => $(id).addEventListener("change", renderCandidates));
@@ -1107,7 +1103,6 @@ $("savePreset").addEventListener("click", () => {
     nationality: $("nationalityFilter").value,
     agency: $("agencyFilter").value,
     group: $("groupFilter").value,
-    activity: $("activityFilter").value,
     hideDrafted: $("hideDrafted").checked
   };
   localStorage.setItem("stagePickPresets", JSON.stringify(savedPresets));
@@ -1123,13 +1118,11 @@ $("presetSelect").addEventListener("change", () => {
   fillFilter("nationalityFilter", idols.map(idol => idol.nationality));
   fillFilter("agencyFilter", idols.map(idol => idol.agency));
   fillFilter("groupFilter", idols.map(idol => idol.group));
-  fillFilter("activityFilter", idols.map(idol => idol.activity));
   $("searchInput").value = preset.query || "";
   $("generationFilter").value = preset.generation || "";
   $("nationalityFilter").value = preset.nationality || "";
   $("agencyFilter").value = preset.agency || "";
   $("groupFilter").value = preset.group || "";
-  $("activityFilter").value = preset.activity || "";
   $("hideDrafted").checked = preset.hideDrafted !== false;
   renderCandidates();
 });
@@ -1145,14 +1138,17 @@ function renderNominations() {
     const idol = nomination && idols.find(item => item.id === nomination.id);
     const firstPick = (picks[team] || []).find(item => item.round === 1);
     const isCurrent = team === currentTeamName();
+    const attemptLabel = r1NominationAttempt === 1
+      ? "初回指名"
+      : `${r1NominationAttempt}回目の再指名`;
     const status = firstPick
       ? `1巡目確定：${escapeHTML(firstPick.name)}`
       : idol
         ? `抽選待ち：${escapeHTML(idol.japaneseName)}`
       : isCurrent
-        ? (aiTeams.has(team) ? "AIが再指名中" : "候補を選ぶ番です")
+        ? (aiTeams.has(team) ? `AIが${attemptLabel}中` : `${attemptLabel}する番です`)
         : r1NominationOrder.includes(team)
-          ? "順番待ち"
+          ? `指名順待ち（${attemptLabel}）`
           : "次の再指名待ち";
     return `
       <div class="nomination-row ${isCurrent ? "is-current" : ""} ${firstPick ? "is-resolved" : ""}">
@@ -1203,7 +1199,7 @@ function updateModeSetup() {
     : `同じ画面の${$("localTeamCount").value}チーム`;
   $("modeDescription").textContent =
     `${teams}で、各チーム${$("pickLimit").value}人を指名します。` +
-    "1巡目は重複指名を何度でも抽選し、全チームが1人決まるまで再指名します。2巡目以降は設定した順番で進みます。";
+    "1巡目は指名が重なったら抽選し、外れたチームは当たるまで再指名します。再指名同士が重なった場合も抽選します。2巡目以降は設定した順番で進みます。";
 }
 
 function startGame(mode, aiCount = 3) {
@@ -1224,13 +1220,14 @@ function startGame(mode, aiCount = 3) {
   r1Started = false;
   r1NominationOrder = teamNames.slice();
   r1NominationIndex = 0;
+  r1NominationAttempt = 1;
   r1Nominations = [];
   r1Queue = [];
   waiverOrder = teamNames.slice();
   if (orderMode === "random") waiverOrder = shuffle(waiverOrder);
   turnIndex = 0;
   lotterySummary = "";
-  $("selectedMember").textContent = "1巡目は同じメンバーを複数チームが選べます。抽選で負けたチームは再指名します。";
+   $("selectedMember").textContent = "1巡目は指名が重なっても大丈夫。抽選に外れたチームは、当たるまで再指名できます。";
   $("randomResult").hidden = true;
   renderNominations();
   renderCandidates();
@@ -1314,24 +1311,137 @@ function queuePickReveal(team, idol, pickRound, type = "pick", extra = {}) {
 function renderLotteryTickets(reveal) {
   const winner = reveal.winner;
   $("lotteryTickets").innerHTML = reveal.teams.map((team, index) => {
+    const teamKey = escapeHTML(team);
     const escapedTeam = escapeHTML(displayTeamName(team));
     const result = team === winner ? "交渉権獲得" : "再指名へ";
     const outcomeClass = team === winner ? "is-winner" : "is-loser";
+    const disabled = "disabled";
+    const openHint = aiTeams.has(team) ? "AIが開封します" : "選んで開封";
     return `
-      <div class="lottery-ticket ${outcomeClass}" style="--ticket-delay:${index * 90}ms">
-        <div class="lottery-ticket-inner">
-          <span class="lottery-ticket-face lottery-ticket-cover">
-            <strong>${escapedTeam}</strong>
-            <small>抽選中</small>
+      <button class="lottery-envelope" type="button" data-lottery-team="${teamKey}"
+        aria-label="${escapedTeam}の抽選封筒を開く" ${disabled} style="--ticket-delay:${index * 90}ms">
+        <span class="lottery-envelope-paper">
+          <strong class="lottery-envelope-team">${escapedTeam}</strong>
+          <span class="lottery-envelope-art" aria-hidden="true">
+            <span class="lottery-envelope-letter">✦</span>
+            <span class="lottery-envelope-flap"></span>
+            <span class="lottery-envelope-seal">OPEN</span>
           </span>
-          <span class="lottery-ticket-face lottery-ticket-result ${outcomeClass}">
+          <small class="lottery-envelope-hint">${openHint}</small>
+        </span>
+        <span class="lottery-envelope-result ${outcomeClass}" aria-hidden="true">
+          <span>
             <strong>${escapedTeam}</strong>
             <small>${result}</small>
           </span>
-        </div>
-      </div>
+        </span>
+      </button>
     `;
   }).join("");
+}
+
+function updateLotteryProgress() {
+  if (!activePickReveal || activePickReveal.type !== "lottery") return;
+  const opened = activePickReveal.opened.size;
+  const total = activePickReveal.teams.length;
+  if (opened >= total) {
+    $("lotteryBoard").classList.add("is-revealed");
+    $("lotteryOutcome").textContent = `${displayTeamName(activePickReveal.winner)}が交渉権を獲得！`;
+    $("pickRevealNext").disabled = false;
+    $("pickRevealNext").textContent = pickRevealQueue.length
+      ? "次の指名へ"
+      : "ドラフト画面へ";
+    $("pickRevealSkip").textContent = "次へ";
+    return;
+  }
+
+  $("lotteryOutcome").textContent = `開封 ${opened} / ${total}通。残りの封筒を開けてね。`;
+}
+
+function scheduleAINextLotteryEnvelope() {
+  if (!activePickReveal || activePickReveal.type !== "lottery") return;
+  const team = activePickReveal.teams.find(candidate =>
+    aiTeams.has(candidate) && !activePickReveal.opened.has(candidate)
+  );
+  if (!team) return;
+
+  pickRevealTimer = window.setTimeout(() => {
+    pickRevealTimer = null;
+    openLotteryEnvelope(team, true);
+  }, 650);
+}
+
+function openLotteryEnvelope(team, automatic = false) {
+  const reveal = activePickReveal;
+  if (!reveal || reveal.type !== "lottery" || reveal.opened.has(team)) return;
+  if (aiTeams.has(team) !== automatic) return;
+  if (reveal.opening) return;
+
+  if (!automatic && pickRevealTimer !== null) {
+    clearTimeout(pickRevealTimer);
+    pickRevealTimer = null;
+  }
+
+  const button = [...$("lotteryTickets").querySelectorAll("[data-lottery-team]")]
+    .find(item => item.dataset.lotteryTeam === team);
+  if (!button) return;
+  reveal.opening = true;
+  $("lotteryTickets").querySelectorAll("[data-lottery-team]").forEach(item => {
+    item.disabled = true;
+  });
+  button.classList.add("is-opening");
+  button.classList.add(team === reveal.winner ? "is-winner" : "is-loser");
+  reveal.opened.add(team);
+  button.setAttribute("aria-label", team === reveal.winner
+    ? `${displayTeamName(team)}、交渉権を獲得`
+    : `${displayTeamName(team)}、再指名へ`);
+
+  const openDelay = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 520;
+  pickRevealTimer = window.setTimeout(() => {
+    pickRevealTimer = null;
+    if (activePickReveal !== reveal) return;
+    reveal.opening = false;
+    button.classList.remove("is-opening");
+    button.classList.add("is-open");
+    $("lotteryTickets").querySelectorAll("[data-lottery-team]").forEach(item => {
+      item.disabled = aiTeams.has(item.dataset.lotteryTeam) || reveal.opened.has(item.dataset.lotteryTeam);
+    });
+    updateLotteryProgress();
+    scheduleAINextLotteryEnvelope();
+  }, openDelay);
+}
+
+function skipCurrentPickReveal() {
+  if (activePickReveal?.type !== "lottery") {
+    showNextPickReveal();
+    return;
+  }
+  if (activePickReveal.opened.size >= activePickReveal.teams.length) {
+    showNextPickReveal();
+    return;
+  }
+
+  if (pickRevealTimer !== null) {
+    clearTimeout(pickRevealTimer);
+    pickRevealTimer = null;
+  }
+  if (pickRevealPhase === "intro") {
+    pickRevealPhase = "revealed";
+    $("pickRevealFlipCard").classList.add("is-flipped");
+  }
+  activePickReveal.opening = false;
+  activePickReveal.teams.forEach(team => {
+    activePickReveal.opened.add(team);
+    const button = [...$("lotteryTickets").querySelectorAll("[data-lottery-team]")]
+      .find(item => item.dataset.lotteryTeam === team);
+    if (button) {
+      button.disabled = true;
+      button.classList.remove("is-opening");
+      button.classList.add(team === activePickReveal.winner ? "is-winner" : "is-loser");
+      button.classList.add("is-open");
+    }
+  });
+  updateLotteryProgress();
 }
 
 function showNextPickReveal() {
@@ -1350,6 +1460,10 @@ function showNextPickReveal() {
 
   activePickReveal = reveal;
   const isLottery = reveal.type === "lottery";
+  if (isLottery) {
+    reveal.opened = new Set();
+    reveal.opening = false;
+  }
   const revealColors = [
     "#b3262e", "#2451b2", "#171b24", "#118247", "#1c4fa3", "#bd2930",
     "#67409b", "#a7480b", "#087481", "#c02f6f", "#4e5c70"
@@ -1375,9 +1489,10 @@ function showNextPickReveal() {
   $("pickRevealAgency").textContent = "所属事務所：" + (reveal.idol.agency || "未確認");
   $("pickRevealGroup").textContent = "グループ：" + reveal.idol.group;
   $("lotteryBoard").hidden = !isLottery;
+  $("pickRevealNext").disabled = false;
   if (isLottery) {
     renderLotteryTickets(reveal);
-    $("lotteryOutcome").textContent = "抽選中…";
+    $("lotteryOutcome").textContent = "チームの封筒を選んで開けてね。";
   } else {
     $("lotteryTickets").innerHTML = "";
   }
@@ -1408,18 +1523,21 @@ function revealPickCard() {
   pickRevealPhase = "revealed";
   $("pickRevealFlipCard").classList.add("is-flipped");
   if (activePickReveal?.type === "lottery") {
-    const winner = activePickReveal.winner;
-    $("lotteryBoard").classList.add("is-revealed");
-    $("lotteryTickets").querySelectorAll(".lottery-ticket").forEach(ticket => {
-      ticket.classList.add("is-revealed");
+    const total = activePickReveal.teams.length;
+    $("lotteryTickets").querySelectorAll("[data-lottery-team]").forEach(button => {
+      button.disabled = aiTeams.has(button.dataset.lotteryTeam);
     });
-    $("lotteryOutcome").textContent = `${displayTeamName(winner)}が交渉権を獲得！`;
+    $("lotteryOutcome").textContent = `開封 0 / ${total}通。各チームの封筒を開けてね。`;
+    $("pickRevealNext").disabled = true;
+    $("pickRevealNext").textContent = "封筒をすべて開けてね";
+    $("pickRevealSkip").textContent = "結果を表示";
+    scheduleAINextLotteryEnvelope();
+    return;
   }
-  $("pickRevealNext").textContent = activePickReveal?.type === "lottery"
-    ? (pickRevealQueue.length ? "次の指名へ" : "ドラフト画面へ")
-    : pickRevealQueue.length
-      ? "次の指名へ（あと" + pickRevealQueue.length + "件）"
-      : "ドラフト画面へ";
+  $("pickRevealNext").disabled = false;
+  $("pickRevealNext").textContent = pickRevealQueue.length
+    ? "次の指名へ（あと" + pickRevealQueue.length + "件）"
+    : "ドラフト画面へ";
   $("pickRevealSkip").textContent = "スキップ";
 
   const revealDelay = window.matchMedia("(prefers-reduced-motion: reduce)").matches
@@ -1430,11 +1548,18 @@ function revealPickCard() {
 
 function advancePickReveal() {
   if (pickRevealPhase === "intro") revealPickCard();
-  else if (pickRevealPhase === "revealed") showNextPickReveal();
+  else if (pickRevealPhase === "revealed" && (
+    activePickReveal?.type !== "lottery" ||
+    activePickReveal.opened.size >= activePickReveal.teams.length
+  )) showNextPickReveal();
 }
 
 $("pickRevealNext").addEventListener("click", advancePickReveal);
-$("pickRevealSkip").addEventListener("click", showNextPickReveal);
+$("pickRevealSkip").addEventListener("click", skipCurrentPickReveal);
+$("lotteryTickets").addEventListener("click", event => {
+  const button = event.target.closest("button[data-lottery-team]");
+  if (button) openLotteryEnvelope(button.dataset.lotteryTeam);
+});
 function nextRoundOrder() {
   if (orderMode === "snake") return waiverOrder.slice().reverse();
   if (orderMode === "random") return shuffle(teamNames);
@@ -1545,6 +1670,7 @@ function resolveFirstRound() {
   winningPicks.forEach(({ team, idol }) => queuePickReveal(team, idol, 1));
 
   r1NominationOrder = batchOrder.filter(team => waiting.has(team));
+  if (r1NominationOrder.length > 0) r1NominationAttempt += 1;
   r1NominationIndex = 0;
   r1Nominations = [];
   selectedId = null;
@@ -1573,10 +1699,10 @@ function renderDraft() {
     $("selectedMember").textContent = "開始後は候補カードをクリックすると、そのまま指名が決まるよ。";
   } else if (!r1Started) {
     const secured = teamNames.filter(team => (picks[team] || []).some(item => item.round === 1)).length;
-    const currentStage = r1NominationOrder.length < teamNames.length ? "再指名" : "候補指名";
+    const currentStage = r1NominationAttempt === 1 ? "初回指名" : `${r1NominationAttempt}回目の再指名`;
     $("draftHint").textContent =
-      `${displayTeamName(currentTeam)}の${currentStage}番です。1巡目は同じメンバーに何チームでも重複指名でき、抽選に外れたチームは次の抽選へ進みます。`;
-    $("selectedMember").textContent = secured + " / " + teamNames.length + "チームの1巡目指名が確定。重複した候補は抽選します。";
+      `${displayTeamName(currentTeam)}の${currentStage}番です。外れたチームだけが再指名し、再指名同士も同じメンバーに重なれば抽選します。全チームの1巡目が決まるまで繰り返します。`;
+    $("selectedMember").textContent = `${secured} / ${teamNames.length}チームの1巡目指名が確定。現在は${currentStage}です。`;
   } else if (!currentTeam) {
     $("draftHint").textContent = "全チームの指名が完了しました。";
     $("selectedMember").textContent = "ドラフト終了！設定を変えて、もう一度遊べるよ。";
