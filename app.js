@@ -697,8 +697,11 @@ const idols = groups.flatMap(group =>
 );
 
 const $ = id => document.getElementById(id);
-const localTeamNames = ["チームA", "チームB", "チームC", "チームD"];
-let teamNames = localTeamNames.slice();
+const localTeamNames = [
+  "チームA", "チームB", "チームC", "チームD", "チームE",
+  "チームF", "チームG", "チームH", "チームI", "チームJ"
+];
+let teamNames = localTeamNames.slice(0, 4);
 let activeMode = "local";
 let aiTeams = new Set();
 
@@ -812,20 +815,25 @@ function renderCandidates() {
 
   $("candidateList").innerHTML = list.map(idol => {
     const isExcluded = excluded.has(idol.id);
-    const isSelected = selectedId === idol.id;
+    const targetTeam = $("nominationTarget")?.value;
+    const nominationIndex = teamNames.indexOf(targetTeam);
+    const nominatedId = !r1Started && nominationIndex >= 0
+      ? $(`nomination-${nominationIndex}`)?.value
+      : "";
+    const isSelected = selectedId === idol.id || nominatedId === idol.id;
     return `
       <article class="candidate-card ${isSelected ? "is-selected" : ""} ${isExcluded ? "is-excluded" : ""}">
-        <p class="candidate-name">${escapeHTML(idol.japaneseName)}</p>
-        <p class="candidate-group">${escapeHTML(idol.group)}</p>
-        <div class="tags">
-          <span class="tag">${escapeHTML(idol.generation)}</span>
-          <span class="tag">${escapeHTML(idol.nationality)}</span>
-          <span class="tag">${escapeHTML(idol.activity)}</span>
-        </div>
+        <button class="candidate-select" type="button" data-action="select" data-id="${idol.id}" aria-pressed="${isSelected}">
+          <span class="candidate-name">${escapeHTML(idol.japaneseName)}</span>
+          <span class="candidate-group">${escapeHTML(idol.group)}</span>
+          <span class="tags">
+            <span class="tag">${escapeHTML(idol.generation)}</span>
+            <span class="tag">${escapeHTML(idol.nationality)}</span>
+            <span class="tag">${escapeHTML(idol.activity)}</span>
+          </span>
+          <span class="candidate-select-hint">${isSelected ? "✓ 選択中" : "このメンバーを選ぶ"}</span>
+        </button>
         <div class="card-actions">
-          <button type="button" data-action="select" data-id="${idol.id}">
-            ${isSelected ? "選択中" : "指名候補にする"}
-          </button>
           <button type="button" data-action="exclude" data-id="${idol.id}">
             ${isExcluded ? "除外を戻す" : "除外"}
           </button>
@@ -836,11 +844,26 @@ function renderCandidates() {
 }
 
 function selectMember(id) {
+  const targetTeam = $("nominationTarget")?.value;
+  const nominationIndex = teamNames.indexOf(targetTeam);
+  if (!r1Started && nominationIndex >= 0 && !aiTeams.has(targetTeam)) {
+    const nominationSelect = $(`nomination-${nominationIndex}`);
+    if (nominationSelect) {
+      nominationSelect.value = id;
+      const nominee = idols.find(item => item.id === id);
+      $("selectedMember").textContent = nominee
+        ? `${nominee.japaneseName}（${nominee.group}）を${displayTeamName(targetTeam)}の1巡目候補に設定`
+        : "候補を選び直してね。";
+      renderCandidates();
+      return;
+    }
+  }
+
   selectedId = id;
   const idol = idols.find(item => item.id === id);
   $("selectedMember").textContent = idol
     ? `${idol.japaneseName}（${idol.group}）を選択中`
-    : "候補一覧からメンバーを選んでね。";
+    : "候補カードをクリックしてメンバーを選んでね。";
   renderCandidates();
 }
 
@@ -858,6 +881,9 @@ $("candidateList").addEventListener("click", event => {
     renderCandidates();
   }
 });
+
+$("nominationTarget").addEventListener("change", renderCandidates);
+$("nominationList").addEventListener("change", renderCandidates);
 
 [
   "searchInput",
@@ -946,16 +972,29 @@ function renderNominations() {
       </label>
     `
   ).join("");
+
+  const humanTeams = teamNames.filter(team => !aiTeams.has(team));
+  const previousTarget = $("nominationTarget").value;
+  $("nominationTarget").innerHTML = humanTeams.map(team =>
+    `<option value="${escapeHTML(team)}">${escapeHTML(displayTeamName(team))}</option>`
+  ).join("");
+  $("nominationTarget").value = humanTeams.includes(previousTarget)
+    ? previousTarget
+    : (humanTeams[0] || "");
+  $("nominationPicker").hidden = humanTeams.length === 0 || r1Started;
 }
 
 function updateModeSetup() {
   const mode = $("playMode").value;
   const aiMode = mode === "ai";
   $("aiCountWrap").hidden = !aiMode;
-  $("startGame").textContent = aiMode ? "AI対戦を始める" : "4チームで始める";
+  $("localTeamCountWrap").hidden = aiMode;
+  $("startGame").textContent = aiMode
+    ? "AI対戦を始める"
+    : `${$("localTeamCount").value}チームで始める`;
   const teams = aiMode
     ? `あなたとAI${$("aiCount").value}人の合計${Number($("aiCount").value) + 1}チーム`
-    : "同じ画面の4チーム";
+    : `同じ画面の${$("localTeamCount").value}チーム`;
   $("modeDescription").textContent =
     `${teams}で、各チーム${$("pickLimit").value}人を指名します。` +
     "1巡目の重複は抽選し、以降は選んだ順番で進みます。AIはチームごとの方針で候補を評価します。";
@@ -967,7 +1006,7 @@ function startGame(mode, aiCount = 3) {
   orderMode = $("orderMode").value;
   teamNames = mode === "ai"
     ? ["あなた", ...Array.from({ length: aiCount }, (_, index) => `AI${index + 1}`)]
-    : localTeamNames.slice();
+    : localTeamNames.slice(0, Number($("localTeamCount").value));
   aiTeams = new Set(mode === "ai" ? teamNames.slice(1) : []);
   drafted = new Set();
   selectedId = null;
@@ -989,6 +1028,7 @@ function startGame(mode, aiCount = 3) {
 
 $("playMode").addEventListener("change", updateModeSetup);
 $("aiCount").addEventListener("change", updateModeSetup);
+$("localTeamCount").addEventListener("change", updateModeSetup);
 $("pickLimit").addEventListener("change", updateModeSetup);
 $("orderMode").addEventListener("change", updateModeSetup);
 $("startGame").addEventListener("click", () => {
@@ -1142,6 +1182,7 @@ $("resolveFirstRound").addEventListener("click", () => {
 
   r1Queue = [...waiting];
   r1Started = true;
+  selectedId = null;
   lotterySummary = results.length ? results.join("、") : "重複なし";
 
   if (r1Queue.length === 0) enterSecondRound();
@@ -1209,7 +1250,8 @@ function renderDraft() {
   $("resolveFirstRound").textContent = r1Started
     ? "1巡目の抽選は完了"
     : "1巡目の重複抽選をする";
-  $("pickSelected").disabled = !currentTeam || (activeMode === "ai" && aiTeams.has(currentTeam));
+  $("nominationPicker").hidden = !teamNames.length || r1Started || !teamNames.some(team => !aiTeams.has(team));
+  $("pickSelected").disabled = !r1Started || !currentTeam || (activeMode === "ai" && aiTeams.has(currentTeam));
   if (currentTeam && activeMode === "ai" && aiTeams.has(currentTeam)) {
     $("selectedMember").textContent = "AIが指名しています…";
   } else if (!selectedId) {

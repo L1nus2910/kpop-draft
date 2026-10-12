@@ -58,6 +58,16 @@
             <option value="9">9人</option><option value="10">10人</option>
           </select>
         </label>
+        <label id="localTeamCountWrap">
+          <span>チーム数（同じ画面で遊ぶ）</span>
+          <select id="localTeamCount">
+            <option value="1">1チーム</option><option value="2">2チーム</option>
+            <option value="3">3チーム</option><option value="4" selected>4チーム</option>
+            <option value="5">5チーム</option><option value="6">6チーム</option>
+            <option value="7">7チーム</option><option value="8">8チーム</option>
+            <option value="9">9チーム</option><option value="10">10チーム</option>
+          </select>
+        </label>
         <label>
           <span>各チームの指名人数</span>
           <select id="pickLimit">
@@ -140,6 +150,12 @@
           <select id="presetSelect" aria-label="保存した条件">
             <option value="">保存した条件を選ぶ</option>
           </select>
+        </div>
+
+        <div class="nomination-picker" id="nominationPicker" hidden>
+          <label for="nominationTarget">クリックしたメンバーを1巡目候補にするチーム</label>
+          <select id="nominationTarget"></select>
+          <span>候補を絞ったら、メンバーのカードをクリックしてね。</span>
         </div>
 
         <div class="random-result" id="randomResult" hidden></div>

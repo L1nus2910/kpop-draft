@@ -449,13 +449,37 @@ select {
   background: #f7f5f7;
 }
 
+.candidate-select {
+  display: block;
+  width: 100%;
+  padding: 0;
+  color: inherit;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
+  font: inherit;
+}
+
+.candidate-select:hover .candidate-name {
+  color: var(--pink-dark);
+}
+
+.candidate-select:focus-visible {
+  outline: 3px solid rgba(237, 108, 155, 0.35);
+  outline-offset: 5px;
+}
+
 .candidate-name {
+  display: block;
   margin: 0;
   font-size: 16px;
   font-weight: 900;
 }
 
 .candidate-group {
+  display: block;
   margin: 4px 0 10px;
   color: var(--muted);
   font-size: 11px;
@@ -474,6 +498,50 @@ select {
   border-radius: 999px;
   font-size: 10px;
   font-weight: 700;
+}
+
+.candidate-select-hint {
+  display: inline-block;
+  margin-top: 11px;
+  color: var(--pink-dark);
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.candidate-card.is-selected .candidate-select-hint {
+  color: #28785b;
+}
+
+.nomination-picker {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  margin: 0 0 16px;
+  padding: 12px;
+  color: var(--ink);
+  background: #fff7fa;
+  border: 1px solid #f1dbe4;
+  border-radius: 12px;
+  font-size: 11px;
+}
+
+.nomination-picker label {
+  font-weight: 800;
+}
+
+.nomination-picker select {
+  min-height: 34px;
+  padding: 6px 10px;
+  color: var(--ink);
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  font: inherit;
+}
+
+.nomination-picker span {
+  color: var(--muted);
 }
 
 .card-actions {
