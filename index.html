@@ -152,12 +152,6 @@
           </select>
         </div>
 
-        <div class="nomination-picker" id="nominationPicker" hidden>
-          <label for="nominationTarget">クリックしたメンバーを1巡目候補にするチーム</label>
-          <select id="nominationTarget"></select>
-          <span>候補を絞ったら、メンバーのカードをクリックしてね。</span>
-        </div>
-
         <div class="random-result" id="randomResult" hidden></div>
         <div class="candidate-list" id="candidateList"></div>
       </section>
@@ -171,22 +165,14 @@
           <span class="round-pill" id="roundStatus">1巡目</span>
         </div>
 
-        <p class="draft-hint" id="draftHint">
-          1巡目は各チームが候補を選び、重複した場合は抽選します。
-        </p>
+        <p class="draft-hint" id="draftHint">設定を選んで「ドラフトを始める」を押してね。</p>
 
         <div class="nomination-list" id="nominationList"></div>
-        <button class="button button-primary full-button" id="resolveFirstRound" type="button">
-          1巡目の重複抽選をする
-        </button>
 
         <div class="turn-card">
           <span>次の指名チーム</span>
-          <strong id="currentTeam">抽選前</strong>
-          <p id="selectedMember">候補一覧からメンバーを選んでね。</p>
-          <button class="button button-primary full-button" id="pickSelected" type="button">
-            このメンバーを指名
-          </button>
+          <strong id="currentTeam">未開始</strong>
+          <p id="selectedMember">開始後は候補カードをクリックすると指名が決まるよ。</p>
         </div>
 
         <div class="draft-board">

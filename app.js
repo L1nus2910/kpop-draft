@@ -727,10 +727,14 @@ function escapeHTML(value) {
 let excluded = new Set(readSaved("stagePickExcluded", []));
 let savedPresets = readSaved("stagePickPresets", {});
 let selectedId = null;
+let gameStarted = false;
 let drafted = new Set();
 let picks = Object.fromEntries(teamNames.map(team => [team, []]));
 let round = 1;
 let r1Started = false;
+let r1NominationOrder = [];
+let r1NominationIndex = 0;
+let r1Nominations = [];
 let r1Queue = [];
 let waiverOrder = teamNames.slice().reverse();
 let turnIndex = 0;
@@ -779,12 +783,19 @@ fillFilter("nationalityFilter", idols.map(idol => idol.nationality));
 fillFilter("groupFilter", idols.map(idol => idol.group));
 fillFilter("activityFilter", idols.map(idol => idol.activity));
 
-function getCandidates() {
+const dependentFilters = [
+  { id: "generationFilter", field: "generation" },
+  { id: "nationalityFilter", field: "nationality" },
+  { id: "groupFilter", field: "group" },
+  { id: "activityFilter", field: "activity" }
+];
+
+function getCandidates(ignoreFilter = "") {
   const query = $("searchInput").value.trim().toLowerCase();
-  const generation = $("generationFilter").value;
-  const nationality = $("nationalityFilter").value;
-  const group = $("groupFilter").value;
-  const activity = $("activityFilter").value;
+  const generation = ignoreFilter === "generationFilter" ? "" : $("generationFilter").value;
+  const nationality = ignoreFilter === "nationalityFilter" ? "" : $("nationalityFilter").value;
+  const group = ignoreFilter === "groupFilter" ? "" : $("groupFilter").value;
+  const activity = ignoreFilter === "activityFilter" ? "" : $("activityFilter").value;
   const hideDrafted = $("hideDrafted").checked;
 
   return idols.filter(idol => {
@@ -801,7 +812,32 @@ function getCandidates() {
   });
 }
 
+function updateDependentFilters() {
+  for (let pass = 0; pass < dependentFilters.length; pass += 1) {
+    let changed = false;
+    dependentFilters.forEach(filter => {
+      const select = $(filter.id);
+      const current = select.value;
+      const values = [...new Set(getCandidates(filter.id).map(idol => idol[filter.field]))]
+        .sort((a, b) => a.localeCompare(b));
+
+      select.innerHTML = '<option value="">すべて</option>' + values.map(value =>
+        `<option value="${escapeHTML(value)}">${escapeHTML(value)}</option>`
+      ).join("");
+
+      if (values.includes(current)) {
+        select.value = current;
+      } else if (current) {
+        select.value = "";
+        changed = true;
+      }
+    });
+    if (!changed) break;
+  }
+}
+
 function renderCandidates() {
+  updateDependentFilters();
   const list = getCandidates();
   $("candidateCount").textContent = list.length;
   $("rosterTotal").textContent = idols.length;
@@ -815,15 +851,21 @@ function renderCandidates() {
 
   $("candidateList").innerHTML = list.map(idol => {
     const isExcluded = excluded.has(idol.id);
-    const targetTeam = $("nominationTarget")?.value;
-    const nominationIndex = teamNames.indexOf(targetTeam);
-    const nominatedId = !r1Started && nominationIndex >= 0
-      ? $(`nomination-${nominationIndex}`)?.value
-      : "";
-    const isSelected = selectedId === idol.id || nominatedId === idol.id;
+    const isNominated = !r1Started && r1Nominations.some(item => item.id === idol.id);
+    const isUnavailable = isExcluded || drafted.has(idol.id);
+    const isSelected = selectedId === idol.id || isNominated;
+    const selectHint = isUnavailable
+      ? (isExcluded ? "除外中" : "指名済み")
+      : isNominated
+        ? "✓ 1巡目候補に設定済み"
+        : selectedId === idol.id && !gameStarted
+          ? "✓ 選択中"
+          : gameStarted
+            ? "クリックして指名"
+            : "クリックして選択";
     return `
       <article class="candidate-card ${isSelected ? "is-selected" : ""} ${isExcluded ? "is-excluded" : ""}">
-        <button class="candidate-select" type="button" data-action="select" data-id="${idol.id}" aria-pressed="${isSelected}">
+        <button class="candidate-select" type="button" data-action="select" data-id="${idol.id}" aria-pressed="${isSelected}" ${isUnavailable ? "disabled" : ""}>
           <span class="candidate-name">${escapeHTML(idol.japaneseName)}</span>
           <span class="candidate-group">${escapeHTML(idol.group)}</span>
           <span class="tags">
@@ -831,7 +873,7 @@ function renderCandidates() {
             <span class="tag">${escapeHTML(idol.nationality)}</span>
             <span class="tag">${escapeHTML(idol.activity)}</span>
           </span>
-          <span class="candidate-select-hint">${isSelected ? "✓ 選択中" : "このメンバーを選ぶ"}</span>
+          <span class="candidate-select-hint">${selectHint}</span>
         </button>
         <div class="card-actions">
           <button type="button" data-action="exclude" data-id="${idol.id}">
@@ -844,27 +886,41 @@ function renderCandidates() {
 }
 
 function selectMember(id) {
-  const targetTeam = $("nominationTarget")?.value;
-  const nominationIndex = teamNames.indexOf(targetTeam);
-  if (!r1Started && nominationIndex >= 0 && !aiTeams.has(targetTeam)) {
-    const nominationSelect = $(`nomination-${nominationIndex}`);
-    if (nominationSelect) {
-      nominationSelect.value = id;
-      const nominee = idols.find(item => item.id === id);
-      $("selectedMember").textContent = nominee
-        ? `${nominee.japaneseName}（${nominee.group}）を${displayTeamName(targetTeam)}の1巡目候補に設定`
-        : "候補を選び直してね。";
-      renderCandidates();
-      return;
-    }
+  const idol = idols.find(item => item.id === id);
+  if (!idol || excluded.has(id) || drafted.has(id)) return;
+
+  if (!gameStarted) {
+    selectedId = id;
+    $("selectedMember").textContent = `${idol.japaneseName}（${idol.group}）を選択中。ドラフト開始後に指名できるよ。`;
+    renderCandidates();
+    return;
   }
 
-  selectedId = id;
-  const idol = idols.find(item => item.id === id);
-  $("selectedMember").textContent = idol
-    ? `${idol.japaneseName}（${idol.group}）を選択中`
-    : "候補カードをクリックしてメンバーを選んでね。";
+  const team = currentTeamName();
+  if (!team || (activeMode === "ai" && aiTeams.has(team))) return;
+
+  selectedId = null;
+  $("randomResult").hidden = true;
+  if (!r1Started) {
+    if (team !== r1NominationOrder[r1NominationIndex]) return;
+    r1Nominations.push({ team, id: idol.id });
+    r1NominationIndex += 1;
+    if (r1NominationIndex >= r1NominationOrder.length) {
+      resolveFirstRound();
+    } else {
+      renderNominations();
+      renderDraft();
+      renderCandidates();
+    }
+    advanceAI();
+    return;
+  }
+
+  recordPick(team, idol);
+  renderNominations();
+  renderDraft();
   renderCandidates();
+  advanceAI();
 }
 
 $("candidateList").addEventListener("click", event => {
@@ -882,37 +938,29 @@ $("candidateList").addEventListener("click", event => {
   }
 });
 
-$("nominationTarget").addEventListener("change", renderCandidates);
-$("nominationList").addEventListener("change", renderCandidates);
-
+$("searchInput").addEventListener("input", renderCandidates);
 [
-  "searchInput",
   "generationFilter",
   "nationalityFilter",
   "groupFilter",
   "activityFilter",
   "hideDrafted",
   "showExcluded"
-].forEach(id => $(id).addEventListener("input", renderCandidates));
+].forEach(id => $(id).addEventListener("change", renderCandidates));
 
 $("randomButton").addEventListener("click", () => {
-  const list = getCandidates();
+  const list = getCandidates().filter(idol => !excluded.has(idol.id) && !drafted.has(idol.id));
   if (list.length === 0) {
     $("randomResult").hidden = false;
-    $("randomResult").textContent = "候補がいないので、条件を変えてみてね。";
+    $("randomResult").textContent = "選べる候補がいないので、条件を変えてみてね。";
     return;
   }
 
   const idol = list[Math.floor(Math.random() * list.length)];
+  selectMember(idol.id);
   $("randomResult").hidden = false;
   $("randomResult").innerHTML =
-    `<strong>✦ ランダム候補：</strong> ${escapeHTML(idol.japaneseName)}（${escapeHTML(idol.group)}） ` +
-    `<button class="text-button" type="button" data-random-id="${idol.id}">この人を選ぶ</button>`;
-});
-
-$("randomResult").addEventListener("click", event => {
-  const button = event.target.closest("button[data-random-id]");
-  if (button) selectMember(button.dataset.randomId);
+    `<strong>✦ ランダム選択：</strong> ${escapeHTML(idol.japaneseName)}（${escapeHTML(idol.group)}）`;
 });
 
 function refreshPresets() {
@@ -946,6 +994,10 @@ $("presetSelect").addEventListener("change", () => {
   const preset = savedPresets[$("presetSelect").value];
   if (!preset) return;
 
+  fillFilter("generationFilter", idols.map(idol => idol.generation));
+  fillFilter("nationalityFilter", idols.map(idol => idol.nationality));
+  fillFilter("groupFilter", idols.map(idol => idol.group));
+  fillFilter("activityFilter", idols.map(idol => idol.activity));
   $("searchInput").value = preset.query || "";
   $("generationFilter").value = preset.generation || "";
   $("nationalityFilter").value = preset.nationality || "";
@@ -956,32 +1008,27 @@ $("presetSelect").addEventListener("change", () => {
 });
 
 function renderNominations() {
-  const options = idols.map(idol =>
-    `<option value="${idol.id}">${escapeHTML(idol.japaneseName)} — ${escapeHTML(idol.group)}</option>`
-  ).join("");
+  if (!gameStarted || r1Started) {
+    $("nominationList").innerHTML = "";
+    return;
+  }
 
-  $("nominationList").innerHTML = teamNames.map((team, index) => aiTeams.has(team)
-    ? `<div class="nomination-row"><strong>${escapeHTML(displayTeamName(team))}</strong><span class="ai-nomination">方針に合わせて候補を評価</span></div>`
-    : `
-      <label class="nomination-row">
+  $("nominationList").innerHTML = r1NominationOrder.map(team => {
+    const nomination = r1Nominations.find(item => item.team === team);
+    const idol = nomination && idols.find(item => item.id === nomination.id);
+    const isCurrent = team === currentTeamName();
+    const status = idol
+      ? `候補：${escapeHTML(idol.japaneseName)}`
+      : isCurrent
+        ? (aiTeams.has(team) ? "AIが候補を選んでいます" : "候補を選ぶ番です")
+        : "順番待ち";
+    return `
+      <div class="nomination-row ${isCurrent ? "is-current" : ""}">
         <strong>${escapeHTML(displayTeamName(team))}</strong>
-        <select id="nomination-${index}">
-          <option value="">1巡目の候補を選ぶ</option>
-          ${options}
-        </select>
-      </label>
-    `
-  ).join("");
-
-  const humanTeams = teamNames.filter(team => !aiTeams.has(team));
-  const previousTarget = $("nominationTarget").value;
-  $("nominationTarget").innerHTML = humanTeams.map(team =>
-    `<option value="${escapeHTML(team)}">${escapeHTML(displayTeamName(team))}</option>`
-  ).join("");
-  $("nominationTarget").value = humanTeams.includes(previousTarget)
-    ? previousTarget
-    : (humanTeams[0] || "");
-  $("nominationPicker").hidden = humanTeams.length === 0 || r1Started;
+        <span>${status}</span>
+      </div>
+    `;
+  }).join("");
 }
 
 function updateModeSetup() {
@@ -989,9 +1036,7 @@ function updateModeSetup() {
   const aiMode = mode === "ai";
   $("aiCountWrap").hidden = !aiMode;
   $("localTeamCountWrap").hidden = aiMode;
-  $("startGame").textContent = aiMode
-    ? "AI対戦を始める"
-    : `${$("localTeamCount").value}チームで始める`;
+  $("startGame").textContent = "ドラフトを始める";
   const teams = aiMode
     ? `あなたとAI${$("aiCount").value}人の合計${Number($("aiCount").value) + 1}チーム`
     : `同じ画面の${$("localTeamCount").value}チーム`;
@@ -1008,22 +1053,27 @@ function startGame(mode, aiCount = 3) {
     ? ["あなた", ...Array.from({ length: aiCount }, (_, index) => `AI${index + 1}`)]
     : localTeamNames.slice(0, Number($("localTeamCount").value));
   aiTeams = new Set(mode === "ai" ? teamNames.slice(1) : []);
+  gameStarted = true;
   drafted = new Set();
   selectedId = null;
   picks = Object.fromEntries(teamNames.map(team => [team, []]));
   round = 1;
   r1Started = false;
+  r1NominationOrder = teamNames.slice();
+  r1NominationIndex = 0;
+  r1Nominations = [];
   r1Queue = [];
   waiverOrder = teamNames.slice();
   if (orderMode === "random") waiverOrder = shuffle(waiverOrder);
   turnIndex = 0;
   lotterySummary = "";
-  $("selectedMember").textContent = "候補一覧からメンバーを選んでね。";
+  $("selectedMember").textContent = "候補カードをクリックすると、そのまま1巡目候補に設定されるよ。";
   $("randomResult").hidden = true;
   renderNominations();
   renderCandidates();
-  renderDraft();
   updateModeSetup();
+  renderDraft();
+  advanceAI();
 }
 
 $("playMode").addEventListener("change", updateModeSetup);
@@ -1046,6 +1096,8 @@ function allTeamsComplete() {
 }
 
 function currentTeamName() {
+  if (!gameStarted) return null;
+  if (!r1Started) return r1NominationOrder[r1NominationIndex] || null;
   if (r1Queue.length) return r1Queue[0];
   if (allTeamsComplete()) return null;
   while (turnIndex < waiverOrder.length && teamIsComplete(waiverOrder[turnIndex])) {
@@ -1124,16 +1176,27 @@ function recordPick(team, idol) {
 }
 
 function advanceAI() {
-  if (activeMode !== "ai" || !r1Started) return;
+  if (activeMode !== "ai" || !gameStarted) return;
 
-  let safety = teamNames.length + 1;
+  let safety = teamNames.length * (pickLimit + 1) + 1;
   while (safety-- > 0) {
+    if (!r1Started) {
+      const team = r1NominationOrder[r1NominationIndex];
+      if (!team || !aiTeams.has(team)) break;
+      const idol = chooseAIIdol(team);
+      r1Nominations.push({ team, id: idol?.id || "" });
+      r1NominationIndex += 1;
+      if (r1NominationIndex >= r1NominationOrder.length) resolveFirstRound();
+      continue;
+    }
+
     const team = currentTeamName();
     if (!team || !aiTeams.has(team)) break;
     const idol = chooseAIIdol(team);
     if (!idol) break;
     recordPick(team, idol);
   }
+  renderNominations();
   renderDraft();
   renderCandidates();
 }
@@ -1145,15 +1208,13 @@ function enterSecondRound() {
   turnIndex = 0;
 }
 
-$("resolveFirstRound").addEventListener("click", () => {
-  if (r1Started) return;
+function resolveFirstRound() {
+  if (!gameStarted || r1Started || r1NominationIndex < r1NominationOrder.length) return;
 
-  const nominations = teamNames.map((team, index) => ({
-    team,
-    id: aiTeams.has(team)
-      ? (chooseAIIdol(team)?.id || "")
-      : ($(`nomination-${index}`)?.value || "")
-  }));
+  const nominations = r1NominationOrder.map(team => {
+    const id = r1Nominations.find(item => item.team === team)?.id || "";
+    return { team, id: excluded.has(id) ? "" : id };
+  });
 
   const waiting = new Set(
     nominations.filter(item => !item.id).map(item => item.team)
@@ -1186,77 +1247,53 @@ $("resolveFirstRound").addEventListener("click", () => {
   lotterySummary = results.length ? results.join("、") : "重複なし";
 
   if (r1Queue.length === 0) enterSecondRound();
+  renderNominations();
   renderDraft();
   renderCandidates();
-  advanceAI();
-});
-
-function makePick() {
-  if (!r1Started) {
-    alert("先に1巡目の重複抽選をしてね。");
-    return;
-  }
-  const team = currentTeamName();
-  if (!team) {
-    alert("全チームの指名が完了しています。");
-    return;
-  }
-  if (!selectedId) {
-    alert("候補一覧からメンバーを選んでね。");
-    return;
-  }
-  if (drafted.has(selectedId) || excluded.has(selectedId)) {
-    alert("そのメンバーは指名できません。");
-    return;
-  }
-
-  if (activeMode === "ai" && aiTeams.has(team)) {
-    alert("AIの指名中です。少し待ってね。");
-    return;
-  }
-
-  const idol = idols.find(item => item.id === selectedId);
-  recordPick(team, idol);
-  selectedId = null;
-  $("selectedMember").textContent = "候補一覧からメンバーを選んでね。";
-  renderDraft();
-  renderCandidates();
-  advanceAI();
 }
 
-$("pickSelected").addEventListener("click", makePick);
-
 function renderDraft() {
-  const currentTeam = !r1Started ? "抽選前" : currentTeamName();
+  const currentTeam = currentTeamName();
+  const finished = gameStarted && allTeamsComplete();
 
-  $("currentTeam").textContent = currentTeam ? displayTeamName(currentTeam) : "指名完了";
+  $("currentTeam").textContent = !gameStarted
+    ? "未開始"
+    : currentTeam
+      ? displayTeamName(currentTeam)
+      : "指名完了";
   $("roundStatus").textContent = `${round}巡目`;
   $("roundLabel").textContent = `${round}巡目`;
 
-  if (!r1Started) {
+  if (!gameStarted) {
+    $("draftHint").textContent = "設定を選んで「ドラフトを始める」を押してね。";
+    $("selectedMember").textContent = "開始後は候補カードをクリックすると、そのまま指名が決まるよ。";
+  } else if (!r1Started) {
     $("draftHint").textContent =
-      `1巡目に各チームが候補を選びます。重複した場合は抽選し、各チーム${pickLimit}人まで指名できます。`;
+      `${displayTeamName(currentTeam)}が1巡目候補を選ぶ番です。全チームの選択後、重複は自動で抽選します。`;
+    $("selectedMember").textContent = "候補カードをクリックすると、そのまま1巡目候補に設定されるよ。";
   } else if (r1Queue.length) {
     $("draftHint").textContent =
-      `抽選結果：${lotterySummary}。${displayTeamName(r1Queue[0])}は候補一覧から選んで指名してね。`;
+      `1巡目の抽選結果：${lotterySummary}。${displayTeamName(r1Queue[0])}の番です。カードをクリックすると指名が決まります。`;
+    $("selectedMember").textContent = "候補カードをクリックすると、そのまま指名が決まるよ。";
   } else if (!currentTeam) {
     $("draftHint").textContent = "全チームの指名が完了しました。";
+    $("selectedMember").textContent = "ドラフト終了！設定を変えて、もう一度遊べるよ。";
   } else {
     $("draftHint").textContent =
-      `2巡目以降は${orderMode === "snake" ? "前巡の逆順" : orderMode === "random" ? "毎巡くじ引き" : "チーム順固定"}です。候補一覧から選んでね。`;
+      `2巡目以降は${orderMode === "snake" ? "前巡の逆順" : orderMode === "random" ? "毎巡くじ引き" : "チーム順固定"}。${displayTeamName(currentTeam)}はカードをクリックして指名してね。`;
+    $("selectedMember").textContent = "候補カードをクリックすると、そのまま指名が決まるよ。";
   }
 
-  $("resolveFirstRound").disabled = r1Started;
-  $("resolveFirstRound").textContent = r1Started
-    ? "1巡目の抽選は完了"
-    : "1巡目の重複抽選をする";
-  $("nominationPicker").hidden = !teamNames.length || r1Started || !teamNames.some(team => !aiTeams.has(team));
-  $("pickSelected").disabled = !r1Started || !currentTeam || (activeMode === "ai" && aiTeams.has(currentTeam));
-  if (currentTeam && activeMode === "ai" && aiTeams.has(currentTeam)) {
-    $("selectedMember").textContent = "AIが指名しています…";
-  } else if (!selectedId) {
-    $("selectedMember").textContent = "候補一覧からメンバーを選んでね。";
-  }
+  const locked = gameStarted && !finished;
+  ["playMode", "aiCount", "localTeamCount", "pickLimit", "orderMode"].forEach(id => {
+    $(id).disabled = locked;
+  });
+  $("startGame").disabled = locked;
+  $("startGame").textContent = !gameStarted
+    ? (activeMode === "ai" ? "AI対戦を始める" : `${$("localTeamCount").value}チームで始める`)
+    : finished
+      ? "もう一度遊ぶ"
+      : "ドラフト進行中";
 
   $("draftBoard").innerHTML = teamNames.map(team => `
     <div class="team-row">

@@ -512,38 +512,6 @@ select {
   color: #28785b;
 }
 
-.nomination-picker {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px 12px;
-  margin: 0 0 16px;
-  padding: 12px;
-  color: var(--ink);
-  background: #fff7fa;
-  border: 1px solid #f1dbe4;
-  border-radius: 12px;
-  font-size: 11px;
-}
-
-.nomination-picker label {
-  font-weight: 800;
-}
-
-.nomination-picker select {
-  min-height: 34px;
-  padding: 6px 10px;
-  color: var(--ink);
-  background: white;
-  border: 1px solid var(--line);
-  border-radius: 9px;
-  font: inherit;
-}
-
-.nomination-picker span {
-  color: var(--muted);
-}
-
 .card-actions {
   display: flex;
   gap: 7px;
@@ -585,6 +553,18 @@ select {
   gap: 8px;
   font-size: 11px;
   font-weight: 800;
+}
+
+.nomination-row.is-current {
+  padding: 8px;
+  color: var(--pink-dark);
+  background: #fff0f5;
+  border-radius: 9px;
+}
+
+.candidate-select:disabled {
+  color: var(--muted);
+  cursor: not-allowed;
 }
 
 .nomination-row select {
