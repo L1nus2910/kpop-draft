@@ -757,7 +757,7 @@ select {
   height: 70px;
   padding: 10px;
   color: white;
-  background: linear-gradient(145deg, hsl(var(--team-hue), 68%, 49%), hsl(var(--team-hue), 64%, 36%));
+  background: var(--team-color);
   text-align: center;
 }
 
@@ -770,7 +770,7 @@ select {
 }
 
 .team-column strong {
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .team-column span {
@@ -911,36 +911,42 @@ select {
 
 .final-results-scroll {
   overflow: auto;
-  border: 1px solid var(--line);
-  border-radius: 14px;
+  border: 1px solid #d9dfe8;
+  border-radius: 10px;
   background: white;
   -webkit-overflow-scrolling: touch;
 }
 
 .final-results .draft-results-table th,
 .final-results .draft-results-table td {
-  width: 210px;
+  width: 220px;
+  border-color: #d9dfe8;
 }
 
 .final-results .draft-results-table .round-column {
-  width: 96px;
-  min-width: 96px;
-  padding: 16px 14px;
-  font-size: 14px;
+  width: 104px;
+  min-width: 104px;
+  padding: 18px 15px;
+  background: #f6f7f9;
+  font-size: 15px;
 }
 
 .final-results .draft-results-table .team-column {
-  min-width: 190px;
-  height: 82px;
+  min-width: 200px;
+  height: 92px;
 }
 
 .final-results .draft-results-table .pick-cell {
-  height: 88px;
-  padding: 12px 14px;
+  height: 96px;
+  padding: 14px 16px;
+}
+
+.final-results .draft-results-table tbody tr:nth-child(even) .pick-cell {
+  background: #f7f8fa;
 }
 
 .final-results .draft-cell-card strong {
-  font-size: 16px;
+  font-size: 18px;
 }
 
 .final-results .draft-cell-card span {
@@ -1048,11 +1054,16 @@ footer span:first-child {
 
   .final-results .draft-results-table th,
   .final-results .draft-results-table td {
-    width: 170px;
+    width: 180px;
   }
 
   .final-results .draft-results-table .team-column {
-    min-width: 170px;
+    min-width: 180px;
+    height: 82px;
+  }
+
+  .final-results .draft-results-table .pick-cell {
+    height: 82px;
   }
 
   .stat-card {

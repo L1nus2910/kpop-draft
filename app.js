@@ -1346,7 +1346,10 @@ function renderDraft() {
           : `${round}巡目を進行中です。`;
 
   const roundRows = Array.from({ length: pickLimit }, (_, index) => index + 1);
-  const teamHue = index => (330 + index * 37) % 360;
+  const teamColors = [
+    "#b3262e", "#2451b2", "#171b24", "#118247", "#1c4fa3", "#bd2930",
+    "#67409b", "#a7480b", "#087481", "#c02f6f", "#4e5c70"
+  ];
   const cellsFor = (team, pickRound) => {
     const teamPicks = picks[team] || [];
     const pick = teamPicks.find(item => item.round === pickRound);
@@ -1387,7 +1390,7 @@ function renderDraft() {
         <tr>
           <th class="round-column" scope="col">巡目</th>
           ${teamNames.map((team, index) => `
-            <th class="team-column" scope="col" style="--team-hue: ${teamHue(index)}deg">
+            <th class="team-column" scope="col" style="--team-color: ${teamColors[index % teamColors.length]}">
               <strong>${escapeHTML(displayTeamName(team))}</strong>
               <span>${picks[team].length} / ${pickLimit}人</span>
             </th>
