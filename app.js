@@ -708,6 +708,8 @@ let playerTeamNameValue = "あなた";
 let teamNames = localTeamNames.slice(0, 4);
 let activeMode = "local";
 let aiTeams = new Set();
+let pickRevealQueue = [];
+let pickRevealTimer = null;
 
 function readSaved(key, fallback) {
   try {
@@ -1191,6 +1193,50 @@ function pickRecord(idol, pickRound = round) {
   };
 }
 
+function queuePickReveal(team, idol, pickRound) {
+  pickRevealQueue.push({ team, idol, round: pickRound });
+  if ($("pickReveal").hidden) showNextPickReveal();
+}
+
+function showNextPickReveal() {
+  if (pickRevealTimer) {
+    clearTimeout(pickRevealTimer);
+    pickRevealTimer = null;
+  }
+
+  const reveal = pickRevealQueue.shift();
+  if (!reveal) {
+    $("pickReveal").hidden = true;
+    return;
+  }
+
+  const revealColors = [
+    "#b3262e", "#2451b2", "#171b24", "#118247", "#1c4fa3", "#bd2930",
+    "#67409b", "#a7480b", "#087481", "#c02f6f", "#4e5c70"
+  ];
+  const teamIndex = Math.max(0, teamNames.indexOf(reveal.team));
+  const card = $("pickRevealCard");
+  card.style.setProperty("--reveal-team-color", revealColors[teamIndex % revealColors.length]);
+  $("pickRevealRound").textContent = `${reveal.round}巡目`;
+  $("pickRevealTeam").textContent = displayTeamName(reveal.team);
+  $("pickRevealName").textContent = reveal.idol.japaneseName;
+  $("pickRevealGroup").textContent = reveal.idol.group;
+  $("pickRevealNext").textContent = pickRevealQueue.length
+    ? `次の指名へ（あと${pickRevealQueue.length}件）`
+    : "ドラフト画面へ";
+
+  $("pickReveal").hidden = false;
+  card.classList.remove("is-visible");
+  void card.offsetWidth;
+  card.classList.add("is-visible");
+  requestAnimationFrame(() => $("pickRevealNext").focus({ preventScroll: true }));
+
+  const delay = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 900 : 1700;
+  pickRevealTimer = window.setTimeout(showNextPickReveal, delay);
+}
+
+$("pickRevealNext").addEventListener("click", showNextPickReveal);
+
 function nextRoundOrder() {
   if (orderMode === "snake") return waiverOrder.reverse();
   if (orderMode === "random") return shuffle(teamNames);
@@ -1218,9 +1264,11 @@ function advanceAfterPick() {
 }
 
 function recordPick(team, idol) {
-  picks[team].push(pickRecord(idol));
+  const pickRound = round;
+  picks[team].push(pickRecord(idol, pickRound));
   drafted.add(idol.id);
   advanceAfterPick();
+  queuePickReveal(team, idol, pickRound);
 }
 
 function advanceAI() {
@@ -1282,6 +1330,7 @@ function resolveFirstRound() {
 
     picks[winner].push(pickRecord(idol, 1));
     drafted.add(id);
+    queuePickReveal(winner, idol, 1);
 
     if (teams.length > 1) {
       results.push(`${idol.japaneseName}は${winner}が当選`);

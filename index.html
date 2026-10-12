@@ -124,6 +124,7 @@
         </div>
         <span class="final-results-status">指名完了</span>
       </div>
+      <p class="table-scroll-hint">表を左右にスワイプして、すべてのチームを確認できます。</p>
       <div class="final-results-scroll" id="finalResultsBoard" role="region" aria-label="最終ドラフト結果一覧" tabindex="0"></div>
     </section>
 
@@ -203,6 +204,7 @@
             </div>
             <span class="draft-board-count" id="draftBoardCount">0人</span>
           </div>
+          <p class="table-scroll-hint">表を左右にスワイプして、すべてのチームを確認できます。</p>
           <div class="draft-table-scroll" id="draftBoard" role="region" aria-label="チームごとの巡目別指名結果" tabindex="0"></div>
         </div>
       </aside>
@@ -213,5 +215,17 @@
     <span>グループ一覧を参考に、活動中・活動休止中のグループを順次追加しています。メンバー名はカタカナでも検索できます。</span>
     </footer>
   </main>
+
+  <div class="pick-reveal" id="pickReveal" hidden role="dialog" aria-modal="true" aria-labelledby="pickRevealName" aria-describedby="pickRevealGroup">
+    <div class="pick-reveal-card" id="pickRevealCard">
+      <p class="pick-reveal-round" id="pickRevealRound">1巡目</p>
+      <p class="pick-reveal-label">指名が確定しました</p>
+      <h2 class="pick-reveal-team" id="pickRevealTeam"></h2>
+      <p class="pick-reveal-caption">が選んだメンバーは…</p>
+      <strong class="pick-reveal-name" id="pickRevealName"></strong>
+      <p class="pick-reveal-group" id="pickRevealGroup"></p>
+      <button class="pick-reveal-next" id="pickRevealNext" type="button">次の指名へ</button>
+    </div>
+  </div>
 </body>
 </html>
