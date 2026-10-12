@@ -911,6 +911,7 @@ function selectMember(id) {
   if (!r1Started) {
     if (team !== r1NominationOrder[r1NominationIndex]) return;
     r1Nominations.push({ team, id: idol.id });
+    queuePickReveal(team, idol, 1, "nomination");
     r1NominationIndex += 1;
     if (r1NominationIndex >= r1NominationOrder.length) {
       resolveFirstRound();
@@ -1218,6 +1219,9 @@ function showNextPickReveal() {
   const card = $("pickRevealCard");
   card.style.setProperty("--reveal-team-color", revealColors[teamIndex % revealColors.length]);
   $("pickRevealRound").textContent = `${reveal.round}巡目`;
+  $("pickRevealLabel").textContent = reveal.type === "nomination"
+    ? "1巡目の候補に選びました・抽選待ち"
+    : "指名が確定しました";
   $("pickRevealTeam").textContent = displayTeamName(reveal.team);
   $("pickRevealName").textContent = reveal.idol.japaneseName;
   $("pickRevealGroup").textContent = reveal.idol.group;
