@@ -85,6 +85,13 @@
             <option value="random">毎巡くじ引き</option>
           </select>
         </label>
+        <div class="team-name-settings" id="teamNameSettings">
+          <div class="team-name-heading">
+            <strong>チーム名</strong>
+            <span id="teamNameHelp">好きな名前を入力できます。</span>
+          </div>
+          <div class="team-name-inputs" id="teamNameInputs"></div>
+        </div>
         <button class="button button-primary" id="startGame" type="button">4チームで始める</button>
       </div>
     </section>
@@ -106,6 +113,18 @@
         <span>ドラフト状況</span>
         <strong id="roundLabel">1巡目</strong>
       </article>
+    </section>
+
+    <section class="final-results panel" id="finalResults" hidden aria-labelledby="finalResultsTitle">
+      <div class="final-results-heading">
+        <div>
+          <p class="eyebrow">DRAFT COMPLETE</p>
+          <h2 id="finalResultsTitle">最終ドラフト結果</h2>
+          <p id="finalResultsSummary">チームごとの指名結果です。</p>
+        </div>
+        <span class="final-results-status">指名完了</span>
+      </div>
+      <div class="final-results-scroll" id="finalResultsBoard" role="region" aria-label="最終ドラフト結果一覧" tabindex="0"></div>
     </section>
 
     <div class="workspace">
@@ -176,8 +195,14 @@
         </div>
 
         <div class="draft-board">
-          <h3>指名結果</h3>
-          <div id="draftBoard"></div>
+          <div class="draft-board-heading">
+            <div>
+              <h3>指名経過・結果</h3>
+              <p id="draftBoardSummary">巡目ごとの指名を一覧で確認できます。</p>
+            </div>
+            <span class="draft-board-count" id="draftBoardCount">0人</span>
+          </div>
+          <div class="draft-table-scroll" id="draftBoard" role="region" aria-label="チームごとの巡目別指名結果" tabindex="0"></div>
         </div>
       </aside>
     </div>

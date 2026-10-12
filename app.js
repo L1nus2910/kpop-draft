@@ -701,6 +701,8 @@ const localTeamNames = [
   "チームA", "チームB", "チームC", "チームD", "チームE",
   "チームF", "チームG", "チームH", "チームI", "チームJ"
 ];
+let localTeamNameValues = localTeamNames.slice();
+let playerTeamNameValue = "あなた";
 let teamNames = localTeamNames.slice(0, 4);
 let activeMode = "local";
 let aiTeams = new Set();
@@ -728,6 +730,7 @@ let excluded = new Set(readSaved("stagePickExcluded", []));
 let savedPresets = readSaved("stagePickPresets", {});
 let selectedId = null;
 let gameStarted = false;
+let finalResultsWasVisible = false;
 let drafted = new Set();
 let picks = Object.fromEntries(teamNames.map(team => [team, []]));
 let round = 1;
@@ -1037,6 +1040,35 @@ function updateModeSetup() {
   $("aiCountWrap").hidden = !aiMode;
   $("localTeamCountWrap").hidden = aiMode;
   $("startGame").textContent = "ドラフトを始める";
+
+  if (aiMode) {
+    $("teamNameHelp").textContent = "AIチーム名は自動で設定されます。";
+    $("teamNameInputs").innerHTML = `
+      <label class="team-name-field" for="playerTeamName">
+        <span>あなたのチーム名</span>
+        <input id="playerTeamName" type="text" maxlength="24" value="${escapeHTML(playerTeamNameValue)}" placeholder="あなた">
+      </label>
+    `;
+    $("playerTeamName").addEventListener("input", event => {
+      playerTeamNameValue = event.currentTarget.value;
+    });
+  } else {
+    const count = Number($("localTeamCount").value);
+    $("teamNameHelp").textContent = "空欄にすると初期名を使います。";
+    $("teamNameInputs").innerHTML = Array.from({ length: count }, (_, index) => `
+      <label class="team-name-field" for="localTeamName${index}">
+        <span>${index + 1}チーム目</span>
+        <input id="localTeamName${index}" data-team-name-index="${index}" type="text" maxlength="24" value="${escapeHTML(localTeamNameValues[index])}" placeholder="${escapeHTML(localTeamNames[index])}">
+      </label>
+    `).join("");
+    $("teamNameInputs").querySelectorAll("[data-team-name-index]").forEach(input => {
+      input.addEventListener("input", event => {
+        const index = Number(event.currentTarget.dataset.teamNameIndex);
+        localTeamNameValues[index] = event.currentTarget.value;
+      });
+    });
+  }
+
   const teams = aiMode
     ? `あなたとAI${$("aiCount").value}人の合計${Number($("aiCount").value) + 1}チーム`
     : `同じ画面の${$("localTeamCount").value}チーム`;
@@ -1050,8 +1082,10 @@ function startGame(mode, aiCount = 3) {
   pickLimit = Number($("pickLimit").value);
   orderMode = $("orderMode").value;
   teamNames = mode === "ai"
-    ? ["あなた", ...Array.from({ length: aiCount }, (_, index) => `AI${index + 1}`)]
-    : localTeamNames.slice(0, Number($("localTeamCount").value));
+    ? [(playerTeamNameValue.trim() || "あなた"), ...Array.from({ length: aiCount }, (_, index) => `AI${index + 1}`)]
+    : localTeamNames.slice(0, Number($("localTeamCount").value)).map((defaultName, index) =>
+        localTeamNameValues[index].trim() || defaultName
+      );
   aiTeams = new Set(mode === "ai" ? teamNames.slice(1) : []);
   gameStarted = true;
   drafted = new Set();
@@ -1288,6 +1322,9 @@ function renderDraft() {
   ["playMode", "aiCount", "localTeamCount", "pickLimit", "orderMode"].forEach(id => {
     $(id).disabled = locked;
   });
+  $("teamNameInputs").querySelectorAll("input").forEach(input => {
+    input.disabled = locked;
+  });
   $("startGame").disabled = locked;
   $("startGame").textContent = !gameStarted
     ? (activeMode === "ai" ? "AI対戦を始める" : `${$("localTeamCount").value}チームで始める`)
@@ -1295,20 +1332,98 @@ function renderDraft() {
       ? "もう一度遊ぶ"
       : "ドラフト進行中";
 
-  $("draftBoard").innerHTML = teamNames.map(team => `
-    <div class="team-row">
-      <div class="team-row-heading">
-        <strong>${escapeHTML(displayTeamName(team))}</strong>
-        <span>${picks[team].length} / ${pickLimit}人</span>
-      </div>
-      ${picks[team].length
-        ? picks[team].map(pick =>
-            `<span class="picked-person">${pick.round}巡目 · ${escapeHTML(pick.name)}</span>`
-          ).join("")
-        : '<span class="candidate-group">まだ指名していません</span>'
+  const totalPicks = teamNames.reduce((sum, team) => sum + picks[team].length, 0);
+  const totalSlots = teamNames.length * pickLimit;
+  $("draftBoardCount").textContent = `${totalPicks} / ${totalSlots}人`;
+  $("draftBoardSummary").textContent = !gameStarted
+    ? `各チーム${pickLimit}人。ドラフト開始後、巡目ごとに表示します。`
+    : finished
+      ? "全チームの指名が完了しました。"
+      : !r1Started
+        ? "1巡目の候補を選択中。全チームの選択後に重複を抽選します。"
+        : r1Queue.length
+          ? `1巡目の抽選後、${r1Queue.length}チームが再指名中です。`
+          : `${round}巡目を進行中です。`;
+
+  const roundRows = Array.from({ length: pickLimit }, (_, index) => index + 1);
+  const teamHue = index => (330 + index * 37) % 360;
+  const cellsFor = (team, pickRound) => {
+    const teamPicks = picks[team] || [];
+    const pick = teamPicks.find(item => item.round === pickRound);
+    const current = gameStarted && !finished && round === pickRound && currentTeam === team;
+
+    if (pick) {
+      return `<div class="draft-cell-card">
+        <strong>${escapeHTML(pick.name)}</strong>
+        <span>${escapeHTML(pick.group)}</span>
+      </div>`;
+    }
+
+    if (pickRound === 1 && gameStarted) {
+      const nomination = r1Nominations.find(item => item.team === team);
+      const nominee = nomination && idols.find(item => item.id === nomination.id);
+      if (!r1Started && nominee) {
+        return `<div class="draft-cell-card draft-nomination">
+          <small>候補・抽選待ち</small>
+          <strong>${escapeHTML(nominee.japaneseName)}</strong>
+          <span>${escapeHTML(nominee.group)}</span>
+        </div>`;
       }
-    </div>
-  `).join("");
+      if (r1Started && r1Queue.includes(team)) {
+        return `<div class="draft-cell-card draft-lottery-wait">
+          <small>${nominee ? "抽選後に再指名" : "候補を再選択"}</small>
+          <strong>${nominee ? escapeHTML(nominee.japaneseName) : "候補選択中"}</strong>
+          ${nominee ? `<span>${escapeHTML(nominee.group)}</span>` : ""}
+        </div>`;
+      }
+    }
+
+    return `<span class="empty-pick${current ? " is-current" : ""}">${current ? "指名中" : "—"}</span>`;
+  };
+
+  $("draftBoard").innerHTML = `
+    <table class="draft-results-table">
+      <thead>
+        <tr>
+          <th class="round-column" scope="col">巡目</th>
+          ${teamNames.map((team, index) => `
+            <th class="team-column" scope="col" style="--team-hue: ${teamHue(index)}deg">
+              <strong>${escapeHTML(displayTeamName(team))}</strong>
+              <span>${picks[team].length} / ${pickLimit}人</span>
+            </th>
+          `).join("")}
+        </tr>
+      </thead>
+      <tbody>
+        ${roundRows.map(pickRound => `
+          <tr class="${gameStarted && !finished && round === pickRound ? "is-active-round" : ""}">
+            <th class="round-column" scope="row">${pickRound}巡目</th>
+            ${teamNames.map(team => `
+              <td class="pick-cell${gameStarted && !finished && round === pickRound && currentTeam === team ? " is-current-cell" : ""}">
+                ${cellsFor(team, pickRound)}
+              </td>
+            `).join("")}
+          </tr>
+        `).join("")}
+      </tbody>
+    </table>
+  `;
+
+  const finalResults = $("finalResults");
+  const compactBoard = $("draftBoard").closest(".draft-board");
+  finalResults.hidden = !finished;
+  compactBoard.hidden = finished;
+  if (finished) {
+    $("finalResultsSummary").textContent =
+      `${teamNames.length}チームが各${pickLimit}人を指名しました（合計${totalPicks}人）。`;
+    $("finalResultsBoard").innerHTML = $("draftBoard").innerHTML;
+    if (!finalResultsWasVisible) {
+      requestAnimationFrame(() => finalResults.scrollIntoView({ behavior: "smooth", block: "start" }));
+    }
+  } else {
+    $("finalResultsBoard").innerHTML = "";
+  }
+  finalResultsWasVisible = finished;
 }
 
 renderNominations();
