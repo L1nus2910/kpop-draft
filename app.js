@@ -710,6 +710,7 @@ let activeMode = "local";
 let aiTeams = new Set();
 let pickRevealQueue = [];
 let pickRevealTimer = null;
+let pickRevealPhase = "closed";
 
 function readSaved(key, fallback) {
   try {
@@ -1194,19 +1195,20 @@ function pickRecord(idol, pickRound = round) {
   };
 }
 
-function queuePickReveal(team, idol, pickRound) {
-  pickRevealQueue.push({ team, idol, round: pickRound });
+function queuePickReveal(team, idol, pickRound, type = "pick") {
+  pickRevealQueue.push({ team, idol, round: pickRound, type });
   if ($("pickReveal").hidden) showNextPickReveal();
 }
 
 function showNextPickReveal() {
-  if (pickRevealTimer) {
+  if (pickRevealTimer !== null) {
     clearTimeout(pickRevealTimer);
     pickRevealTimer = null;
   }
 
   const reveal = pickRevealQueue.shift();
   if (!reveal) {
+    pickRevealPhase = "closed";
     $("pickReveal").hidden = true;
     return;
   }
@@ -1218,29 +1220,55 @@ function showNextPickReveal() {
   const teamIndex = Math.max(0, teamNames.indexOf(reveal.team));
   const card = $("pickRevealCard");
   card.style.setProperty("--reveal-team-color", revealColors[teamIndex % revealColors.length]);
-  $("pickRevealRound").textContent = `${reveal.round}巡目`;
+  $("pickRevealRound").textContent = reveal.type === "nomination"
+    ? "1巡目 / 抽選候補"
+    : reveal.round + "巡目";
   $("pickRevealLabel").textContent = reveal.type === "nomination"
-    ? "1巡目の候補に選びました・抽選待ち"
+    ? "このメンバーを1巡目候補に登録"
     : "指名が確定しました";
   $("pickRevealTeam").textContent = displayTeamName(reveal.team);
   $("pickRevealName").textContent = reveal.idol.japaneseName;
   $("pickRevealGroup").textContent = reveal.idol.group;
-  $("pickRevealNext").textContent = pickRevealQueue.length
-    ? `次の指名へ（あと${pickRevealQueue.length}件）`
-    : "ドラフト画面へ";
 
   $("pickReveal").hidden = false;
+  $("pickRevealFlipCard").classList.remove("is-flipped");
   card.classList.remove("is-visible");
   void card.offsetWidth;
   card.classList.add("is-visible");
+  pickRevealPhase = "intro";
+  $("pickRevealNext").textContent = "指名を見る";
+  $("pickRevealSkip").textContent = "演出をスキップ";
   requestAnimationFrame(() => $("pickRevealNext").focus({ preventScroll: true }));
 
-  const delay = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 900 : 1700;
-  pickRevealTimer = window.setTimeout(showNextPickReveal, delay);
+  const introDelay = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 80 : 720;
+  pickRevealTimer = window.setTimeout(revealPickCard, introDelay);
 }
 
-$("pickRevealNext").addEventListener("click", showNextPickReveal);
+function revealPickCard() {
+  if (pickRevealTimer !== null) {
+    clearTimeout(pickRevealTimer);
+    pickRevealTimer = null;
+  }
+  if (pickRevealPhase !== "intro") return;
 
+  pickRevealPhase = "revealed";
+  $("pickRevealFlipCard").classList.add("is-flipped");
+  $("pickRevealNext").textContent = pickRevealQueue.length
+    ? "次の指名へ（あと" + pickRevealQueue.length + "件）"
+    : "ドラフト画面へ";
+  $("pickRevealSkip").textContent = pickRevealQueue.length ? "次へ" : "閉じる";
+
+  const revealDelay = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 1000 : 2200;
+  pickRevealTimer = window.setTimeout(showNextPickReveal, revealDelay);
+}
+
+function advancePickReveal() {
+  if (pickRevealPhase === "intro") revealPickCard();
+  else if (pickRevealPhase === "revealed") showNextPickReveal();
+}
+
+$("pickRevealNext").addEventListener("click", advancePickReveal);
+$("pickRevealSkip").addEventListener("click", advancePickReveal);
 function nextRoundOrder() {
   if (orderMode === "snake") return waiverOrder.reverse();
   if (orderMode === "random") return shuffle(teamNames);

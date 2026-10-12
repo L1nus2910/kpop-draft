@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>STAGE PICK — K-POP Draft</title>
   <link rel="stylesheet" href="style.css">
   <script src="app.js" defer></script>
@@ -217,14 +217,29 @@
   </main>
 
   <div class="pick-reveal" id="pickReveal" hidden role="dialog" aria-modal="true" aria-labelledby="pickRevealName" aria-describedby="pickRevealGroup">
+    <button class="pick-reveal-skip" id="pickRevealSkip" type="button">スキップ</button>
     <div class="pick-reveal-card" id="pickRevealCard">
       <p class="pick-reveal-round" id="pickRevealRound">1巡目</p>
       <p class="pick-reveal-label" id="pickRevealLabel">指名が確定しました</p>
-      <h2 class="pick-reveal-team" id="pickRevealTeam"></h2>
-      <p class="pick-reveal-caption">が選んだメンバーは…</p>
-      <strong class="pick-reveal-name" id="pickRevealName"></strong>
-      <p class="pick-reveal-group" id="pickRevealGroup"></p>
-      <button class="pick-reveal-next" id="pickRevealNext" type="button">次の指名へ</button>
+      <div class="pick-reveal-team-band">
+        <span>指名チーム</span>
+        <h2 class="pick-reveal-team" id="pickRevealTeam"></h2>
+      </div>
+      <p class="pick-reveal-caption">選ばれたメンバーは…</p>
+      <div class="pick-flip-card" id="pickRevealFlipCard">
+        <div class="pick-flip-inner">
+          <div class="pick-flip-face pick-flip-back">
+            <span>STAGE PICK</span>
+            <strong>指名発表</strong>
+            <b>✦</b>
+          </div>
+          <div class="pick-flip-face pick-flip-front">
+            <span class="pick-reveal-name" id="pickRevealName"></span>
+            <span class="pick-reveal-group" id="pickRevealGroup"></span>
+          </div>
+        </div>
+      </div>
+      <button class="pick-reveal-next" id="pickRevealNext" type="button">指名を見る</button>
     </div>
   </div>
 </body>
