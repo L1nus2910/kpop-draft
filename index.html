@@ -38,7 +38,7 @@
       <div>
         <p class="eyebrow">PLAY MODE</p>
         <h2 id="modeTitle">遊び方</h2>
-        <p class="mode-copy" id="modeDescription">今までどおり、同じ画面で4チームのドラフトを遊べます。</p>
+        <p class="mode-copy" id="modeDescription">指名人数と指名順を決めて、4チームで遊べます。</p>
       </div>
       <div class="mode-controls">
         <label>
@@ -58,7 +58,24 @@
             <option value="9">9人</option><option value="10">10人</option>
           </select>
         </label>
-        <button class="button button-primary" id="startGame" type="button" hidden>AI対戦を始める</button>
+        <label>
+          <span>各チームの指名人数</span>
+          <select id="pickLimit">
+            <option value="1">1人</option><option value="2">2人</option>
+            <option value="3">3人</option><option value="4">4人</option>
+            <option value="5" selected>5人</option><option value="6">6人</option>
+            <option value="7">7人</option><option value="8">8人</option>
+          </select>
+        </label>
+        <label>
+          <span>2巡目以降の指名順</span>
+          <select id="orderMode">
+            <option value="snake" selected>前巡の逆順（ウェーバー）</option>
+            <option value="fixed">チーム順に固定</option>
+            <option value="random">毎巡くじ引き</option>
+          </select>
+        </label>
+        <button class="button button-primary" id="startGame" type="button">4チームで始める</button>
       </div>
     </section>
 

@@ -568,10 +568,23 @@ select {
   border-top: 1px solid var(--line);
 }
 
-.team-row > strong {
-  display: block;
+.team-row-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
   margin-bottom: 5px;
+}
+
+.team-row-heading strong {
   font-size: 11px;
+}
+
+.team-row-heading span {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
 }
 
 .picked-person {
