@@ -122,14 +122,18 @@
           <h2 id="finalResultsTitle">最終ドラフト結果</h2>
           <p id="finalResultsSummary">チームごとの指名結果です。</p>
         </div>
-        <span class="final-results-status">指名完了</span>
+        <div class="final-results-actions">
+          <span class="final-results-status">指名完了</span>
+          <button class="button button-secondary" id="finalScreenshotToggle" type="button" aria-pressed="false">スクショ用レイアウト</button>
+        </div>
       </div>
-      <p class="table-scroll-hint">表を左右にスワイプして、すべてのチームを確認できます。</p>
+      <p class="table-scroll-hint" id="finalResultsTableHint">表を左右にスワイプして、すべてのチームを確認できます。</p>
       <div class="final-results-scroll" id="finalResultsBoard" role="region" aria-label="最終ドラフト結果一覧" tabindex="0"></div>
+      <div class="final-snapshot-grid" id="finalSnapshotGrid" hidden aria-label="スクリーンショット用チーム別指名一覧"></div>
     </section>
 
     <div class="workspace">
-      <section class="pool-panel panel" id="pool">
+      <section class="pool-panel panel" id="pool" tabindex="-1">
         <div class="section-heading">
           <div>
             <p class="eyebrow">THE CANDIDATE POOL</p>
@@ -173,8 +177,14 @@
           </select>
         </div>
 
-        <div class="recommendation-guide">
-          <div class="recommendation-guide-title"><span aria-hidden="true">★</span><strong>人気おすすめ順</strong></div>
+        <details class="recommendation-guide">
+          <summary class="recommendation-guide-summary">
+            <span class="recommendation-guide-star" aria-hidden="true">★</span>
+            <strong>人気おすすめ順</strong>
+            <span class="recommendation-guide-summary-label">評価方法・参考資料を見る</span>
+            <span class="recommendation-guide-chevron" aria-hidden="true">＋</span>
+          </summary>
+          <div class="recommendation-guide-content">
           <p>星1は個人順位データなし、順位データがある人は同じ世代の中で上位から約25%ずつ星5・星4・星3・星2に分けます。同点は同じ星です。人気参考スコアは個人ブランド評判の直近1年（2025年10月〜2026年9月）を55%とし、直近6か月を70%、前半6か月を30%にして最近の動きも反映します。音源・アルバム・YouTube・放送・SNSなどを集計するIDOL CHART年間総合順位（2024・2025年）を20%、韓国ギャラップの全国調査で個人名が挙がった順位を10%、個人名入りの2015〜2019年調査を5%加えます。全国調査は標本の広さを重視しつつ、個人名で公表される対象が限られるため10%にしています。過去のギャラップ調査がない第4・第5世代にはその履歴分を適用せず、残りの情報で再計算します。グループ名だけの回答は個々のメンバーに配りません。ファン投票型のCHOEAEDOL（4%）、Star News（4%）、Fannstar（2%）は計10%に抑えます。投票者の国籍は公開されていないため、配点は韓国票・海外票の割合を示すものではありません。AIは星を指名材料の一つにします。</p>
           <p>ネイバーの検索トレンドと下記のチャート情報アカウントも確認資料に加えています。ネイバーの値は比較期間・検索語の中での相対値で、別々の検索条件で集めた値をそのまま横並びにはできません。また、各アカウントは対象世代・地域・指標が異なるため、星の点数には混ぜず、急上昇や見落としの確認に使います。</p>
           <a href="https://www.soompi.com/article/1871886wpp/september-girl-group-member-brand-reputation-rankings-announced-8" target="_blank" rel="noopener noreferrer">個人ブランド順位 2026年9月 ↗</a>
@@ -208,7 +218,8 @@
           <a href="https://x.com/karinachartss" target="_blank" rel="noopener noreferrer">@karinachartss ↗</a>
           <a href="https://www.starnewskorea.com/star-ranking/female-idol/259" target="_blank" rel="noopener noreferrer">Star News 女性アイドル第259回 ↗</a>
           <a href="https://fannstar.tf.co.kr/rank/view/topic?mode=women" target="_blank" rel="noopener noreferrer">Fannstar 女性スター順位 ↗</a>
-        </div>
+          </div>
+        </details>
 
         <div class="random-result" id="randomResult" hidden></div>
         <div class="candidate-list" id="candidateList"></div>
@@ -271,7 +282,7 @@
     <button class="pick-reveal-skip" id="pickRevealSkip" type="button" aria-label="アニメーションを省略して指名結果を表示">演出をスキップ</button>
     <div class="pick-reveal-card" id="pickRevealCard">
       <p class="pick-reveal-round" id="pickRevealRound">1巡目</p>
-      <p class="pick-reveal-label" id="pickRevealLabel">指名が確定しました</p>
+      <p class="pick-reveal-label" id="pickRevealLabel">1巡目入札メンバー</p>
       <div class="pick-reveal-team-band" id="pickRevealTeamBand">
         <span id="pickRevealTeamLabel">指名チーム</span>
         <h2 class="pick-reveal-team" id="pickRevealTeam"></h2>

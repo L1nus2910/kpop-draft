@@ -1920,6 +1920,7 @@ function updateModeSetup() {
 }
 
 function startGame(mode, aiCount = 3) {
+  setFinalScreenshotMode(false, false);
   activeMode = mode;
   pickLimit = Number($("pickLimit").value);
   orderMode = $("orderMode").value;
@@ -1957,6 +1958,10 @@ function startGame(mode, aiCount = 3) {
   updateModeSetup();
   renderDraft();
   advanceAI();
+  requestAnimationFrame(() => {
+    $("pool").scrollIntoView({ behavior: "smooth", block: "start" });
+    $("pool").focus({ preventScroll: true });
+  });
 }
 
 $("playMode").addEventListener("change", updateModeSetup);
@@ -1968,6 +1973,30 @@ $("startGame").addEventListener("click", () => {
   const mode = $("playMode").value;
   if (mode === "ai") startGame("ai", Number($("aiCount").value));
   else startGame("local");
+});
+
+function setFinalScreenshotMode(enabled, shouldScroll = true) {
+  const screenshotButton = $("finalScreenshotToggle");
+  if (!screenshotButton) return;
+  document.body.classList.toggle("final-screenshot-mode", enabled);
+  $("finalResultsBoard").hidden = enabled;
+  $("finalSnapshotGrid").hidden = !enabled;
+  $("finalResultsTableHint").hidden = enabled;
+  screenshotButton.setAttribute("aria-pressed", String(enabled));
+  screenshotButton.textContent = enabled ? "通常の結果表に戻る" : "スクショ用レイアウト";
+  if (enabled && shouldScroll) {
+    requestAnimationFrame(() => $("finalResults").scrollIntoView({ behavior: "smooth", block: "start" }));
+  }
+}
+
+$("finalScreenshotToggle").addEventListener("click", () => {
+  setFinalScreenshotMode($("finalSnapshotGrid").hidden);
+});
+
+window.addEventListener("keydown", event => {
+  if (event.key === "Escape" && document.body.classList.contains("final-screenshot-mode")) {
+    setFinalScreenshotMode(false, false);
+  }
 });
 
 function teamIsComplete(team) {
@@ -2271,8 +2300,8 @@ function showNextPickReveal() {
   $("pickRevealLabel").textContent = isLottery
     ? "指名が重複しました"
     : reveal.type === "nomination"
-      ? "このメンバーを1巡目候補に登録"
-      : "指名が確定しました";
+      ? "1巡目入札メンバー"
+      : reveal.round + "巡目指名";
   $("pickRevealTeamLabel").textContent = "指名チーム";
   $("pickRevealTeam").textContent = displayTeamName(reveal.team);
   $("pickRevealTeamBand").hidden = isLottery;
@@ -2378,7 +2407,6 @@ function recordPick(team, idol) {
   picks[team].push(pickRecord(idol, pickRound));
   markPersonDrafted(idol);
   advanceAfterPick();
-  queuePickReveal(team, idol, pickRound);
 }
 
 function advanceAI() {
@@ -2461,7 +2489,6 @@ function resolveFirstRound() {
 
   const results = [];
   const lotteries = [];
-  const winningPicks = [];
 
   byMember.forEach(({ idol, teams }, personKey) => {
 
@@ -2469,7 +2496,6 @@ function resolveFirstRound() {
       const team = teams[0];
       picks[team].push(pickRecord(idol, 1));
       drafted.add(personKey);
-      winningPicks.push({ team, idol });
       return;
     }
 
@@ -2490,7 +2516,6 @@ function resolveFirstRound() {
   selectedId = null;
 
   lotteries.forEach(event => queuePickReveal(event.team, event.idol, 1, "lottery", event));
-  winningPicks.forEach(({ team, idol }) => queuePickReveal(team, idol, 1));
 
   if (pickRevealQueue.length === 0 && $("pickReveal").hidden) {
     finishFirstRoundResolution();
@@ -2499,6 +2524,24 @@ function resolveFirstRound() {
   renderNominations();
   renderDraft();
   renderCandidates();
+}
+
+function renderFinalSnapshot() {
+  $("finalSnapshotGrid").innerHTML = teamNames.map((team, index) => {
+    const teamPicks = picks[team] || [];
+    const rows = Array.from({ length: pickLimit }, (_, roundIndex) => {
+      const pick = teamPicks.find(item => item.round === roundIndex + 1);
+      const memberName = pick?.name || "—";
+      const groupName = pick?.group || "グループ情報なし";
+      return "<li><span class=\"final-snapshot-round\">" + (roundIndex + 1) +
+        "巡</span><span class=\"final-snapshot-member\"><strong>" + escapeHTML(memberName) +
+        "</strong><small>" + escapeHTML(groupName) + "</small></span></li>";
+    }).join("");
+    return "<article class=\"final-snapshot-team\" style=\"--team-color: " +
+      teamColorPalette[index % teamColorPalette.length] + "\"><header><strong>" +
+      escapeHTML(displayTeamName(team)) + "</strong><span>" + teamPicks.length + " / " +
+      pickLimit + "人</span></header><ol>" + rows + "</ol></article>";
+  }).join("");
 }
 
 function renderDraft() {
@@ -2665,11 +2708,13 @@ function renderDraft() {
     $("finalResultsSummary").textContent =
       `${teamNames.length}チームが各${pickLimit}人を指名しました（合計${totalPicks}人）。`;
     $("finalResultsBoard").innerHTML = $("draftBoard").innerHTML;
+    renderFinalSnapshot();
     if (!finalResultsWasVisible) {
       requestAnimationFrame(() => finalResults.scrollIntoView({ behavior: "smooth", block: "start" }));
     }
   } else {
     $("finalResultsBoard").innerHTML = "";
+    $("finalSnapshotGrid").innerHTML = "";
   }
   finalResultsWasVisible = finished;
 }
