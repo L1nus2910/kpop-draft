@@ -2986,11 +2986,6 @@ footer span:first-child {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85);
 }
 
-.draft-cell-card.draft-lottery-loss small {
-  color: #75869a;
-  font-size: 9px;
-}
-
 .draft-cell-card.draft-lottery-loss strong {
   color: #66768a;
   font-size: 12px;
@@ -3007,4 +3002,31 @@ footer span:first-child {
   border-radius: 8px;
   background: linear-gradient(145deg, #fff, #edf6fc);
   box-shadow: inset 0 1px 0 #fff;
+}
+
+.lottery-envelope.is-chosen .lottery-envelope-art {
+  border-color: #17689f;
+  box-shadow: 0 0 0 3px rgba(72, 167, 222, 0.16), 0 4px 10px rgba(24, 87, 132, 0.2);
+}
+
+.lottery-envelope.is-chosen .lottery-envelope-hint {
+  color: #1765a4;
+}
+
+.candidate-card .pick-confirmation {
+  gap: 10px;
+  margin: 12px 0 0;
+  padding: 12px;
+}
+
+.candidate-card .pick-confirmation-actions {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+.candidate-card .pick-confirmation-actions .button {
+  width: 100%;
+  min-width: 0;
+  padding: 10px;
 }

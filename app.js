@@ -953,9 +953,15 @@ function updateDependentFilters() {
 }
 
 function renderCandidates() {
+  const confirmationPanel = $("pickConfirmation");
+  $("pickConfirmationMount").append(confirmationPanel);
   updateDependentFilters();
-  const list = getCandidates();
-  $("candidateCount").textContent = list.length;
+  const candidates = getCandidates();
+  const pendingIdol = idols.find(item => item.id === pendingDraftPickId);
+  const list = pendingIdol && !candidates.some(item => item.id === pendingIdol.id)
+    ? [pendingIdol, ...candidates]
+    : candidates;
+  $("candidateCount").textContent = candidates.length;
   $("rosterTotal").textContent = idols.length;
   $("groupTotal").textContent = groups.length;
 
@@ -982,7 +988,7 @@ function renderCandidates() {
             ? "クリックして選択"
             : "クリックして選択";
     return `
-      <article class="candidate-card ${isSelected ? "is-selected" : ""} ${isExcluded ? "is-excluded" : ""}">
+      <article class="candidate-card ${isSelected ? "is-selected" : ""} ${isExcluded ? "is-excluded" : ""}" data-candidate-id="${idol.id}">
         <button class="candidate-select" type="button" data-action="select" data-id="${idol.id}" aria-pressed="${isSelected}" ${isUnavailable ? "disabled" : ""}>
           <span class="candidate-name">${escapeHTML(idol.japaneseName)}</span>
           <span class="candidate-group">${escapeHTML(idol.group)}</span>
@@ -1001,6 +1007,13 @@ function renderCandidates() {
       </article>
     `;
   }).join("");
+
+  if (pendingIdol) {
+    const selectedCard = [...$("candidateList").querySelectorAll(".candidate-card")]
+      .find(card => card.dataset.candidateId === pendingIdol.id);
+    const cardActions = selectedCard?.querySelector(".card-actions");
+    if (selectedCard && cardActions) selectedCard.insertBefore(confirmationPanel, cardActions);
+  }
 }
 
 function selectMember(id) {
@@ -1349,7 +1362,7 @@ function queuePickReveal(team, idol, pickRound, type = "pick", extra = {}) {
 function renderLotteryTickets(reveal) {
   $("lotteryTickets").innerHTML = reveal.envelopes.map((envelope, index) => `
     <button class="lottery-envelope" type="button" data-lottery-envelope="${envelope}"
-      aria-label="抽選封筒 ${index + 1}。選択できます" disabled style="--ticket-delay:${index * 90}ms">
+      aria-label="抽選封筒 ${index + 1}。全員が選んだ後に開示されます" disabled style="--ticket-delay:${index * 90}ms">
       <span class="lottery-envelope-paper">
         <strong class="lottery-envelope-team">封筒 ${index + 1}</strong>
         <span class="lottery-envelope-art" aria-hidden="true">
@@ -1357,12 +1370,12 @@ function renderLotteryTickets(reveal) {
           <span class="lottery-envelope-flap"></span>
           <span class="lottery-envelope-seal">OPEN</span>
         </span>
-        <small class="lottery-envelope-hint">選んで開封</small>
+        <small class="lottery-envelope-hint">封筒を選ぶ</small>
       </span>
       <span class="lottery-envelope-result" aria-hidden="true">
         <span>
           <strong>抽選結果</strong>
-          <small>開封待ち</small>
+          <small>開示待ち</small>
         </span>
       </span>
     </button>
@@ -1372,7 +1385,7 @@ function renderLotteryTickets(reveal) {
 function updateLotteryProgress() {
   if (!activePickReveal || activePickReveal.type !== "lottery") return;
   const reveal = activePickReveal;
-  const total = reveal.teams.length;
+  const total = reveal.drawOrder.length;
   const drawer = reveal.drawOrder[reveal.drawIndex];
   if (reveal.winner) {
     $("lotteryBoard").classList.add("is-revealed");
@@ -1388,45 +1401,53 @@ function updateLotteryProgress() {
     return;
   }
 
+  if (reveal.revealing) {
+    $("lotteryTurn").textContent = `全${total}チームの封筒がそろいました`;
+    $("lotteryOutcome").textContent = "選んだ封筒を一斉に開示します…";
+    $("pickRevealNext").disabled = true;
+    $("pickRevealNext").textContent = "結果を開示中";
+    $("lotteryTickets").querySelectorAll("[data-lottery-envelope]").forEach(button => {
+      button.disabled = true;
+    });
+    return;
+  }
+
   if (!drawer) return;
   $("lotteryBoard").classList.remove("is-revealed");
-  $("lotteryTurn").textContent = `抽選順 ${reveal.drawIndex + 1} / ${total}：${displayTeamName(drawer)}の番`;
-  $("lotteryOutcome").textContent = reveal.lastTeam
-    ? `${displayTeamName(reveal.lastTeam)}は落選。${displayTeamName(drawer)}が封筒を選んでね。`
-    : `${displayTeamName(drawer)}は好きな封筒を一つ選んでね。`;
+  $("lotteryTurn").textContent = `抽選順 ${reveal.drawIndex + 1} / ${total}：${displayTeamName(drawer)}が封筒を選択`;
+  $("lotteryOutcome").textContent = `${reveal.selections.size} / ${total}チームが選択済み。全員が選んだ後に一斉開示します。`;
   $("pickRevealNext").disabled = true;
-  $("pickRevealNext").textContent = "当選チームを待っています";
+  $("pickRevealNext").textContent = "全員の選択を待っています";
   const canChoose = pickRevealPhase === "revealed" && !reveal.opening && !aiTeams.has(drawer);
   $("lotteryTickets").querySelectorAll("[data-lottery-envelope]").forEach(button => {
     const envelope = Number(button.dataset.lotteryEnvelope);
-    button.disabled = !canChoose || reveal.opened.has(envelope);
+    button.disabled = !canChoose || reveal.selections.has(envelope);
   });
 }
 
 function scheduleAINextLotteryEnvelope() {
   const reveal = activePickReveal;
-  if (!reveal || reveal.type !== "lottery" || reveal.winner || reveal.opening || pickRevealPhase !== "revealed") return;
+  if (!reveal || reveal.type !== "lottery" || reveal.winner || reveal.opening || reveal.revealing || pickRevealPhase !== "revealed") return;
   const team = reveal.drawOrder[reveal.drawIndex];
   if (!team || !aiTeams.has(team)) return;
-  const availableEnvelopes = reveal.envelopes.filter(envelope => !reveal.opened.has(envelope));
+  const availableEnvelopes = reveal.envelopes.filter(envelope => !reveal.selections.has(envelope));
   if (!availableEnvelopes.length) return;
 
   pickRevealTimer = window.setTimeout(() => {
     pickRevealTimer = null;
     if (activePickReveal !== reveal) return;
     const envelope = availableEnvelopes[Math.floor(Math.random() * availableEnvelopes.length)];
-    openLotteryEnvelope(envelope, true);
+    selectLotteryEnvelope(envelope, true);
   }, 700);
 }
 
-function openLotteryEnvelope(envelope, automatic = false) {
+function selectLotteryEnvelope(envelope, automatic = false) {
   const reveal = activePickReveal;
-  if (!reveal || reveal.type !== "lottery" || reveal.winner || reveal.opening) return;
+  if (!reveal || reveal.type !== "lottery" || reveal.winner || reveal.opening || reveal.revealing) return;
   const team = reveal.drawOrder[reveal.drawIndex];
   const envelopeId = Number(envelope);
-  if (!team || !reveal.envelopes.includes(envelopeId) || reveal.opened.has(envelopeId)) return;
-  if (aiTeams.has(team) !== automatic) return;
-  if (reveal.opening) return;
+  if (!team || !reveal.envelopes.includes(envelopeId) || reveal.selections.has(envelopeId)) return;
+  if (aiTeams.has(team) !== automatic || pickRevealPhase !== "revealed") return;
 
   if (!automatic && pickRevealTimer !== null) {
     clearTimeout(pickRevealTimer);
@@ -1436,60 +1457,88 @@ function openLotteryEnvelope(envelope, automatic = false) {
   const button = [...$("lotteryTickets").querySelectorAll("[data-lottery-envelope]")]
     .find(item => Number(item.dataset.lotteryEnvelope) === envelopeId);
   if (!button) return;
-  reveal.opening = true;
-  $("lotteryTickets").querySelectorAll("[data-lottery-envelope]").forEach(item => {
-    item.disabled = true;
-  });
-  button.classList.add("is-selected");
-  button.classList.add("is-opening");
-  button.setAttribute("aria-label", `封筒 ${envelopeId + 1}を開封中`);
-  $("lotteryOutcome").textContent = `${displayTeamName(team)}が封筒を開けています…`;
+  reveal.selections.set(envelopeId, team);
+  reveal.drawIndex += 1;
+  button.classList.add("is-chosen", "is-selected");
+  button.querySelector(".lottery-envelope-hint").textContent = "選択済み";
+  button.setAttribute("aria-label", `封筒 ${envelopeId + 1}は選択済み。開示まで結果は伏せられます`);
 
-  const openDelay = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 520;
+  if (reveal.drawIndex >= reveal.drawOrder.length) {
+    reveal.revealing = true;
+    updateLotteryProgress();
+    const revealDelay = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 850;
+    pickRevealTimer = window.setTimeout(() => revealLotteryResults(reveal), revealDelay);
+    return;
+  }
+
+  updateLotteryProgress();
+  scheduleAINextLotteryEnvelope();
+}
+
+function revealLotteryResults(reveal) {
+  if (activePickReveal !== reveal || reveal.winner || reveal.selections.size !== reveal.drawOrder.length) return;
+  pickRevealTimer = null;
+  reveal.opening = true;
+  $("lotteryTurn").textContent = "全員の封筒を一斉に開封！";
+  $("lotteryOutcome").textContent = "せーの…！";
+
+  reveal.envelopes.forEach(envelope => {
+    const button = [...$("lotteryTickets").querySelectorAll("[data-lottery-envelope]")]
+      .find(item => Number(item.dataset.lotteryEnvelope) === envelope);
+    const team = reveal.selections.get(envelope);
+    const won = envelope === reveal.winningEnvelope;
+    if (!button || !team) return;
+    const result = button.querySelector(".lottery-envelope-result");
+    result.querySelector("strong").textContent = displayTeamName(team);
+    result.querySelector("small").textContent = won ? "交渉権獲得" : "再指名へ";
+    button.classList.add("is-opening");
+    button.disabled = true;
+  });
+
+  const openingDelay = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 560;
   pickRevealTimer = window.setTimeout(() => {
     pickRevealTimer = null;
     if (activePickReveal !== reveal) return;
-    reveal.opening = false;
-    button.classList.remove("is-opening");
-    button.classList.add("is-open");
-    reveal.opened.add(envelopeId);
-    reveal.lastTeam = team;
-    const won = envelopeId === reveal.winningEnvelope;
-    const result = button.querySelector(".lottery-envelope-result");
-    result.classList.add(won ? "is-winner" : "is-loser");
-    result.querySelector("strong").textContent = displayTeamName(team);
-    result.querySelector("small").textContent = won ? "交渉権獲得" : "再指名へ";
-    button.classList.add(won ? "is-winner" : "is-loser");
-    button.setAttribute("aria-label", won
-      ? `${displayTeamName(team)}が当選。交渉権を獲得`
-      : `${displayTeamName(team)}は落選。再指名へ`);
+    const winner = reveal.selections.get(reveal.winningEnvelope);
+    if (!winner) return;
 
-    if (won) {
-      reveal.winner = team;
-      reveal.teams.forEach(losingTeam => {
-        if (losingTeam === team) return;
-        if (!firstRoundLotteryLosses[losingTeam]) firstRoundLotteryLosses[losingTeam] = [];
-        firstRoundLotteryLosses[losingTeam].push({
-          name: reveal.idol.japaneseName,
-          group: reveal.idol.group
-        });
+    reveal.opening = false;
+    reveal.opened = new Set(reveal.envelopes);
+    reveal.winner = winner;
+    reveal.envelopes.forEach(envelope => {
+      const button = [...$("lotteryTickets").querySelectorAll("[data-lottery-envelope]")]
+        .find(item => Number(item.dataset.lotteryEnvelope) === envelope);
+      const team = reveal.selections.get(envelope);
+      const won = envelope === reveal.winningEnvelope;
+      if (!button || !team) return;
+      button.classList.remove("is-opening");
+      button.classList.add("is-open", won ? "is-winner" : "is-loser");
+      const result = button.querySelector(".lottery-envelope-result");
+      result.classList.add(won ? "is-winner" : "is-loser");
+      button.setAttribute("aria-label", won
+        ? `${displayTeamName(team)}が当選。交渉権を獲得`
+        : `${displayTeamName(team)}は落選。再指名へ`);
+    });
+
+    reveal.teams.forEach(losingTeam => {
+      if (losingTeam === winner) return;
+      if (!firstRoundLotteryLosses[losingTeam]) firstRoundLotteryLosses[losingTeam] = [];
+      firstRoundLotteryLosses[losingTeam].push({
+        name: reveal.idol.japaneseName,
+        group: reveal.idol.group
       });
-      picks[team].push(pickRecord(reveal.idol, 1));
-      drafted.add(reveal.idol.id);
-      if (pendingR1Resolution) {
-        pendingR1Resolution.waiting.delete(team);
-        pendingR1Resolution.results.push(`${reveal.idol.japaneseName}：${displayTeamName(team)}が当選`);
-      }
-      renderNominations();
-      renderDraft();
-      renderCandidates();
-    } else {
-      reveal.drawIndex += 1;
+    });
+    picks[winner].push(pickRecord(reveal.idol, 1));
+    drafted.add(reveal.idol.id);
+    if (pendingR1Resolution) {
+      pendingR1Resolution.waiting.delete(winner);
+      pendingR1Resolution.results.push(`${reveal.idol.japaneseName}：${displayTeamName(winner)}が当選`);
     }
-    updateLotteryProgress();
+    renderNominations();
     renderDraft();
-    if (!won) scheduleAINextLotteryEnvelope();
-  }, openDelay);
+    renderCandidates();
+    updateLotteryProgress();
+  }, openingDelay);
 }
 
 function skipCurrentPickReveal() {
@@ -1518,12 +1567,13 @@ function showNextPickReveal() {
   const isLottery = reveal.type === "lottery";
   if (isLottery) {
     reveal.opened = new Set();
+    reveal.selections = new Map();
     reveal.opening = false;
+    reveal.revealing = false;
     reveal.envelopes = reveal.teams.map((_, index) => index);
     reveal.winningEnvelope = Math.floor(Math.random() * reveal.envelopes.length);
     reveal.drawIndex = 0;
     reveal.winner = null;
-    reveal.lastTeam = null;
   }
   const teamIndex = Math.max(0, teamNames.indexOf(isLottery ? reveal.drawOrder[0] : reveal.team));
   const card = $("pickRevealCard");
@@ -1549,7 +1599,7 @@ function showNextPickReveal() {
   $("pickRevealNext").disabled = false;
   if (isLottery) {
     renderLotteryTickets(reveal);
-    $("lotteryOutcome").textContent = "抽選順に封筒を選んでね。";
+    $("lotteryOutcome").textContent = "全員が封筒を選ぶまで、結果は伏せられます。";
   } else {
     $("lotteryTickets").innerHTML = "";
   }
@@ -1607,7 +1657,7 @@ $("pickRevealNext").addEventListener("click", advancePickReveal);
 $("pickRevealSkip").addEventListener("click", skipCurrentPickReveal);
 $("lotteryTickets").addEventListener("click", event => {
   const button = event.target.closest("button[data-lottery-envelope]");
-  if (button) openLotteryEnvelope(button.dataset.lotteryEnvelope);
+  if (button) selectLotteryEnvelope(button.dataset.lotteryEnvelope);
 });
 function nextRoundOrder() {
   if (orderMode === "snake") return waiverOrder.slice().reverse();
@@ -1851,7 +1901,6 @@ function renderDraft() {
       <div class="draft-lottery-history" aria-label="1巡目の抽選で外れた候補">
         ${losses.map(lost => `
           <div class="draft-cell-card draft-lottery-loss">
-            <small>抽選落選</small>
             <strong>${escapeHTML(lost.name)}</strong>
             <span>${escapeHTML(lost.group)}</span>
           </div>

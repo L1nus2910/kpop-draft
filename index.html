@@ -196,15 +196,17 @@
           <p id="selectedMember">開始後は候補カードを選び、確認してから指名を提出できます。</p>
         </div>
 
-        <div class="pick-confirmation" id="pickConfirmation" hidden>
-          <div class="pick-confirmation-copy">
-            <span>指名内容の確認</span>
-            <strong id="pickConfirmName"></strong>
-            <small id="pickConfirmDetails"></small>
-          </div>
-          <div class="pick-confirmation-actions">
-            <button class="button button-secondary" id="cancelPick" type="button">選び直す</button>
-            <button class="button button-primary" id="confirmPick" type="button">このメンバーを指名する</button>
+        <div id="pickConfirmationMount">
+          <div class="pick-confirmation" id="pickConfirmation" hidden>
+            <div class="pick-confirmation-copy">
+              <span>指名内容の確認</span>
+              <strong id="pickConfirmName"></strong>
+              <small id="pickConfirmDetails"></small>
+            </div>
+            <div class="pick-confirmation-actions">
+              <button class="button button-secondary" id="cancelPick" type="button">選び直す</button>
+              <button class="button button-primary" id="confirmPick" type="button">このメンバーを指名する</button>
+            </div>
           </div>
         </div>
 
@@ -253,10 +255,10 @@
         </div>
       </div>
       <section class="lottery-board" id="lotteryBoard" hidden aria-live="polite">
-        <p class="lottery-board-title">ウェーバー順位の低いチームから、好きな封筒を選んでね</p>
+        <p class="lottery-board-title">順番に封筒を選び、全員が選び終わったら一斉に開封します</p>
         <p class="lottery-turn" id="lotteryTurn"></p>
         <div class="lottery-ticket-grid" id="lotteryTickets"></div>
-        <p class="lottery-outcome" id="lotteryOutcome">封筒を開けると抽選結果が表示されます。</p>
+        <p class="lottery-outcome" id="lotteryOutcome">全員が封筒を選ぶまで、結果は伏せられます。</p>
       </section>
       <button class="pick-reveal-next" id="pickRevealNext" type="button">指名を見る</button>
     </div>
