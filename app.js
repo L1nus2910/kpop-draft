@@ -872,64 +872,235 @@ const idols = groups.flatMap(group =>
   }))
 );
 
-const choeaedolIndividualRanks = [
-  ["NiziU", "Maya", 1], ["BABYMONSTER", "Ahyeon", 2], ["NiziU", "Mako", 3],
-  ["IVE", "Leeseo", 4], ["CLASS:y", "Boeun", 5], ["aespa", "Winter", 6],
-  ["NiziU", "Ayaka", 7], ["NiziU", "Rima", 8], ["NiziU", "Riku", 9],
-  ["NiziU", "Miihi", 10], ["Kep1er", "Hikaru", 11], ["NiziU", "Mayuka", 12],
-  ["NiziU", "Rio", 13], ["aespa", "Ningning", 14], ["aespa", "Karina", 15],
-  ["NiziU", "Nina", 16], ["LE SSERAFIM", "Sakura", 17], ["IVE", "Yujin", 18],
-  ["Hearts2Hearts", "Carmen", 19], ["NMIXX", "Haewon", 20],
-  ["TWICE", "Tzuyu", 1], ["BLACKPINK", "Lisa", 2], ["TWICE", "Mina", 2],
-  ["TWICE", "Momo", 4], ["BLACKPINK", "Jennie", 5], ["TWICE", "Jeongyeon", 6],
-  ["I.O.I", "Sejeong", 12], ["TWICE", "Nayeon", 8], ["TWICE", "Sana", 9],
-  ["TWICE", "Dahyun", 10], ["BLACKPINK", "Jisoo", 11], ["TWICE", "Jihyo", 13],
-  ["TWICE", "Chaeyoung", 14], ["BLACKPINK", "Rosé", 15], ["Apink", "Hayoung", 16],
-  ["ITZY", "Yeji", 17], ["Girls' Generation", "Taeyeon", 18], ["Apink", "Eunji", 19],
-  ["ITZY", "Yuna", 20]
-];
-
 const popularityRankingSources = [
   {
-    id: "youloy",
+    id: "brandReputation",
     weight: 50,
     topN: 30,
-    ranks: [
-      ["RESCENE", "Woni", 1], ["IVE", "Wonyoung", 2], ["BLACKPINK", "Jennie", 3],
-      ["aespa", "Karina", 4], ["RESCENE", "Zena", 5], ["RESCENE", "Minami", 6],
-      ["IVE", "Yujin", 7], ["RESCENE", "Liv", 8], ["BLACKPINK", "Rosé", 9],
-      ["RESCENE", "May", 10], ["ILLIT", "Wonhee", 11], ["aespa", "Winter", 12],
-      ["BLACKPINK", "Lisa", 13], ["Red Velvet", "Joy", 14],
-      ["Girls' Generation", "Taeyeon", 15], ["BLACKPINK", "Jisoo", 16],
-      ["NMIXX", "Sullyoon", 17], ["Red Velvet", "Irene", 18],
-      ["Red Velvet", "Seulgi", 19], ["ITZY", "Lia", 20],
-      ["Red Velvet", "Wendy", 21], ["Girls' Generation", "Yoona", 22],
-      ["TWICE", "Jeongyeon", 23], ["Red Velvet", "Yeri", 24],
-      ["IVE", "Rei", 25], ["ITZY", "Ryujin", 26], ["IVE", "Liz", 27],
-      ["LE SSERAFIM", "Chaewon", 28], ["ITZY", "Chaeryeong", 29],
-      ["Girls' Generation", "Sooyoung", 30]
+    snapshots: [
+      {
+        period: "2026-09",
+        weight: 0.30,
+        ranks: [
+          ["RESCENE", "Woni", 1], ["IVE", "Wonyoung", 2], ["aespa", "Karina", 3],
+          ["RESCENE", "Zena", 4], ["BLACKPINK", "Jennie", 5], ["BLACKPINK", "Rosé", 6],
+          ["RESCENE", "Minami", 7], ["RESCENE", "May", 8], ["IVE", "Yujin", 9],
+          ["BLACKPINK", "Jisoo", 10], ["RESCENE", "Liv", 11], ["BLACKPINK", "Lisa", 12],
+          ["i-dle", "Soyeon", 13], ["Girls' Generation", "Taeyeon", 14],
+          ["Girls' Generation", "Yoona", 15], ["TWICE", "Sana", 16],
+          ["MAMAMOO", "Moonbyul", 17], ["aespa", "Winter", 18],
+          ["Red Velvet", "Joy", 19], ["Girls' Generation", "Yuri", 20],
+          ["Red Velvet", "Irene", 21], ["MEOVV", "Ella", 22],
+          ["Girls' Generation", "Sooyoung", 23], ["TWICE", "Jihyo", 24],
+          ["EXID", "Hyelin", 25], ["TWICE", "Jeongyeon", 26],
+          ["Girls' Generation", "Hyoyeon", 27], ["Red Velvet", "Yeri", 28],
+          ["TWICE", "Nayeon", 29], ["KiiiKiii", "Haum", 30]
+        ]
+      },
+      {
+        period: "2026-08",
+        weight: 0.22,
+        ranks: [
+          ["RESCENE", "Woni", 1], ["IVE", "Wonyoung", 2], ["BLACKPINK", "Jennie", 3],
+          ["aespa", "Karina", 4], ["RESCENE", "Zena", 5], ["RESCENE", "Minami", 6],
+          ["IVE", "Yujin", 7], ["RESCENE", "Liv", 8], ["BLACKPINK", "Rosé", 9],
+          ["RESCENE", "May", 10], ["ILLIT", "Wonhee", 11], ["aespa", "Winter", 12],
+          ["BLACKPINK", "Lisa", 13], ["Red Velvet", "Joy", 14],
+          ["Girls' Generation", "Taeyeon", 15], ["BLACKPINK", "Jisoo", 16],
+          ["NMIXX", "Sullyoon", 17], ["Red Velvet", "Irene", 18],
+          ["Red Velvet", "Seulgi", 19], ["ITZY", "Lia", 20],
+          ["Red Velvet", "Wendy", 21], ["Girls' Generation", "Yoona", 22],
+          ["TWICE", "Jeongyeon", 23], ["Red Velvet", "Yeri", 24],
+          ["IVE", "Rei", 25], ["ITZY", "Ryujin", 26], ["IVE", "Liz", 27],
+          ["LE SSERAFIM", "Chaewon", 28], ["ITZY", "Chaeryeong", 29],
+          ["Girls' Generation", "Sooyoung", 30]
+        ]
+      },
+      {
+        period: "2026-07",
+        weight: 0.17,
+        ranks: [
+          ["RESCENE", "Woni", 1], ["IVE", "Wonyoung", 2], ["aespa", "Karina", 3],
+          ["BLACKPINK", "Jennie", 4], ["RESCENE", "Minami", 5], ["BLACKPINK", "Lisa", 6],
+          ["IVE", "Yujin", 7], ["ILLIT", "Wonhee", 8], ["RESCENE", "Sena", 9],
+          ["BLACKPINK", "Rosé", 10], ["RESCENE", "May", 11], ["aespa", "Winter", 12],
+          ["RESCENE", "Liv", 13], ["Red Velvet", "Irene", 14], ["BLACKPINK", "Jisoo", 15],
+          ["Girls' Generation", "Taeyeon", 16], ["TWICE", "Nayeon", 17],
+          ["ITZY", "Ryujin", 18], ["Red Velvet", "Joy", 19],
+          ["Girls' Generation", "Yoona", 20], ["TWICE", "Sana", 21],
+          ["IVE", "Rei", 22], ["LE SSERAFIM", "Chaewon", 23], ["NMIXX", "Sullyoon", 24],
+          ["aespa", "Ningning", 25], ["Red Velvet", "Seulgi", 26],
+          ["DIA", "Chaeyeon", 27], ["TWICE", "Jihyo", 28],
+          ["TWICE", "Jeongyeon", 29], ["fromis_9", "Chaeyoung", 30]
+        ]
+      },
+      {
+        period: "2026-06",
+        weight: 0.13,
+        ranks: [
+          ["IVE", "Wonyoung", 1], ["BLACKPINK", "Jennie", 2], ["aespa", "Karina", 3],
+          ["BLACKPINK", "Rosé", 4], ["RESCENE", "Woni", 5], ["IVE", "Wonyoung", 6],
+          ["BLACKPINK", "Lisa", 7], ["IVE", "Yujin", 8], ["aespa", "Winter", 9],
+          ["LE SSERAFIM", "Chaewon", 10], ["BLACKPINK", "Jisoo", 11],
+          ["NMIXX", "Sullyoon", 12], ["DIA", "Chaeyeon", 13], ["Red Velvet", "Joy", 14],
+          ["aespa", "Ningning", 15], ["Girls' Generation", "Taeyeon", 16],
+          ["TWICE", "Nayeon", 17], ["WJSN", "Yeonjung", 18], ["TWICE", "Jeongyeon", 19],
+          ["IVE", "Leeseo", 21], ["IVE", "Moka", 22], ["RESCENE", "Minami", 23],
+          ["LE SSERAFIM", "Kazuha", 24], ["Girls' Generation", "Yoona", 25],
+          ["fromis_9", "Chaeyoung", 27], ["Red Velvet", "Seulgi", 28],
+          ["Red Velvet", "Irene", 29], ["aespa", "Giselle", 30]
+        ]
+      },
+      {
+        period: "2026-05",
+        weight: 0.10,
+        ranks: [
+          ["IVE", "Wonyoung", 1], ["BLACKPINK", "Jennie", 2], ["aespa", "Karina", 3],
+          ["IVE", "Yujin", 4], ["BLACKPINK", "Lisa", 5], ["aespa", "Winter", 6],
+          ["ILLIT", "Wonhee", 7], ["BLACKPINK", "Jisoo", 8], ["BLACKPINK", "Rosé", 9],
+          ["MAMAMOO", "Hwasa", 10], ["aespa", "Ningning", 11], ["KISS OF LIFE", "Natty", 12],
+          ["Red Velvet", "Joy", 13], ["TWICE", "Jeongyeon", 14], ["IVE", "Leeseo", 15],
+          ["LE SSERAFIM", "Chaewon", 16], ["NMIXX", "Sullyoon", 17], ["IVE", "Liz", 18],
+          ["Red Velvet", "Seulgi", 19], ["IVE", "Gaeul", 20], ["Red Velvet", "Irene", 21],
+          ["TWICE", "Jihyo", 22], ["aespa", "Giselle", 23], ["IVE", "Leeseo", 24],
+          ["Girls' Generation", "Taeyeon", 25], ["Red Velvet", "Wendy", 26],
+          ["TWICE", "Dahyun", 27], ["TWICE", "Mina", 28], ["ITZY", "Yuna", 29],
+          ["ILLIT", "Moka", 30]
+        ]
+      },
+      {
+        period: "2026-04",
+        weight: 0.08,
+        ranks: [
+          ["IVE", "Wonyoung", 1], ["BLACKPINK", "Jennie", 2], ["aespa", "Karina", 3],
+          ["BLACKPINK", "Rosé", 4], ["BLACKPINK", "Lisa", 5], ["BLACKPINK", "Jisoo", 6],
+          ["IVE", "Yujin", 7], ["aespa", "Winter", 8], ["KISS OF LIFE", "Natty", 9],
+          ["IVE", "Liz", 10], ["IVE", "Leeseo", 11], ["aespa", "Ningning", 12],
+          ["TWICE", "Nayeon", 13], ["TWICE", "Sana", 14], ["Girls' Generation", "Yoona", 15],
+          ["NMIXX", "Sullyoon", 16], ["ITZY", "Yuna", 17], ["LE SSERAFIM", "Chaewon", 18],
+          ["Red Velvet", "Joy", 19], ["IVE", "Gaeul", 20], ["Red Velvet", "Seulgi", 21],
+          ["Red Velvet", "Irene", 22], ["TWICE", "Jihyo", 23], ["TWICE", "Jeongyeon", 24],
+          ["Girls' Generation", "Taeyeon", 25], ["Girls' Generation", "Sooyoung", 26],
+          ["IVE", "Leeseo", 27], ["OH MY GIRL", "Mimi", 28], ["TWICE", "Dahyun", 29]
+        ]
+      }
+    ]
+  },
+  {
+    id: "choeaedol",
+    weight: 25,
+    topN: 20,
+    snapshots: [
+      {
+        period: "2026-09",
+        weight: 0.40,
+        ranks: [
+          ["NiziU", "Maya", 1], ["BABYMONSTER", "Ahyeon", 2], ["NiziU", "Mako", 3],
+          ["IVE", "Leeseo", 4], ["CLASS:y", "Boeun", 5], ["aespa", "Winter", 6],
+          ["NiziU", "Ayaka", 7], ["NiziU", "Rima", 8], ["NiziU", "Riku", 9],
+          ["NiziU", "Miihi", 10], ["Kep1er", "Hikaru", 11], ["NiziU", "Mayuka", 12],
+          ["NiziU", "Rio", 13], ["aespa", "Ningning", 14], ["aespa", "Karina", 15],
+          ["NiziU", "Nina", 16], ["LE SSERAFIM", "Sakura", 17], ["IVE", "Yujin", 18],
+          ["Hearts2Hearts", "Carmen", 19], ["NMIXX", "Haewon", 20],
+          ["TWICE", "Tzuyu", 1], ["BLACKPINK", "Lisa", 2], ["TWICE", "Mina", 2],
+          ["TWICE", "Momo", 4], ["BLACKPINK", "Jennie", 5], ["TWICE", "Jeongyeon", 6],
+          ["IU", "IU", 7], ["TWICE", "Nayeon", 8], ["TWICE", "Sana", 9],
+          ["TWICE", "Dahyun", 10], ["BLACKPINK", "Jisoo", 11], ["I.O.I", "Sejeong", 12],
+          ["TWICE", "Jihyo", 13], ["TWICE", "Chaeyoung", 14], ["BLACKPINK", "Rosé", 15],
+          ["Apink", "Hayoung", 16], ["ITZY", "Yeji", 17],
+          ["Girls' Generation", "Taeyeon", 18], ["Apink", "Eunji", 19], ["ITZY", "Yuna", 19]
+        ]
+      },
+      {
+        period: "2026-08",
+        weight: 0.28,
+        ranks: [
+          ["NiziU", "Maya", 1], ["NiziU", "Mako", 2], ["NiziU", "Rima", 3],
+          ["IVE", "Leeseo", 4], ["BABYMONSTER", "Ahyeon", 5], ["CLASS:y", "Boeun", 6],
+          ["NiziU", "Ayaka", 7], ["NiziU", "Riku", 8], ["aespa", "Winter", 9],
+          ["NiziU", "Miihi", 9], ["NiziU", "Mayuka", 11], ["NiziU", "Rio", 12],
+          ["Kep1er", "Hikaru", 13], ["aespa", "Karina", 14], ["IVE", "Yujin", 15],
+          ["aespa", "Ningning", 16], ["NiziU", "Nina", 17], ["LE SSERAFIM", "Sakura", 18],
+          ["Hearts2Hearts", "Carmen", 19], ["NMIXX", "Haewon", 20],
+          ["TWICE", "Tzuyu", 1], ["TWICE", "Mina", 2], ["BLACKPINK", "Lisa", 3],
+          ["TWICE", "Momo", 4], ["BLACKPINK", "Jennie", 5], ["TWICE", "Jeongyeon", 6],
+          ["TWICE", "Nayeon", 7], ["IU", "IU", 8], ["TWICE", "Sana", 9],
+          ["BLACKPINK", "Jisoo", 10], ["TWICE", "Dahyun", 11], ["BLACKPINK", "Rosé", 12],
+          ["TWICE", "Chaeyoung", 13], ["ITZY", "Yuna", 14], ["TWICE", "Jihyo", 15],
+          ["Red Velvet", "Irene", 16], ["ITZY", "Yeji", 17], ["Apink", "Hayoung", 18],
+          ["Apink", "Eunji", 19], ["Red Velvet", "Yeri", 20]
+        ]
+      },
+      {
+        period: "2026-07",
+        weight: 0.19,
+        ranks: [
+          ["NiziU", "Maya", 1], ["NiziU", "Mako", 2], ["NiziU", "Rima", 3],
+          ["aespa", "Winter", 4], ["BABYMONSTER", "Ahyeon", 5], ["CLASS:y", "Boeun", 6],
+          ["NiziU", "Ayaka", 7], ["Kep1er", "Hikaru", 8], ["NiziU", "Mayuka", 9],
+          ["NiziU", "Riku", 10], ["NiziU", "Miihi", 11], ["IVE", "Yujin", 12],
+          ["NiziU", "Nina", 13], ["NiziU", "Rio", 14], ["aespa", "Ningning", 15],
+          ["LE SSERAFIM", "Sakura", 16], ["aespa", "Karina", 17],
+          ["Hearts2Hearts", "Carmen", 18], ["NMIXX", "Haewon", 19], ["KISS OF LIFE", "Natty", 20],
+          ["TWICE", "Tzuyu", 1], ["TWICE", "Mina", 2], ["BLACKPINK", "Lisa", 3],
+          ["TWICE", "Dahyun", 4], ["TWICE", "Momo", 5], ["BLACKPINK", "Jennie", 6],
+          ["TWICE", "Sana", 7], ["IU", "IU", 8], ["TWICE", "Jeongyeon", 9],
+          ["TWICE", "Nayeon", 10], ["BLACKPINK", "Jisoo", 11], ["TWICE", "Chaeyoung", 12],
+          ["BLACKPINK", "Rosé", 13], ["TWICE", "Jihyo", 14], ["ITZY", "Yeji", 15],
+          ["Dreamcatcher", "Siyeon", 16], ["Apink", "Hayoung", 17], ["ITZY", "Yuna", 18],
+          ["I.O.I", "Sejeong", 19], ["Apink", "Eunji", 20]
+        ]
+      },
+      {
+        period: "2026-06",
+        weight: 0.13,
+        ranks: [
+          ["NiziU", "Maya", 1], ["NiziU", "Mako", 2], ["BABYMONSTER", "Ahyeon", 3],
+          ["NiziU", "Rima", 4], ["CLASS:y", "Boeun", 5], ["NiziU", "Ayaka", 6],
+          ["NiziU", "Miihi", 7], ["Kep1er", "Hikaru", 8], ["NiziU", "Mayuka", 9],
+          ["aespa", "Winter", 10], ["KISS OF LIFE", "Natty", 11], ["NiziU", "Riku", 12],
+          ["IVE", "Yujin", 13], ["NiziU", "Rio", 14], ["aespa", "Karina", 15],
+          ["NiziU", "Nina", 16], ["LE SSERAFIM", "Sakura", 17],
+          ["MADEIN", "Mashiro", 18], ["NMIXX", "Haewon", 19], ["aespa", "Ningning", 20],
+          ["TWICE", "Mina", 1], ["TWICE", "Tzuyu", 2], ["BLACKPINK", "Lisa", 3],
+          ["TWICE", "Momo", 4], ["BLACKPINK", "Jennie", 5], ["TWICE", "Dahyun", 6],
+          ["TWICE", "Nayeon", 7], ["IU", "IU", 8], ["TWICE", "Jeongyeon", 9],
+          ["TWICE", "Sana", 10], ["BLACKPINK", "Jisoo", 11], ["TWICE", "Chaeyoung", 12],
+          ["BLACKPINK", "Rosé", 13], ["ITZY", "Yuna", 14], ["ITZY", "Yeji", 15],
+          ["TWICE", "Jihyo", 16], ["Dreamcatcher", "Siyeon", 17],
+          ["Dreamcatcher", "JiU", 18], ["Apink", "Hayoung", 19], ["I.O.I", "Sejeong", 20]
+        ]
+      }
     ]
   },
   {
     id: "starnews",
     weight: 15,
     topN: 5,
-    ranks: [
-      ["NewJeans", "Minji", 1], ["NewJeans", "Hyein", 2],
-      ["NewJeans", "Hanni", 3], ["NewJeans", "Haerin", 4],
-      ["Red Velvet", "Irene", 5]
-    ]
+    snapshots: [{
+      period: "2026-10-current",
+      weight: 1,
+      ranks: [
+        ["NewJeans", "Minji", 1], ["NewJeans", "Hyein", 2],
+        ["NewJeans", "Hanni", 3], ["NewJeans", "Haerin", 4],
+        ["Red Velvet", "Irene", 5]
+      ]
+    }]
   },
   {
     id: "fannstar",
     weight: 10,
     topN: 16,
-    ranks: [
-      ["Girls' Generation", "Yoona", 3], ["NMIXX", "Haewon", 5],
-      ["i-dle", "Yuqi", 9], ["NMIXX", "Sullyoon", 10],
-      ["aespa", "Winter", 11], ["BABYMONSTER", "Ahyeon", 13],
-      ["ILLIT", "Wonhee", 15], ["i-dle", "Soyeon", 16]
-    ]
+    snapshots: [{
+      period: "2026-10-current",
+      weight: 1,
+      ranks: [
+        ["Girls' Generation", "Yoona", 3], ["NMIXX", "Haewon", 5],
+        ["i-dle", "Yuqi", 9], ["NMIXX", "Sullyoon", 10],
+        ["aespa", "Winter", 11], ["BABYMONSTER", "Ahyeon", 13],
+        ["ILLIT", "Wonhee", 15], ["i-dle", "Soyeon", 16]
+      ]
+    }]
   }
 ];
 
@@ -937,47 +1108,66 @@ const normalizeRankingName = value => String(value).toLowerCase().replace(/[^a-z
 const memberRankingKey = (group, member) =>
   `${normalizeRankingName(group)}:${normalizeRankingName(member)}`;
 
-function starsForPopularityScore(score) {
-  if (score >= 70) return 5;
-  if (score >= 50) return 4;
-  if (score >= 30) return 3;
-  if (score >= 15) return 2;
-  return 1;
+function starsForPopularityPercentile(percentile) {
+  if (percentile <= 0.25) return 5;
+  if (percentile <= 0.50) return 4;
+  if (percentile <= 0.75) return 3;
+  return 2;
 }
 
 const popularityRanksByMember = new Map();
-function addPopularityRank(sourceId, group, member, rank) {
+function addPopularityRank(sourceId, period, group, member, rank) {
   const key = memberRankingKey(group, member);
   const sourceRanks = popularityRanksByMember.get(key) || {};
-  sourceRanks[sourceId] = Math.min(sourceRanks[sourceId] || Infinity, rank);
+  sourceRanks[sourceId] = sourceRanks[sourceId] || {};
+  sourceRanks[sourceId][period] = Math.min(sourceRanks[sourceId][period] || Infinity, rank);
   popularityRanksByMember.set(key, sourceRanks);
 }
 
-choeaedolIndividualRanks.forEach(([group, member, rank]) =>
-  addPopularityRank("choeaedol", group, member, rank)
-);
 popularityRankingSources.forEach(source => {
-  source.ranks.forEach(([group, member, rank]) =>
-    addPopularityRank(source.id, group, member, rank)
-  );
+  source.snapshots.forEach(snapshot => {
+    snapshot.ranks.forEach(([group, member, rank]) =>
+      addPopularityRank(source.id, snapshot.period, group, member, rank)
+    );
+  });
 });
 
 idols.forEach(idol => {
   const sourceRanks = popularityRanksByMember.get(memberRankingKey(idol.group, idol.name)) || {};
-  const choeaedolRank = sourceRanks.choeaedol || null;
   const compositeScore = popularityRankingSources.reduce((score, source) => {
-    const rank = sourceRanks[source.id];
-    if (!rank) return score;
-    const sourceScore = ((source.topN + 1 - rank) / source.topN) * 100;
-    return score + sourceScore * (source.weight / 100);
-  }, choeaedolRank ? ((21 - choeaedolRank) / 20) * 25 : 0);
+    const weightedSnapshotScore = source.snapshots.reduce((snapshotScore, snapshot) => {
+      const rank = sourceRanks[source.id]?.[snapshot.period];
+      if (!rank) return snapshotScore;
+      return snapshotScore + ((source.topN + 1 - rank) / source.topN) * snapshot.weight;
+    }, 0);
+    return score + weightedSnapshotScore * source.weight;
+  }, 0);
 
   idol.popularityScore = Math.round(compositeScore * 10) / 10;
-  idol.popularityStars = starsForPopularityScore(idol.popularityScore);
-  idol.individualPopularityRank = choeaedolRank;
+  idol.popularityStars = compositeScore > 0 ? 2 : 1;
+  idol.individualPopularityRank = sourceRanks.choeaedol?.["2026-09"] || null;
   idol.popularitySortScore = idol.popularityScore;
   idol.popularitySources = sourceRanks;
 });
+
+const rankedIdols = idols
+  .filter(idol => idol.popularityScore > 0)
+  .sort((a, b) => b.popularityScore - a.popularityScore ||
+    a.japaneseName.localeCompare(b.japaneseName, "ja"));
+
+for (let start = 0; start < rankedIdols.length;) {
+  let end = start + 1;
+  while (end < rankedIdols.length &&
+    rankedIdols[end].popularityScore === rankedIdols[start].popularityScore) {
+    end += 1;
+  }
+  const midpointPercentile = ((start + end) / 2) / rankedIdols.length;
+  const stars = starsForPopularityPercentile(midpointPercentile);
+  for (let index = start; index < end; index += 1) {
+    rankedIdols[index].popularityStars = stars;
+  }
+  start = end;
+}
 
 const $ = id => document.getElementById(id);
 const localTeamNames = [
@@ -1178,13 +1368,16 @@ function renderCandidates() {
             : "クリックして選択";
     const rankingDetails = idol.popularityScore > 0
       ? `人気参考スコア ${Math.round(idol.popularityScore)}点`
-      : "参照した個人ランキングに未掲載";
+      : "参照した個人ランキングに掲載なし";
+    const rankingStars = idol.popularityScore > 0
+      ? `<span class="candidate-stars" aria-label="人気参考ランク ${idol.popularityStars}つ星">${"★".repeat(idol.popularityStars)}${"☆".repeat(5 - idol.popularityStars)}</span>`
+      : '<span class="candidate-stars" aria-label="ランキング未掲載のため星1つ" title="ランキング未掲載">★☆☆☆☆</span>';
     return `
       <article class="candidate-card ${isSelected ? "is-selected" : ""} ${isExcluded ? "is-excluded" : ""}" data-candidate-id="${idol.id}">
         <button class="candidate-select" type="button" data-action="select" data-id="${idol.id}" aria-pressed="${isSelected}" ${isUnavailable ? "disabled" : ""}>
           <span class="candidate-title-row">
             <span class="candidate-name">${escapeHTML(idol.japaneseName)}</span>
-            <span class="candidate-stars" aria-label="人気参考ランク ${idol.popularityStars}つ星">${"★".repeat(idol.popularityStars)}${"☆".repeat(5 - idol.popularityStars)}</span>
+            ${rankingStars}
           </span>
           <span class="candidate-group">${escapeHTML(idol.group)}</span>
           <span class="candidate-rank-details">${rankingDetails}</span>
