@@ -1157,7 +1157,7 @@ const popularityRankingSources = [
   },
   {
     id: "gallup2025",
-    weight: 5,
+    weight: 10,
     topN: 30,
     snapshots: [{
       period: "2025-13-39",
@@ -1189,7 +1189,7 @@ const popularityRankingSources = [
   },
   {
     id: "choeaedol",
-    weight: 5,
+    weight: 4,
     topN: 20,
     snapshots: [
       {
@@ -1276,7 +1276,7 @@ const popularityRankingSources = [
   },
   {
     id: "starnews",
-    weight: 7,
+    weight: 4,
     topN: 30,
     snapshots: [{
       period: "2026-10-poll-259",
@@ -1301,7 +1301,7 @@ const popularityRankingSources = [
   },
   {
     id: "fannstar",
-    weight: 3,
+    weight: 2,
     topN: 16,
     snapshots: [{
       period: "2026-10-current",
@@ -1494,8 +1494,8 @@ let orderMode = "snake";
 let firstRoundLotteryLosses = {};
 
 const teamColorPalette = [
-  "#b4233b", "#2457aa", "#08786f", "#a55310", "#6741a5",
-  "#20764a", "#a72f69", "#116d87", "#826012", "#4b5a71"
+  "#bf435a", "#3d70c4", "#16877c", "#bd792e", "#7957b8",
+  "#328552", "#bd5187", "#287f99", "#967824", "#536b9c"
 ];
 
 const aiStrategies = [

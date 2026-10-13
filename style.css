@@ -2956,19 +2956,27 @@ footer span:first-child {
   }
 }
 
-/* Keep team headers distinct while adding a subtle glossy finish. */
+/* Light, pearly team headers keep the color accents balanced and easy to scan. */
 .draft-results-table .team-column,
 .final-results .draft-results-table .team-column {
+  color: #18304c;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.2), transparent 48%),
-    linear-gradient(
-      145deg,
-      color-mix(in srgb, var(--team-color) 82%, #fff),
-      var(--team-color) 54%,
-      color-mix(in srgb, var(--team-color) 76%, #101c2b)
-    );
-  border-bottom-color: rgba(8, 28, 48, 0.18);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.48), inset 0 -2px 0 rgba(5, 22, 39, 0.12);
+    linear-gradient(155deg, rgba(255, 255, 255, 0.97) 0%, rgba(255, 255, 255, 0.78) 52%, rgba(255, 255, 255, 0.48) 100%),
+    linear-gradient(135deg, color-mix(in srgb, var(--team-color) 42%, #fff), var(--team-color));
+  border-top: 4px solid var(--team-color);
+  border-bottom-color: color-mix(in srgb, var(--team-color) 22%, #fff);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.98), inset 0 -2px 0 rgba(255, 255, 255, 0.62), 0 5px 14px rgba(42, 76, 116, 0.07);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.draft-results-table .team-column strong,
+.final-results .draft-results-table .team-column strong {
+  color: #18304c;
+}
+
+.draft-results-table .team-column span,
+.final-results .draft-results-table .team-column span {
+  color: #657992;
 }
 
 .draft-lottery-history {
@@ -3089,6 +3097,14 @@ footer span:first-child {
   line-height: 1;
   white-space: nowrap;
   text-shadow: 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.candidate-stars.is-unrated {
+  color: #7d8c9b;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-shadow: none;
 }
 
 .candidate-rank-details {
