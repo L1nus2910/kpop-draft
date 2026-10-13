@@ -89,7 +89,7 @@ const groups = [
     generation: "4世代",
     activity: "活動終了",
     members: [
-      ["Eunbi", "韓国"], ["Hyewon", "韓国"], ["Yena", "韓国"],
+      ["Eunbi", "韓国"], ["Sakura", "日本"], ["Hyewon", "韓国"], ["Yena", "韓国"],
       ["Yuri", "韓国"], ["Chaeyeon", "韓国"], ["Nako", "日本"],
       ["Hitomi", "日本"], ["Minju", "韓国"], ["Wonyoung", "韓国"],
       ["Chaewon", "韓国"], ["Yujin", "韓国"]
@@ -617,6 +617,7 @@ const japaneseNameOverrides = Object.fromEntries(
 Object.assign(japaneseNameOverrides, {
   "juun": "ジュウン",
   "a-na": "エイナ",
+  "sakura": "サクラ",
   "chloe young": "クロエ・ヤング",
   "chanelle moon": "シャネル・ムン",
   "moon sua": "ムン・スア",
@@ -857,12 +858,46 @@ const agencyByGroup = {
   HITGS: "H MUSIC Entertainment"
 };
 
+const sharedPersonMemberships = [
+  ["宮脇咲良", [["IZ*ONE", "Sakura"], ["LE SSERAFIM", "Sakura"]]],
+  ["チャン・ウォニョン", [["IZ*ONE", "Wonyoung"], ["IVE", "Wonyoung"]]],
+  ["アン・ユジン", [["IZ*ONE", "Yujin"], ["IVE", "Yujin"]]],
+  ["キム・チェウォン", [["IZ*ONE", "Chaewon"], ["LE SSERAFIM", "Chaewon"]]],
+  ["チェ・ユジン", [["CLC", "Yujin"], ["Kep1er", "Yujin"]]],
+  ["チョン・チェヨン", [["I.O.I", "Chaeyeon"], ["DIA", "Chaeyeon"]]],
+  ["カン・ミナ", [["I.O.I", "Mina"], ["gugudan", "Mina"]]],
+  ["キム・セジョン", [["I.O.I", "Sejeong"], ["gugudan", "Sejeong"]]],
+  ["チェ・ユジョン", [["I.O.I", "Yoojung"], ["Weki Meki", "Yoojung"]]],
+  ["キム・ドヨン", [["I.O.I", "Doyeon"], ["Weki Meki", "Doyeon"]]],
+  ["ユ・ヨンジョン", [["I.O.I", "Yeonjung"], ["WJSN", "Yeonjung"]]],
+  ["チョン・ウンビ", [["GFRIEND", "Eunha"], ["VIVIZ", "Eunha"]]],
+  ["ファン・ウンビ", [["GFRIEND", "SinB"], ["VIVIZ", "SinB"]]],
+  ["キム・イェウォン", [["GFRIEND", "Umji"], ["VIVIZ", "Umji"]]],
+  ["チョン・ヒジン", [["LOONA", "Heejin"], ["ARTMS", "Heejin"]]],
+  ["チョ・ハスル", [["LOONA", "Haseul"], ["ARTMS", "Haseul"]]],
+  ["キム・ジョンウン", [["LOONA", "Kim Lip"], ["ARTMS", "Kim Lip"]]],
+  ["チョン・ジウ", [["LOONA", "Jinsoul"], ["ARTMS", "Jinsoul"]]],
+  ["チェ・イェリム", [["LOONA", "Choerry"], ["ARTMS", "Choerry"]]]
+];
+const sharedPersonKeyByMembership = new Map();
+sharedPersonMemberships.forEach(([personKey, memberships]) => {
+  memberships.forEach(([group, name]) => {
+    sharedPersonKeyByMembership.set(`${group}|${normalizeSearchText(name)}`, personKey);
+  });
+});
+function personKeyFor(group, name) {
+  return sharedPersonKeyByMembership.get(`${group}|${normalizeSearchText(name)}`) ||
+    `${group}|${normalizeSearchText(name)}`;
+}
+
 let nextId = 1;
 const idols = groups.flatMap(group =>
   group.members.map(member => ({
     id: String(nextId++),
     name: member[0],
     japaneseName: toJapaneseMemberName(member[0]),
+    japaneseSearchName: member[0].toLowerCase() === "sakura" ? "宮脇咲良" : "",
+    personKey: personKeyFor(group.name, member[0]),
     koreanName: toKoreanMemberName(member[0]),
     nationality: member[1],
     group: group.name,
@@ -880,7 +915,7 @@ const popularityRankingSources = [
     snapshots: [
       {
         period: "2026-09",
-        weight: 0.30,
+        weight: 0.21,
         ranks: [
           ["RESCENE", "Woni", 1], ["IVE", "Wonyoung", 2], ["aespa", "Karina", 3],
           ["RESCENE", "Zena", 4], ["BLACKPINK", "Jennie", 5], ["BLACKPINK", "Rosé", 6],
@@ -899,7 +934,7 @@ const popularityRankingSources = [
       },
       {
         period: "2026-08",
-        weight: 0.22,
+        weight: 0.15,
         ranks: [
           ["RESCENE", "Woni", 1], ["IVE", "Wonyoung", 2], ["BLACKPINK", "Jennie", 3],
           ["aespa", "Karina", 4], ["RESCENE", "Zena", 5], ["RESCENE", "Minami", 6],
@@ -918,11 +953,11 @@ const popularityRankingSources = [
       },
       {
         period: "2026-07",
-        weight: 0.17,
+        weight: 0.12,
         ranks: [
           ["RESCENE", "Woni", 1], ["IVE", "Wonyoung", 2], ["aespa", "Karina", 3],
           ["BLACKPINK", "Jennie", 4], ["RESCENE", "Minami", 5], ["BLACKPINK", "Lisa", 6],
-          ["IVE", "Yujin", 7], ["ILLIT", "Wonhee", 8], ["RESCENE", "Sena", 9],
+          ["IVE", "Yujin", 7], ["ILLIT", "Wonhee", 8], ["RESCENE", "Zena", 9],
           ["BLACKPINK", "Rosé", 10], ["RESCENE", "May", 11], ["aespa", "Winter", 12],
           ["RESCENE", "Liv", 13], ["Red Velvet", "Irene", 14], ["BLACKPINK", "Jisoo", 15],
           ["Girls' Generation", "Taeyeon", 16], ["TWICE", "Nayeon", 17],
@@ -936,30 +971,31 @@ const popularityRankingSources = [
       },
       {
         period: "2026-06",
-        weight: 0.13,
+        weight: 0.09,
         ranks: [
           ["IVE", "Wonyoung", 1], ["BLACKPINK", "Jennie", 2], ["aespa", "Karina", 3],
-          ["BLACKPINK", "Rosé", 4], ["RESCENE", "Woni", 5], ["IVE", "Wonyoung", 6],
+          ["BLACKPINK", "Rosé", 4], ["RESCENE", "Woni", 5], ["ILLIT", "Wonhee", 6],
           ["BLACKPINK", "Lisa", 7], ["IVE", "Yujin", 8], ["aespa", "Winter", 9],
           ["LE SSERAFIM", "Chaewon", 10], ["BLACKPINK", "Jisoo", 11],
           ["NMIXX", "Sullyoon", 12], ["DIA", "Chaeyeon", 13], ["Red Velvet", "Joy", 14],
           ["aespa", "Ningning", 15], ["Girls' Generation", "Taeyeon", 16],
           ["TWICE", "Nayeon", 17], ["WJSN", "Yeonjung", 18], ["TWICE", "Jeongyeon", 19],
-          ["IVE", "Leeseo", 21], ["IVE", "Moka", 22], ["RESCENE", "Minami", 23],
-          ["LE SSERAFIM", "Kazuha", 24], ["Girls' Generation", "Yoona", 25],
+          ["cignature", "Jiwon", 20], ["IVE", "Rei", 21], ["ILLIT", "Moka", 22],
+          ["RESCENE", "Minami", 23], ["LE SSERAFIM", "Kazuha", 24],
+          ["Girls' Generation", "Yoona", 25], ["Weki Meki", "Yoojung", 26],
           ["fromis_9", "Chaeyoung", 27], ["Red Velvet", "Seulgi", 28],
           ["Red Velvet", "Irene", 29], ["aespa", "Giselle", 30]
         ]
       },
       {
         period: "2026-05",
-        weight: 0.10,
+        weight: 0.07,
         ranks: [
           ["IVE", "Wonyoung", 1], ["BLACKPINK", "Jennie", 2], ["aespa", "Karina", 3],
           ["IVE", "Yujin", 4], ["BLACKPINK", "Lisa", 5], ["aespa", "Winter", 6],
           ["ILLIT", "Wonhee", 7], ["BLACKPINK", "Jisoo", 8], ["BLACKPINK", "Rosé", 9],
           ["MAMAMOO", "Hwasa", 10], ["aespa", "Ningning", 11], ["KISS OF LIFE", "Natty", 12],
-          ["Red Velvet", "Joy", 13], ["TWICE", "Jeongyeon", 14], ["IVE", "Leeseo", 15],
+          ["Red Velvet", "Joy", 13], ["TWICE", "Jeongyeon", 14], ["IVE", "Rei", 15],
           ["LE SSERAFIM", "Chaewon", 16], ["NMIXX", "Sullyoon", 17], ["IVE", "Liz", 18],
           ["Red Velvet", "Seulgi", 19], ["IVE", "Gaeul", 20], ["Red Velvet", "Irene", 21],
           ["TWICE", "Jihyo", 22], ["aespa", "Giselle", 23], ["IVE", "Leeseo", 24],
@@ -970,21 +1006,164 @@ const popularityRankingSources = [
       },
       {
         period: "2026-04",
-        weight: 0.08,
+        weight: 0.06,
         ranks: [
           ["IVE", "Wonyoung", 1], ["BLACKPINK", "Jennie", 2], ["aespa", "Karina", 3],
           ["BLACKPINK", "Rosé", 4], ["BLACKPINK", "Lisa", 5], ["BLACKPINK", "Jisoo", 6],
           ["IVE", "Yujin", 7], ["aespa", "Winter", 8], ["KISS OF LIFE", "Natty", 9],
-          ["IVE", "Liz", 10], ["IVE", "Leeseo", 11], ["aespa", "Ningning", 12],
-          ["TWICE", "Nayeon", 13], ["TWICE", "Sana", 14], ["Girls' Generation", "Yoona", 15],
-          ["NMIXX", "Sullyoon", 16], ["ITZY", "Yuna", 17], ["LE SSERAFIM", "Chaewon", 18],
-          ["Red Velvet", "Joy", 19], ["IVE", "Gaeul", 20], ["Red Velvet", "Seulgi", 21],
-          ["Red Velvet", "Irene", 22], ["TWICE", "Jihyo", 23], ["TWICE", "Jeongyeon", 24],
-          ["Girls' Generation", "Taeyeon", 25], ["Girls' Generation", "Sooyoung", 26],
-          ["IVE", "Leeseo", 27], ["OH MY GIRL", "Mimi", 28], ["TWICE", "Dahyun", 29]
+          ["ILLIT", "Wonhee", 10], ["IVE", "Liz", 11], ["IVE", "Rei", 12],
+          ["aespa", "Ningning", 13], ["TWICE", "Nayeon", 14], ["TWICE", "Sana", 15],
+          ["Girls' Generation", "Yoona", 16], ["NMIXX", "Sullyoon", 17], ["ITZY", "Yuna", 18],
+          ["LE SSERAFIM", "Chaewon", 19], ["Red Velvet", "Joy", 20], ["IVE", "Gaeul", 21],
+          ["Red Velvet", "Seulgi", 22], ["Red Velvet", "Irene", 23], ["TWICE", "Jihyo", 24],
+          ["TWICE", "Jeongyeon", 25], ["Girls' Generation", "Taeyeon", 26],
+          ["Girls' Generation", "Sooyoung", 27], ["IVE", "Leeseo", 28],
+          ["OH MY GIRL", "Mimi", 29], ["TWICE", "Dahyun", 30]
+        ]
+      },
+      {
+        period: "2026-03",
+        weight: 0.055,
+        ranks: [
+          ["IVE", "Wonyoung", 1], ["BLACKPINK", "Jennie", 2], ["BLACKPINK", "Rosé", 3],
+          ["BLACKPINK", "Lisa", 4], ["IVE", "Yujin", 5], ["BLACKPINK", "Jisoo", 6],
+          ["Girls' Generation", "Taeyeon", 7], ["aespa", "Karina", 8], ["aespa", "Winter", 9],
+          ["Girls' Generation", "Sooyoung", 10], ["OH MY GIRL", "Mimi", 11],
+          ["LE SSERAFIM", "Chaewon", 12], ["ILLIT", "Wonhee", 13],
+          ["Girls' Generation", "Yoona", 14], ["IVE", "Liz", 15], ["MAMAMOO", "Hwasa", 16],
+          ["cignature", "Jiwon", 17], ["IVE", "Rei", 18], ["aespa", "Ningning", 19],
+          ["Red Velvet", "Joy", 20], ["TWICE", "Nayeon", 21], ["NMIXX", "Sullyoon", 22],
+          ["TWICE", "Dahyun", 23], ["IVE", "Leeseo", 24], ["Red Velvet", "Seulgi", 25],
+          ["IVE", "Gaeul", 26], ["TWICE", "Jihyo", 27], ["Red Velvet", "Irene", 28],
+          ["Red Velvet", "Wendy", 29], ["TWICE", "Sana", 30]
+        ]
+      },
+      {
+        period: "2026-02",
+        weight: 0.053,
+        ranks: [
+          ["BLACKPINK", "Jennie", 1], ["IVE", "Wonyoung", 2], ["BLACKPINK", "Lisa", 3],
+          ["BLACKPINK", "Rosé", 4], ["IVE", "Yujin", 5], ["MAMAMOO", "Hwasa", 6],
+          ["aespa", "Karina", 7], ["aespa", "Winter", 8], ["ILLIT", "Wonhee", 9],
+          ["BLACKPINK", "Jisoo", 10], ["IVE", "Liz", 11], ["Girls' Generation", "Taeyeon", 12],
+          ["LE SSERAFIM", "Chaewon", 13], ["NMIXX", "Sullyoon", 14], ["IVE", "Rei", 15],
+          ["TWICE", "Nayeon", 16], ["Apink", "Naeun", 17], ["Red Velvet", "Seulgi", 18],
+          ["Girls' Generation", "Yoona", 19], ["TWICE", "Jihyo", 20],
+          ["Red Velvet", "Irene", 21], ["IVE", "Leeseo", 22], ["Red Velvet", "Joy", 23],
+          ["IVE", "Gaeul", 24], ["Apink", "Eunji", 25], ["ITZY", "Ryujin", 26],
+          ["Red Velvet", "Wendy", 27], ["KiiiKiii", "Haum", 28], ["TWICE", "Dahyun", 29],
+          ["cignature", "Jiwon", 30]
+        ]
+      },
+      {
+        period: "2026-01",
+        weight: 0.051,
+        ranks: [
+          ["IVE", "Wonyoung", 1], ["BLACKPINK", "Jennie", 2], ["aespa", "Winter", 3],
+          ["BLACKPINK", "Lisa", 4], ["aespa", "Karina", 5], ["BLACKPINK", "Rosé", 6],
+          ["BLACKPINK", "Jisoo", 7], ["IVE", "Yujin", 8], ["ILLIT", "Wonhee", 9],
+          ["Girls' Generation", "Taeyeon", 10], ["ILLIT", "Minju", 11],
+          ["Red Velvet", "Joy", 12], ["NMIXX", "Sullyoon", 13], ["IVE", "Rei", 14],
+          ["IVE", "Liz", 15], ["cignature", "Jiwon", 16], ["Girls' Generation", "Yoona", 17],
+          ["TWICE", "Sana", 18], ["Red Velvet", "Seulgi", 19], ["LE SSERAFIM", "Kazuha", 20],
+          ["IVE", "Leeseo", 21], ["TWICE", "Jihyo", 22], ["LE SSERAFIM", "Chaewon", 23],
+          ["Red Velvet", "Irene", 24], ["IVE", "Gaeul", 25], ["aespa", "Ningning", 26],
+          ["fromis_9", "Chaeyoung", 27], ["TWICE", "Momo", 28],
+          ["Girls' Generation", "Sooyoung", 29], ["TWICE", "Dahyun", 30]
+        ]
+      },
+      {
+        period: "2025-12",
+        weight: 0.049,
+        ranks: [
+          ["IVE", "Wonyoung", 1], ["BLACKPINK", "Jennie", 2], ["BLACKPINK", "Rosé", 3],
+          ["BLACKPINK", "Lisa", 4], ["IVE", "Yujin", 5], ["MAMAMOO", "Hwasa", 6],
+          ["aespa", "Winter", 7], ["BLACKPINK", "Jisoo", 8], ["aespa", "Karina", 9],
+          ["ILLIT", "Wonhee", 10], ["Red Velvet", "Joy", 11], ["NMIXX", "Sullyoon", 12],
+          ["IVE", "Rei", 13], ["IVE", "Liz", 14], ["OH MY GIRL", "Mimi", 15],
+          ["TWICE", "Jihyo", 16], ["Girls' Generation", "Yoona", 17],
+          ["Red Velvet", "Seulgi", 18], ["aespa", "Ningning", 19],
+          ["LE SSERAFIM", "Chaewon", 20], ["TWICE", "Nayeon", 21],
+          ["Red Velvet", "Irene", 22], ["IVE", "Leeseo", 23], ["IVE", "Gaeul", 24],
+          ["Red Velvet", "Wendy", 25], ["Girls' Generation", "Taeyeon", 26],
+          ["LE SSERAFIM", "Yunjin", 27], ["aespa", "Giselle", 28],
+          ["TWICE", "Mina", 29], ["TWICE", "Dahyun", 30]
+        ]
+      },
+      {
+        period: "2025-11",
+        weight: 0.047,
+        ranks: [
+          ["IVE", "Wonyoung", 1], ["BLACKPINK", "Jennie", 2], ["BLACKPINK", "Rosé", 3],
+          ["BLACKPINK", "Lisa", 4], ["IVE", "Yujin", 5], ["aespa", "Winter", 6],
+          ["cignature", "Jiwon", 7], ["LE SSERAFIM", "Chaewon", 8], ["IVE", "Liz", 9],
+          ["BLACKPINK", "Jisoo", 10], ["Red Velvet", "Joy", 11], ["NMIXX", "Sullyoon", 12],
+          ["OH MY GIRL", "Mimi", 13], ["ILLIT", "Wonhee", 14], ["TWICE", "Nayeon", 15],
+          ["TWICE", "Jihyo", 16], ["IVE", "Rei", 17], ["TWICE", "Momo", 18],
+          ["aespa", "Giselle", 19], ["Red Velvet", "Seulgi", 20],
+          ["Hearts2Hearts", "Ian", 21], ["Red Velvet", "Irene", 22],
+          ["IVE", "Gaeul", 23], ["ITZY", "Yuna", 24], ["aespa", "Ningning", 25],
+          ["TWICE", "Jeongyeon", 26], ["LE SSERAFIM", "Yunjin", 27], ["TWICE", "Mina", 28],
+          ["Red Velvet", "Wendy", 29], ["IVE", "Leeseo", 30]
+        ]
+      },
+      {
+        period: "2025-10",
+        weight: 0.045,
+        ranks: [
+          ["IVE", "Wonyoung", 1], ["BLACKPINK", "Rosé", 2], ["BLACKPINK", "Jennie", 3],
+          ["BLACKPINK", "Lisa", 4], ["IVE", "Yujin", 5], ["aespa", "Winter", 6],
+          ["IVE", "Liz", 7], ["Red Velvet", "Joy", 8], ["WJSN", "Dayoung", 9],
+          ["BLACKPINK", "Jisoo", 10], ["Red Velvet", "Seulgi", 11], ["NMIXX", "Sullyoon", 12],
+          ["IVE", "Rei", 13], ["TWICE", "Nayeon", 14], ["Girls' Generation", "Yoona", 15],
+          ["WJSN", "Yeoreum", 16], ["TWICE", "Jihyo", 17],
+          ["LE SSERAFIM", "Chaewon", 18], ["aespa", "Giselle", 19], ["IVE", "Gaeul", 20],
+          ["Red Velvet", "Irene", 21], ["aespa", "Ningning", 22], ["Red Velvet", "Wendy", 23],
+          ["IVE", "Leeseo", 24], ["TWICE", "Jeongyeon", 25], ["cignature", "Jiwon", 26],
+          ["TWICE", "Mina", 27], ["OH MY GIRL", "YooA", 28], ["TWICE", "Dahyun", 29],
+          ["OH MY GIRL", "Mimi", 30]
         ]
       }
     ]
+  },
+  {
+    id: "gallupIdolHistory",
+    weight: 5,
+    topN: 10,
+    snapshots: [
+      { period: "2015", weight: 0.2, maxGeneration: 3, ranks: [
+        ["Girls' Generation", "Taeyeon", 3], ["SISTAR", "Hyolyn", 5], ["Apink", "Eunji", 6],
+        ["EXID", "Hani", 7], ["Girls' Generation", "Yoona", 8],
+        ["Miss A", "Suzy", 10], ["AOA", "Seolhyun", 10]
+      ] },
+      { period: "2016", weight: 0.2, maxGeneration: 3, ranks: [
+        ["Girls' Generation", "Taeyeon", 1], ["TWICE", "Tzuyu", 3], ["Apink", "Eunji", 6],
+        ["SISTAR", "Hyolyn", 7], ["AOA", "Seolhyun", 10]
+      ] },
+      { period: "2017", weight: 0.2, maxGeneration: 3, ranks: [
+        ["Red Velvet", "Irene", 4], ["TWICE", "Nayeon", 6], ["AOA", "Seolhyun", 9],
+        ["Girls' Generation", "Taeyeon", 9], ["TWICE", "Tzuyu", 9]
+      ] },
+      { period: "2018", weight: 0.2, maxGeneration: 3, ranks: [
+        ["BLACKPINK", "Jennie", 2], ["Red Velvet", "Irene", 4],
+        ["TWICE", "Nayeon", 6], ["BLACKPINK", "Jisoo", 10]
+      ] },
+      { period: "2019", weight: 0.2, maxGeneration: 3, ranks: [
+        ["TWICE", "Nayeon", 5], ["Red Velvet", "Irene", 6],
+        ["Girls' Generation", "Taeyeon", 7], ["BLACKPINK", "Jennie", 8],
+        ["MAMAMOO", "Hwasa", 9]
+      ] }
+    ]
+  },
+  {
+    id: "gallup2025",
+    weight: 5,
+    topN: 30,
+    snapshots: [{
+      period: "2025-13-39",
+      weight: 1,
+      ranks: [["BLACKPINK", "Rosé", 8], ["BLACKPINK", "Jennie", 12], ["MAMAMOO", "Hwasa", 20]]
+    }]
   },
   {
     id: "idolChartAnnual",
@@ -1010,7 +1189,7 @@ const popularityRankingSources = [
   },
   {
     id: "choeaedol",
-    weight: 10,
+    weight: 5,
     topN: 20,
     snapshots: [
       {
@@ -1097,21 +1276,32 @@ const popularityRankingSources = [
   },
   {
     id: "starnews",
-    weight: 10,
-    topN: 5,
+    weight: 7,
+    topN: 30,
     snapshots: [{
-      period: "2026-10-current",
+      period: "2026-10-poll-259",
       weight: 1,
       ranks: [
         ["NewJeans", "Minji", 1], ["NewJeans", "Hyein", 2],
-        ["NewJeans", "Hanni", 3], ["NewJeans", "Haerin", 4],
-        ["Red Velvet", "Irene", 5]
+        ["NewJeans", "Haerin", 3], ["Red Velvet", "Irene", 4],
+        ["NewJeans", "Hanni", 5], ["LE SSERAFIM", "Kazuha", 6],
+        ["Girls' Generation", "Yuri", 7], ["Girls' Generation", "Yoona", 8],
+        ["Red Velvet", "Wendy", 9], ["IVE", "Yujin", 10],
+        ["IVE", "Wonyoung", 11], ["BLACKPINK", "Jisoo", 12],
+        ["Girls' Generation", "Seohyun", 13], ["MAMAMOO", "Hwasa", 15],
+        ["Girls' Generation", "Taeyeon", 16], ["ILLIT", "Minju", 18],
+        ["LE SSERAFIM", "Chaewon", 19], ["RESCENE", "Minami", 20],
+        ["aespa", "Ningning", 21], ["RESCENE", "Woni", 22],
+        ["ILLIT", "Yunah", 23], ["IVE", "Rei", 24],
+        ["NMIXX", "Haewon", 25], ["fromis_9", "Jiwon", 26],
+        ["fromis_9", "Hayoung", 27], ["BLACKPINK", "Rosé", 28],
+        ["LE SSERAFIM", "Eunchae", 29], ["LE SSERAFIM", "Sakura", 30]
       ]
     }]
   },
   {
     id: "fannstar",
-    weight: 5,
+    weight: 3,
     topN: 16,
     snapshots: [{
       period: "2026-10-current",
@@ -1156,14 +1346,28 @@ popularityRankingSources.forEach(source => {
 
 idols.forEach(idol => {
   const sourceRanks = popularityRanksByMember.get(memberRankingKey(idol.group, idol.name)) || {};
-  const compositeScore = popularityRankingSources.reduce((score, source) => {
-    const weightedSnapshotScore = source.snapshots.reduce((snapshotScore, snapshot) => {
+  const generationNumber = Number(idol.generation.match(/\d+/)?.[0] || 0);
+  let applicableSourceWeight = 0;
+  const weightedScore = popularityRankingSources.reduce((score, source) => {
+    const eligibleSnapshots = source.snapshots.filter(snapshot =>
+      !snapshot.maxGeneration || generationNumber <= snapshot.maxGeneration
+    );
+    if (eligibleSnapshots.length === 0) return score;
+
+    const eligibleSnapshotWeight = eligibleSnapshots.reduce((total, snapshot) =>
+      total + snapshot.weight, 0);
+    const weightedSnapshotScore = eligibleSnapshots.reduce((snapshotScore, snapshot) => {
       const rank = sourceRanks[source.id]?.[snapshot.period];
       if (!rank) return snapshotScore;
-      return snapshotScore + ((source.topN + 1 - rank) / source.topN) * snapshot.weight;
+      return snapshotScore + ((source.topN + 1 - rank) / source.topN) *
+        (snapshot.weight / eligibleSnapshotWeight);
     }, 0);
+    applicableSourceWeight += source.weight;
     return score + weightedSnapshotScore * source.weight;
   }, 0);
+  const compositeScore = applicableSourceWeight
+    ? weightedScore * (100 / applicableSourceWeight)
+    : 0;
 
   idol.popularityScore = Math.round(compositeScore * 10) / 10;
   idol.popularityStars = compositeScore > 0 ? 2 : 1;
@@ -1172,8 +1376,14 @@ idols.forEach(idol => {
   idol.popularitySources = sourceRanks;
 });
 
-const rankedIdols = idols
-  .filter(idol => idol.popularityScore > 0)
+const rankedIdolByPerson = new Map();
+idols.filter(idol => idol.popularityScore > 0).forEach(idol => {
+  const current = rankedIdolByPerson.get(idol.personKey);
+  if (!current || idol.popularityScore > current.popularityScore) {
+    rankedIdolByPerson.set(idol.personKey, idol);
+  }
+});
+const rankedIdols = [...rankedIdolByPerson.values()]
   .sort((a, b) => b.popularityScore - a.popularityScore ||
     a.japaneseName.localeCompare(b.japaneseName, "ja"));
 
@@ -1200,6 +1410,23 @@ rankedIdolsByGeneration.forEach(generationIdols => {
     }
     start = end;
   }
+});
+
+const bestPopularityByPerson = new Map();
+idols.forEach(idol => {
+  const current = bestPopularityByPerson.get(idol.personKey);
+  if (!current || idol.popularityScore > current.popularityScore) {
+    bestPopularityByPerson.set(idol.personKey, idol);
+  }
+});
+idols.forEach(idol => {
+  const best = bestPopularityByPerson.get(idol.personKey);
+  if (!best || best === idol) return;
+  idol.popularityScore = best.popularityScore;
+  idol.popularityStars = best.popularityStars;
+  idol.popularitySortScore = best.popularitySortScore;
+  idol.popularitySources = best.popularitySources;
+  idol.individualPopularityRank = best.individualPopularityRank;
 });
 
 const $ = id => document.getElementById(id);
@@ -1242,6 +1469,12 @@ let selectedId = null;
 let gameStarted = false;
 let finalResultsWasVisible = false;
 let drafted = new Set();
+function personHasBeenDrafted(idol) {
+  return drafted.has(idol.personKey || idol.id);
+}
+function markPersonDrafted(idol) {
+  drafted.add(idol.personKey || idol.id);
+}
 let pendingDraftPickId = null;
 let picks = Object.fromEntries(teamNames.map(team => [team, []]));
 let round = 1;
@@ -1313,7 +1546,19 @@ const dependentFilters = [
   { id: "groupFilter", field: "group" }
 ];
 
-function getCandidates(ignoreFilter = "") {
+function preferredPersonCandidates(candidates, query = "") {
+  const preferred = new Map();
+  const priority = idol =>
+    (query && normalizeSearchText(idol.group).includes(query) ? 100 : 0) +
+    (idol.activity === "活動中" ? 10 : idol.activity === "活動休止" ? 5 : 0);
+  candidates.forEach(idol => {
+    const current = preferred.get(idol.personKey);
+    if (!current || priority(idol) > priority(current)) preferred.set(idol.personKey, idol);
+  });
+  return [...preferred.values()];
+}
+
+function getCandidates(ignoreFilter = "", dedupePeople = true) {
   const query = normalizeSearchText($("searchInput").value.trim());
   const generation = ignoreFilter === "generationFilter" ? "" : $("generationFilter").value;
   const nationality = ignoreFilter === "nationalityFilter" ? "" : $("nationalityFilter").value;
@@ -1321,9 +1566,9 @@ function getCandidates(ignoreFilter = "") {
   const group = ignoreFilter === "groupFilter" ? "" : $("groupFilter").value;
   const hideDrafted = $("hideDrafted").checked;
 
-  return idols.filter(idol => {
+  const candidates = idols.filter(idol => {
     const matchesText = !query ||
-      [idol.name, idol.japaneseName, idol.koreanName, idol.group, idol.nationality, idol.agency]
+      [idol.name, idol.japaneseName, idol.japaneseSearchName, idol.koreanName, idol.group, idol.nationality, idol.agency]
         .some(value => normalizeSearchText(value).includes(query));
 
     return matchesText &&
@@ -1331,9 +1576,10 @@ function getCandidates(ignoreFilter = "") {
       (!nationality || idol.nationality === nationality) &&
       (!agency || idol.agency === agency) &&
       (!group || idol.group === group) &&
-      (!hideDrafted || !drafted.has(idol.id)) &&
+      (!hideDrafted || !personHasBeenDrafted(idol)) &&
       ($("showExcluded").checked || !excluded.has(idol.id));
-  }).sort((a, b) =>
+  });
+  return (dedupePeople ? preferredPersonCandidates(candidates, query) : candidates).sort((a, b) =>
     b.popularityStars - a.popularityStars ||
     b.popularitySortScore - a.popularitySortScore ||
     a.japaneseName.localeCompare(b.japaneseName, "ja")
@@ -1346,7 +1592,7 @@ function updateDependentFilters() {
     dependentFilters.forEach(filter => {
       const select = $(filter.id);
       const current = select.value;
-      const values = [...new Set(getCandidates(filter.id).map(idol => idol[filter.field]))]
+      const values = [...new Set(getCandidates(filter.id, false).map(idol => idol[filter.field]))]
         .sort((a, b) => a.localeCompare(b));
 
       select.innerHTML = '<option value="">すべて</option>' + values.map(value =>
@@ -1383,10 +1629,13 @@ function renderCandidates() {
     return;
   }
 
+  const nominatedPersonKeys = new Set(r1Nominations.map(item =>
+    idols.find(idol => idol.id === item.id)?.personKey
+  ).filter(Boolean));
   $("candidateList").innerHTML = list.map(idol => {
     const isExcluded = excluded.has(idol.id);
-    const isNominated = !r1Started && r1Nominations.some(item => item.id === idol.id);
-    const isUnavailable = isExcluded || drafted.has(idol.id);
+    const isNominated = !r1Started && nominatedPersonKeys.has(idol.personKey);
+    const isUnavailable = isExcluded || personHasBeenDrafted(idol);
     const isSelected = selectedId === idol.id || pendingDraftPickId === idol.id || isNominated;
     const selectHint = isUnavailable
       ? (isExcluded ? "除外中" : "指名済み")
@@ -1439,7 +1688,7 @@ function renderCandidates() {
 
 function selectMember(id) {
   const idol = idols.find(item => item.id === id);
-  if (!idol || excluded.has(id) || drafted.has(id)) return;
+  if (!idol || excluded.has(id) || personHasBeenDrafted(idol)) return;
 
   if (!gameStarted) {
     selectedId = id;
@@ -1468,7 +1717,7 @@ function cancelDraftPick() {
 function confirmDraftPick() {
   if (!$("pickReveal").hidden || pendingR1Resolution) return;
   const idol = idols.find(item => item.id === pendingDraftPickId);
-  if (!idol || excluded.has(idol.id) || drafted.has(idol.id)) {
+  if (!idol || excluded.has(idol.id) || personHasBeenDrafted(idol)) {
     cancelDraftPick();
     return;
   }
@@ -1535,7 +1784,7 @@ $("resetFilters").addEventListener("click", () => {
 ].forEach(id => $(id).addEventListener("change", renderCandidates));
 
 $("randomButton").addEventListener("click", () => {
-  const list = getCandidates().filter(idol => !excluded.has(idol.id) && !drafted.has(idol.id));
+  const list = getCandidates().filter(idol => !excluded.has(idol.id) && !personHasBeenDrafted(idol));
   if (list.length === 0) {
     $("randomResult").hidden = false;
     $("randomResult").textContent = "選べる候補がいないので、条件を変えてみてね。";
@@ -1740,7 +1989,9 @@ function currentTeamName() {
 }
 
 function availableForAI() {
-  return idols.filter(idol => !drafted.has(idol.id) && !excluded.has(idol.id));
+  return preferredPersonCandidates(
+    idols.filter(idol => !personHasBeenDrafted(idol) && !excluded.has(idol.id))
+  );
 }
 
 function chooseAIIdol(team) {
@@ -1772,6 +2023,7 @@ function chooseAIIdol(team) {
 function pickRecord(idol, pickRound = round) {
   return {
     round: pickRound,
+    personKey: idol.personKey,
     name: idol.japaneseName,
     group: idol.group,
     agency: idol.agency,
@@ -1956,7 +2208,7 @@ function revealLotteryResults(reveal) {
       });
     });
     picks[winner].push(pickRecord(reveal.idol, 1));
-    drafted.add(reveal.idol.id);
+    markPersonDrafted(reveal.idol);
     if (pendingR1Resolution) {
       pendingR1Resolution.waiting.delete(winner);
       pendingR1Resolution.results.push(`${reveal.idol.japaneseName}：${displayTeamName(winner)}が当選`);
@@ -2109,7 +2361,7 @@ function advanceAfterPick() {
 function recordPick(team, idol) {
   const pickRound = round;
   picks[team].push(pickRecord(idol, pickRound));
-  drafted.add(idol.id);
+  markPersonDrafted(idol);
   advanceAfterPick();
   queuePickReveal(team, idol, pickRound);
 }
@@ -2185,25 +2437,23 @@ function resolveFirstRound() {
   const byMember = new Map();
 
   nominations.filter(item => item.id).forEach(item => {
-    if (!byMember.has(item.id)) byMember.set(item.id, []);
-    byMember.get(item.id).push(item.team);
+    const nominee = idols.find(idol => idol.id === item.id);
+    if (!nominee) return;
+    const personKey = nominee.personKey || nominee.id;
+    if (!byMember.has(personKey)) byMember.set(personKey, { idol: nominee, teams: [] });
+    byMember.get(personKey).teams.push(item.team);
   });
 
   const results = [];
   const lotteries = [];
   const winningPicks = [];
 
-  byMember.forEach((teams, id) => {
-    const idol = idols.find(item => item.id === id);
-    if (!idol) {
-      teams.forEach(team => waiting.add(team));
-      return;
-    }
+  byMember.forEach(({ idol, teams }, personKey) => {
 
     if (teams.length === 1) {
       const team = teams[0];
       picks[team].push(pickRecord(idol, 1));
-      drafted.add(id);
+      drafted.add(personKey);
       winningPicks.push({ team, idol });
       return;
     }
