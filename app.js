@@ -1682,10 +1682,14 @@ function renderCandidates() {
     return;
   }
 
-  const nominatedPersonKeys = new Set(r1Nominations.map(item =>
-    idols.find(idol => idol.id === item.id)?.personKey
-  ).filter(Boolean));
+  const nominatedPersonKeys = areOnlineR1BidsSealed()
+    ? new Set()
+    : new Set(r1Nominations.map(item =>
+      idols.find(idol => idol.id === item.id)?.personKey
+    ).filter(Boolean));
   const currentTeam = gameStarted ? currentTeamName() : "";
+  const ownOnlineTeam = activeMode === "online" ? teamOwnerUid(onlineUid) : "";
+  const ownOnlineBidSubmitted = Boolean(ownOnlineTeam && r1Nominations.some(item => item.team === ownOnlineTeam));
   const canPickNow = !gameStarted || Boolean(
     currentTeam && canControlTeam(currentTeam) && !onlineActionPending && $("pickReveal").hidden && !pendingR1Resolution
   );
@@ -1697,7 +1701,9 @@ function renderCandidates() {
     const selectHint = isUnavailable
       ? (isExcluded ? "除外中" : "指名済み")
       : gameStarted && !canPickNow
-        ? "あなたの指名番ではありません"
+        ? (ownOnlineBidSubmitted && areOnlineR1BidsSealed()
+          ? "入札提出済み・開示待ち"
+          : "あなたの指名番ではありません")
       : pendingDraftPickId === idol.id
         ? "✓ 選択中・確認して提出"
         : isNominated
@@ -1759,7 +1765,7 @@ function selectMember(id) {
   if (!$("pickReveal").hidden || pendingR1Resolution || onlineActionPending) return;
   const team = currentTeamName();
   if (!team || !canControlTeam(team)) return;
-  if (!r1Started && team !== r1NominationOrder[r1NominationIndex]) return;
+  if (!r1Started && !canSubmitR1Nomination(team)) return;
 
   pendingDraftPickId = idol.id;
   $("randomResult").hidden = true;
@@ -1773,15 +1779,15 @@ function cancelDraftPick() {
   renderCandidates();
 }
 
-function confirmDraftPick() {
+function confirmDraftPick(submittingUid = "") {
   if (!$("pickReveal").hidden || pendingR1Resolution) return;
   const idol = idols.find(item => item.id === pendingDraftPickId);
   if (!idol || excluded.has(idol.id) || personHasBeenDrafted(idol)) {
     cancelDraftPick();
     return;
   }
-  const team = currentTeamName();
-  if (!team || !canControlTeam(team)) return;
+  const team = submittingUid ? teamOwnerUid(submittingUid) : currentTeamName();
+  if (!team || !canControlTeam(team, submittingUid || onlineUid)) return;
   if (activeMode === "online" && !onlineIsHost) {
     submitOnlineAction({ kind: "pick", idolId: idol.id });
     return;
@@ -1790,10 +1796,10 @@ function confirmDraftPick() {
   pendingDraftPickId = null;
   selectedId = null;
   if (!r1Started) {
-    if (team !== r1NominationOrder[r1NominationIndex]) return;
+    if (!canSubmitR1Nomination(team)) return;
     r1Nominations.push({ team, id: idol.id });
     r1NominationIndex += 1;
-    queuePickReveal(team, idol, 1, "nomination");
+    if (activeMode !== "online") queuePickReveal(team, idol, 1, "nomination");
     if (r1NominationIndex >= r1NominationOrder.length) {
       resolveFirstRound();
     }
@@ -1804,9 +1810,10 @@ function confirmDraftPick() {
   renderDraft();
   renderCandidates();
   advanceAI();
+  syncOnlineState();
 }
 
-$("confirmPick").addEventListener("click", confirmDraftPick);
+$("confirmPick").addEventListener("click", () => confirmDraftPick());
 $("cancelPick").addEventListener("click", cancelDraftPick);
 
 $("candidateList").addEventListener("click", event => {
@@ -1913,7 +1920,8 @@ function renderNominations() {
 
   $("nominationList").innerHTML = teamNames.map(team => {
     const nomination = r1Nominations.find(item => item.team === team);
-    const idol = nomination && idols.find(item => item.id === nomination.id);
+    const sealed = areOnlineR1BidsSealed();
+    const idol = nomination && !sealed && idols.find(item => item.id === nomination.id);
     const firstPick = (picks[team] || []).find(item => item.round === 1);
     const isCurrent = team === currentTeamName();
     const attemptLabel = r1NominationAttempt === 1
@@ -1921,12 +1929,14 @@ function renderNominations() {
       : `${r1NominationAttempt}回目の再指名`;
     const status = firstPick
       ? `1巡目確定：${escapeHTML(firstPick.name)}`
+      : sealed && nomination
+        ? "入札提出済み・開示待ち"
       : idol
         ? `抽選待ち：${escapeHTML(idol.japaneseName)}`
       : isCurrent
-        ? (aiTeams.has(team) ? `AIが${attemptLabel}中` : `${attemptLabel}する番です`)
+        ? (aiTeams.has(team) ? `AIが${attemptLabel}中` : activeMode === "online" ? "入札できます" : `${attemptLabel}する番です`)
         : r1NominationOrder.includes(team)
-          ? `指名順待ち（${attemptLabel}）`
+          ? (activeMode === "online" ? "入札待ち" : `指名順待ち（${attemptLabel}）`)
           : "次の再指名待ち";
     return `
       <div class="nomination-row ${isCurrent ? "is-current" : ""} ${firstPick ? "is-resolved" : ""}">
@@ -2324,8 +2334,8 @@ function teamOwnerUid(team) {
   )?.[0] || "";
 }
 
-function canControlTeam(team) {
-  if (activeMode === "online") return Boolean(onlineUid && teamOwnerUid(team) === onlineUid);
+function canControlTeam(team, actorUid = onlineUid) {
+  if (activeMode === "online") return Boolean(actorUid && teamOwnerUid(team) === actorUid);
   return !aiTeams.has(team);
 }
 
@@ -2367,6 +2377,8 @@ function restoreOnlineReveal(source) {
 }
 
 function serializeOnlineGame() {
+  const sealR1Bids = !r1Started && !pendingR1Resolution &&
+    r1NominationIndex < r1NominationOrder.length;
   return {
     teamNames,
     gameStarted,
@@ -2377,7 +2389,9 @@ function serializeOnlineGame() {
     r1NominationOrder,
     r1NominationIndex,
     r1NominationAttempt,
-    r1Nominations,
+    r1Nominations: sealR1Bids
+      ? r1Nominations.map(({ team }) => ({ team, id: "" }))
+      : r1Nominations,
     r1Queue,
     pendingR1Resolution: pendingR1Resolution ? {
       batchOrder: pendingR1Resolution.batchOrder,
@@ -2582,9 +2596,20 @@ async function processOnlineAction(snapshot) {
   const revealMatches = Boolean(action?.revealKey && action.revealKey === currentRevealKey());
   try {
     if (!action || !onlinePlayers[action.uid]) return;
-    if (action?.kind === "pick" && ownerTeam && ownerTeam === currentTeamName()) {
+    const canAcceptPick = action?.kind === "pick" && ownerTeam && (
+      !r1Started ? canSubmitR1Nomination(ownerTeam) : ownerTeam === currentTeamName()
+    );
+    if (canAcceptPick) {
+      const localPendingPickId = pendingDraftPickId;
       pendingDraftPickId = String(action.idolId || "");
-      confirmDraftPick();
+      try {
+        confirmDraftPick(action.uid);
+      } finally {
+        pendingDraftPickId = localPendingPickId;
+        renderNominations();
+        renderDraft();
+        renderCandidates();
+      }
     } else if (action?.kind === "envelope" && revealMatches && activePickReveal?.type === "lottery") {
       const drawer = activePickReveal.drawOrder[activePickReveal.drawIndex];
       if (drawer && teamOwnerUid(drawer) === action.uid) selectLotteryEnvelope(action.envelope, false, action.uid);
@@ -2738,9 +2763,25 @@ function allTeamsComplete() {
   return teamNames.length > 0 && teamNames.every(teamIsComplete);
 }
 
+function canSubmitR1Nomination(team) {
+  if (!team || !r1NominationOrder.includes(team) || r1Nominations.some(item => item.team === team)) return false;
+  return activeMode === "online" || team === r1NominationOrder[r1NominationIndex];
+}
+
+function areOnlineR1BidsSealed() {
+  return activeMode === "online" && !r1Started && !pendingR1Resolution &&
+    r1NominationIndex < r1NominationOrder.length;
+}
+
 function currentTeamName() {
   if (!gameStarted) return null;
-  if (!r1Started) return r1NominationOrder[r1NominationIndex] || null;
+  if (!r1Started) {
+    if (activeMode === "online") {
+      const ownTeam = teamOwnerUid(onlineUid);
+      return canSubmitR1Nomination(ownTeam) ? ownTeam : null;
+    }
+    return r1NominationOrder[r1NominationIndex] || null;
+  }
   if (allTeamsComplete()) return null;
   while (turnIndex < waiverOrder.length && teamIsComplete(waiverOrder[turnIndex])) {
     turnIndex += 1;
@@ -3330,7 +3371,6 @@ function resolveFirstRound() {
   pendingR1Resolution = { batchOrder, waiting, results };
   r1NominationOrder = [];
   r1NominationIndex = 0;
-  r1Nominations = [];
   selectedId = null;
 
   lotteries.forEach(event => queuePickReveal(event.team, event.idol, 1, "lottery", event));
@@ -3366,6 +3406,9 @@ function renderFinalSnapshot() {
 
 function renderDraft() {
   const currentTeam = currentTeamName();
+  const ownOnlineTeam = activeMode === "online" ? teamOwnerUid(onlineUid) : "";
+  const ownOnlineSubmitted = Boolean(ownOnlineTeam && r1Nominations.some(item => item.team === ownOnlineTeam));
+  const ownOnlineFirstPick = Boolean(ownOnlineTeam && (picks[ownOnlineTeam] || []).some(item => item.round === 1));
   const finished = Boolean(
     gameStarted && allTeamsComplete() && !pendingR1Resolution &&
     $("pickReveal").hidden && pickRevealQueue.length === 0
@@ -3400,19 +3443,35 @@ function renderDraft() {
     $("draftHint").textContent = "設定を選んで「ドラフトを始める」を押してね。";
     $("selectedMember").textContent = "開始後は候補カードを選び、確認してから指名を提出できます。";
   } else if (pendingR1Resolution) {
-    $("draftHint").textContent = "1巡目の指名を順番に発表しています。抽選がある場合は、外れたチームが再指名します。";
+    $("draftHint").textContent = activeMode === "online"
+      ? "全チームの1巡目入札を一斉公開しました。抽選がある場合は、当選チームを決めています。"
+      : "1巡目の指名を順番に発表しています。抽選がある場合は、外れたチームが再指名します。";
     $("selectedMember").textContent = "発表が終わるまで次の指名はできません。";
   } else if (!r1Started) {
     const secured = teamNames.filter(team => (picks[team] || []).some(item => item.round === 1)).length;
     const currentStage = r1NominationAttempt === 1 ? "初回指名" : `${r1NominationAttempt}回目の再指名`;
-    $("draftHint").textContent = currentTeam
-      ? canControlTeam(currentTeam)
-        ? `${displayTeamName(currentTeam)}の${currentStage}番です。候補を選んで確認し、指名を提出してください。`
-        : `${displayTeamName(currentTeam)}の${currentStage}です。相手が指名しています。`
-      : "次の指名チームを準備しています。";
+    $("draftHint").textContent = activeMode === "online"
+      ? ownOnlineSubmitted
+        ? "入札を提出済みです。今回の対象チームが全員提出すると、1巡目の候補を一斉に公開します。"
+        : ownOnlineFirstPick
+          ? "1巡目の指名は確定済みです。抽選と再入札が終わるまでお待ちください。"
+          : currentTeam
+            ? `${displayTeamName(currentTeam)}の${currentStage}を選んで提出してください。他チームの入札は提出がそろうまで非公開です。`
+            : "他チームの入札がそろうのを待っています。"
+      : currentTeam
+        ? canControlTeam(currentTeam)
+          ? `${displayTeamName(currentTeam)}の${currentStage}番です。候補を選んで確認し、指名を提出してください。`
+          : `${displayTeamName(currentTeam)}の${currentStage}です。相手が指名しています。`
+        : "次の指名チームを準備しています。";
     $("selectedMember").textContent = pendingIdol
       ? `${pendingIdol.japaneseName}を選択中です。確認ボタンを押すと指名が提出されます。`
-      : `${secured} / ${teamNames.length}チームの1巡目指名が確定。外れたチームは当たるまで再指名できます。`;
+      : activeMode === "online"
+        ? ownOnlineSubmitted
+          ? "提出済み。ほかのチームの提出を待っています。"
+          : ownOnlineFirstPick
+            ? "あなたの1巡目指名は確定しました。"
+            : "候補カードを選んで、すぐ下の確認ボタンから入札を提出してください。"
+        : `${secured} / ${teamNames.length}チームの1巡目指名が確定。外れたチームは当たるまで再指名できます。`;
   } else if (!currentTeam) {
     $("draftHint").textContent = "全チームの指名が完了しました。";
     $("selectedMember").textContent = "ドラフト終了！設定を変えて、もう一度遊べるよ。";
@@ -3447,6 +3506,8 @@ function renderDraft() {
     ? `各チーム${pickLimit}人。ドラフト開始後、巡目ごとに表示します。`
     : finished
       ? "全チームの指名が完了しました。"
+      : areOnlineR1BidsSealed()
+        ? `${r1NominationIndex} / ${r1NominationOrder.length}チームが入札を提出。対象チームがそろうと一斉公開します。`
       : !r1Started
         ? teamNames.filter(team => (picks[team] || []).some(item => item.round === 1)).length + " / " + teamNames.length + "チームが1巡目確定。重複は抽選し、落選チームは再指名します。"
         : `${round}巡目を進行中です。`;
@@ -3478,17 +3539,24 @@ function renderDraft() {
     if (pickRound === 1 && gameStarted) {
       const nomination = r1Nominations.find(item => item.team === team);
       const nominee = nomination && idols.find(item => item.id === nomination.id);
+      if (areOnlineR1BidsSealed() && nomination) {
+        return `${lossMarkup}<div class="draft-cell-card draft-nomination">
+          <small>1巡目入札</small>
+          <strong>提出済み・非公開</strong>
+          <span>全員の提出後に開示</span>
+        </div>`;
+      }
+      if (nominee) {
+        return `${lossMarkup}<div class="draft-cell-card draft-nomination">
+          <small>入札公開・抽選待ち</small>
+          <strong>${escapeHTML(nominee.japaneseName)}</strong>
+          <span>${escapeHTML(nominee.group)}</span>
+        </div>`;
+      }
       if (!r1Started && r1NominationOrder.includes(team)) {
-        if (nominee) {
-          return `${lossMarkup}<div class="draft-cell-card draft-nomination">
-            <small>抽選待ち</small>
-            <strong>${escapeHTML(nominee.japaneseName)}</strong>
-            <span>${escapeHTML(nominee.group)}</span>
-          </div>`;
-        }
         return `${lossMarkup}<div class="draft-cell-card draft-lottery-wait">
-          <small>${team === currentTeam ? "再指名中" : "再指名待ち"}</small>
-          <strong>${team === currentTeam ? "候補を選択" : "抽選待ち"}</strong>
+          <small>${activeMode === "online" ? (team === currentTeam ? "あなたの入札" : "入札") : (team === currentTeam ? "再指名中" : "再指名待ち")}</small>
+          <strong>${activeMode === "online" ? (team === currentTeam ? "候補を選択" : "提出待ち") : (team === currentTeam ? "候補を選択" : "抽選待ち")}</strong>
         </div>`;
       }
     }
