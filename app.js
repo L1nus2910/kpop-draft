@@ -2979,9 +2979,17 @@ function resumeOnlineHostProgress() {
 function submitOnlineAction(action) {
   if (!onlineRoomRef) {
     setOnlineStatus("ルームへの接続が切れています。再接続してから、もう一度押してください。");
-    return;
+    if (action.kind === "next") {
+      $("pickRevealActionHint").textContent = "ルームに接続できていません。再接続後にもう一度押してください。";
+    }
+    return false;
   }
-  if (onlineIsHost || onlineActionPending) return;
+  if (onlineIsHost || onlineActionPending) {
+    if (action.kind === "next" && onlineActionPending) {
+      $("pickRevealActionHint").textContent = "確認を送信中です。少し待ってください。";
+    }
+    return false;
+  }
   onlineActionPending = true;
   renderDraft();
   renderOnlinePickReveal();
@@ -3032,6 +3040,7 @@ function submitOnlineAction(action) {
       $("pickRevealActionHint").textContent = "確認を送信しましたが、ホストから応答がありません。通信状態を確認して、もう一度押してください。";
     }
   }, 12000);
+  return true;
 }
 
 function enqueueOnlineAction(snapshot) {
@@ -3796,32 +3805,54 @@ function revealPickCard() {
 
 function advancePickReveal() {
   if (activeMode === "online") {
-    if (pickRevealPhase !== "revealed" ||
-        onlineRevealAutoAdvanceDelay() > 0 ||
-        (activePickReveal?.type === "lottery" && !activePickReveal.winner)) return;
-    if (!onlineIsHost) submitOnlineAction({ kind: "next" });
-    else acknowledgeOnlineReveal(onlineUid);
-    return;
+    if (onlineActionPending) {
+      $("pickRevealActionHint").textContent = "確認を送信中です。少し待ってください。";
+      return false;
+    }
+    if (pickRevealPhase !== "revealed") {
+      $("pickRevealActionHint").textContent = "発表演出が終わってから確認できます。";
+      return false;
+    }
+    if (onlineRevealAutoAdvanceDelay() > 0) {
+      $("pickRevealActionHint").textContent = "この発表は数秒後に自動で次へ進みます。";
+      return false;
+    }
+    if (activePickReveal?.type === "lottery" && !activePickReveal.winner) {
+      $("pickRevealActionHint").textContent = "抽選結果が開示されてから次へ進めます。";
+      return false;
+    }
+    if (!onlineIsHost) return submitOnlineAction({ kind: "next" });
+    const accepted = acknowledgeOnlineReveal(onlineUid);
+    if (!accepted) {
+      $("pickRevealActionHint").textContent = "この端末は確認対象ではないか、ルーム接続が切れています。";
+    }
+    return accepted;
   }
   if (pickRevealPhase === "intro") revealPickCard();
   else if (pickRevealPhase === "revealed" && (
     activePickReveal?.type !== "lottery" ||
     Boolean(activePickReveal.winner)
   )) showNextPickReveal();
+  else return false;
+  return true;
 }
 
 const pickRevealNextButton = $("pickRevealNext");
-pickRevealNextButton.addEventListener("pointerup", event => {
-  if (event.pointerType === "mouse" && event.button !== 0) return;
-  lastPickRevealPointerActionAt = Date.now();
-  advancePickReveal();
-});
-pickRevealNextButton.addEventListener("click", event => {
-  // Pointer devices already advanced on pointerup; retain click for keyboard
-  // activation and browsers without Pointer Events.
-  if (event.detail > 0 && Date.now() - lastPickRevealPointerActionAt < 800) return;
-  advancePickReveal();
-});
+function handlePickRevealNextActivation(event) {
+  if (event.type === "pointerup" && event.pointerType === "mouse" && event.button !== 0) return;
+  if (event.type === "touchend") event.preventDefault();
+
+  const isDirectTouch = event.type === "pointerup" || event.type === "touchend";
+  if (Date.now() - lastPickRevealPointerActionAt < 800 && (isDirectTouch || event.detail > 0)) return;
+
+  const accepted = advancePickReveal();
+  // Only suppress the browser's follow-up click after an activation was
+  // actually accepted. A rejected pointer event must leave click as fallback.
+  if (accepted && isDirectTouch) lastPickRevealPointerActionAt = Date.now();
+}
+pickRevealNextButton.addEventListener("pointerup", handlePickRevealNextActivation);
+pickRevealNextButton.addEventListener("touchend", handlePickRevealNextActivation, { passive: false });
+pickRevealNextButton.addEventListener("click", handlePickRevealNextActivation);
 $("pickRevealSkip").addEventListener("click", skipCurrentPickReveal);
 $("lotteryTickets").addEventListener("click", event => {
   const button = event.target.closest("button[data-lottery-envelope]");
