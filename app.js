@@ -942,6 +942,59 @@ const idols = groups.flatMap(group =>
   }))
 );
 
+const agencyShortLabels = {
+  "SM Entertainment": "SM",
+  "JYP Entertainment": "JYP",
+  "YG Entertainment": "YG",
+  "STARSHIP Entertainment": "STARSHIP",
+  "SOURCE MUSIC": "SOURCE",
+  "OFF THE RECORD（プロジェクト）": "OTR",
+  "CJ ENM（プロジェクト）": "CJ ENM",
+  "BELIFT LAB": "BELIFT",
+  "Choi Creative Lab": "CCL",
+  "Dreamcatcher Company": "DC Co.",
+  "High Up Entertainment": "High Up",
+  "The Muze Entertainment": "The Muze",
+  "The Black Label": "TBL",
+  "HYBE x Geffen Records": "HYBE × Geffen",
+  "BlockBerry Creative（旧所属）": "BlockBerry",
+  "Dream T Entertainment": "Dream T"
+};
+
+function fullAgencyName(group, agency = "") {
+  const value = String(agency || "").trim();
+  return value && value !== "未確認" ? value : (agencyByGroup[group] || value);
+}
+
+function shortAgencyName(agency) {
+  const value = String(agency || "").trim();
+  if (!value || value === "未確認") return "";
+  if (agencyShortLabels[value]) return agencyShortLabels[value];
+  return value
+    .replace(/\s+Entertainment$/i, "")
+    .replace(/\s+Company$/i, " Co.")
+    .replace(/\s+Records$/i, " Rec.")
+    .replace(/（プロジェクト）|（旧所属）/g, "")
+    .trim();
+}
+
+function memberAffiliationLabel(member) {
+  const agency = shortAgencyName(fullAgencyName(member?.group, member?.agency));
+  return [agency, String(member?.group || "").trim()].filter(Boolean).join(" · ");
+}
+
+function memberAffiliationTitle(member) {
+  const agency = fullAgencyName(member?.group, member?.agency);
+  return [agency, member?.group].filter(Boolean).join(" / ");
+}
+function memberAffiliationMarkup(member) {
+  const agency = shortAgencyName(fullAgencyName(member?.group, member?.agency));
+  const group = String(member?.group || "").trim();
+  return '<span class="affiliation-lines">' +
+    (agency ? '<span class="affiliation-agency">' + escapeHTML(agency) + '</span>' : '') +
+    (group ? '<span class="affiliation-group">' + escapeHTML(group) + '</span>' : '') +
+    '</span>';
+}
 const popularityRankingSources = [
   {
     id: "brandReputation",
@@ -1527,6 +1580,7 @@ let turnIndex = 0;
 let lotterySummary = "";
 let pickLimit = 5;
 let orderMode = "snake";
+let startOrderMode = "fixed";
 let firstRoundLotteryLosses = {};
 let onlineRoomRef = null;
 let onlineRoomCode = "";
@@ -2109,7 +2163,9 @@ function setOnlineRoomConnected(code, isHost, initialPlayers = null, deferGameAc
     const settings = snapshot.val();
     if (!settings) return;
     $("pickLimit").value = String(settings.pickLimit || 5);
-    $("orderMode").value = settings.orderMode || "snake";
+    const savedOrderMode = settings.orderMode || "snake";
+    $("orderMode").value = savedOrderMode === "random" ? "fixed" : savedOrderMode;
+    $("startOrderMode").value = settings.startOrderMode || (savedOrderMode === "random" ? "random" : "fixed");
     updateModeSetup();
   });
 
@@ -2199,7 +2255,7 @@ async function createOnlineRoom() {
     await roomRef.set({
       hostUid: uid,
       status: "lobby",
-      settings: { pickLimit: Number($("pickLimit").value), orderMode: $("orderMode").value },
+      settings: { pickLimit: Number($("pickLimit").value), orderMode: $("orderMode").value, startOrderMode: $("startOrderMode").value },
       players: { [uid]: { name: baseName, teamName: baseName, order: 0, host: true } }
     });
     setOnlineRoomConnected(code, true);
@@ -2416,6 +2472,7 @@ function serializeOnlineGame() {
     lotterySummary,
     pickLimit,
     orderMode,
+    startOrderMode,
     firstRoundLotteryLosses,
     pickRevealQueue: pickRevealQueue.map(serializeOnlineReveal),
     activePickReveal: serializeOnlineReveal(activePickReveal),
@@ -2458,8 +2515,8 @@ function renderOnlinePickReveal() {
   $("pickRevealTeamBand").hidden = isLottery;
   $("pickRevealCaption").textContent = isLottery ? "封筒を選んで、交渉権を引き当てよう" : "選ばれたメンバーは…";
   $("pickRevealName").textContent = reveal.idol.japaneseName;
-  $("pickRevealAgency").textContent = "所属事務所：" + (reveal.idol.agency || "未確認");
-  $("pickRevealGroup").textContent = "グループ：" + reveal.idol.group;
+  $("pickRevealAgency").textContent = shortAgencyName(fullAgencyName(reveal.idol.group, reveal.idol.agency));
+  $("pickRevealGroup").textContent = reveal.idol.group;
   $("lotteryBoard").hidden = !isLottery;
   $("pickRevealSkip").hidden = isLottery || pickRevealPhase !== "intro";
   $("pickRevealSkip").textContent = "演出をスキップ";
@@ -2530,7 +2587,8 @@ function applyOnlineGameState(state) {
     turnIndex = Number(state.turnIndex || 0);
     lotterySummary = state.lotterySummary || "";
     pickLimit = Number(state.pickLimit || 5);
-    orderMode = state.orderMode || "snake";
+    orderMode = state.orderMode === "random" ? "fixed" : (state.orderMode || "snake");
+    startOrderMode = state.startOrderMode || "fixed";
     firstRoundLotteryLosses = state.firstRoundLotteryLosses || {};
     pickRevealQueue = (state.pickRevealQueue || []).map(restoreOnlineReveal).filter(Boolean);
     activePickReveal = restoreOnlineReveal(state.activePickReveal);
@@ -2653,7 +2711,8 @@ async function startOnlineGame() {
   try {
     const onlineSettings = {
       pickLimit: Number($("pickLimit").value),
-      orderMode: $("orderMode").value
+      orderMode: $("orderMode").value,
+      startOrderMode: $("startOrderMode").value
     };
     await onlineRoomRef.child("settings").set(onlineSettings);
     await onlineRoomRef.child("status").set("playing");
@@ -2672,6 +2731,7 @@ function startGame(mode, aiCount = 3) {
   activeMode = mode;
   pickLimit = Number($("pickLimit").value);
   orderMode = $("orderMode").value;
+  startOrderMode = $("startOrderMode").value || "fixed";
   teamNames = mode === "ai"
     ? [(playerTeamNameValue.trim() || "あなた"), ...Array.from({ length: aiCount }, (_, index) => `AI${index + 1}`)]
     : mode === "online"
@@ -2680,6 +2740,7 @@ function startGame(mode, aiCount = 3) {
         localTeamNameValues[index].trim() || defaultName
       );
   aiTeams = new Set(mode === "ai" ? teamNames.slice(1) : []);
+  if (startOrderMode === "random") teamNames = shuffle(teamNames);
   gameStarted = true;
   drafted = new Set();
   selectedId = null;
@@ -2695,7 +2756,6 @@ function startGame(mode, aiCount = 3) {
   r1Queue = [];
   pendingR1Resolution = null;
   waiverOrder = teamNames.slice();
-  if (orderMode === "random") waiverOrder = shuffle(waiverOrder);
   firstRoundWaiverOrder = orderMode === "snake"
     ? teamNames.slice().reverse()
     : waiverOrder.slice();
@@ -2720,9 +2780,15 @@ $("aiCount").addEventListener("change", updateModeSetup);
 $("localTeamCount").addEventListener("change", updateModeSetup);
 $("pickLimit").addEventListener("change", updateModeSetup);
 $("orderMode").addEventListener("change", updateModeSetup);
+$("startOrderMode").addEventListener("change", updateModeSetup);
 $("pickLimit").addEventListener("change", () => {
   if (onlineIsHost && onlineGameStatus === "lobby") {
     onlineRoomRef.child("settings").update({ pickLimit: Number($("pickLimit").value) });
+  }
+});
+$("startOrderMode").addEventListener("change", () => {
+  if (onlineIsHost && onlineGameStatus === "lobby") {
+    onlineRoomRef.child("settings").update({ startOrderMode: $("startOrderMode").value });
   }
 });
 $("orderMode").addEventListener("change", () => {
@@ -3086,7 +3152,8 @@ function revealLotteryResults(reveal) {
       if (!firstRoundLotteryLosses[losingTeam]) firstRoundLotteryLosses[losingTeam] = [];
       firstRoundLotteryLosses[losingTeam].push({
         name: reveal.idol.japaneseName,
-        group: reveal.idol.group
+        group: reveal.idol.group,
+        agency: reveal.idol.agency
       });
     });
     picks[winner].push(pickRecord(reveal.idol, 1));
@@ -3160,8 +3227,8 @@ function showNextPickReveal() {
     ? "封筒を一つ選んで、交渉権を引き当てよう"
     : "選ばれたメンバーは…";
   $("pickRevealName").textContent = reveal.idol.japaneseName;
-  $("pickRevealAgency").textContent = "所属事務所：" + (reveal.idol.agency || "未確認");
-  $("pickRevealGroup").textContent = "グループ：" + reveal.idol.group;
+  $("pickRevealAgency").textContent = shortAgencyName(fullAgencyName(reveal.idol.group, reveal.idol.agency));
+  $("pickRevealGroup").textContent = reveal.idol.group;
   $("lotteryBoard").hidden = !isLottery;
   $("pickRevealNext").disabled = false;
   if (isLottery) {
@@ -3243,7 +3310,6 @@ $("lotteryTickets").addEventListener("click", event => {
 });
 function nextRoundOrder() {
   if (orderMode === "snake") return waiverOrder.slice().reverse();
-  if (orderMode === "random") return shuffle(teamNames);
   return teamNames.slice();
 }
 
@@ -3410,9 +3476,19 @@ function renderFinalSnapshot() {
       <th scope="row" class="final-snapshot-round">${roundIndex + 1}巡</th>
       ${teamNames.map(team => {
         const pick = (picks[team] || []).find(item => item.round === roundIndex + 1);
+        const losses = roundIndex === 0 ? (firstRoundLotteryLosses[team] || []) : [];
         const memberName = pick?.name || "—";
-        const groupName = pick?.group || "";
-        return `<td title="${escapeHTML(groupName)}"><strong>${escapeHTML(memberName)}</strong>${groupName ? `<small>${escapeHTML(groupName)}</small>` : ""}</td>`;
+        const details = losses.map(lost => lost.name + " " + memberAffiliationTitle(lost))
+          .concat(pick ? [memberName + " " + memberAffiliationTitle(pick)] : [])
+          .filter(Boolean).join(" / ");
+        const lossMarkup = losses.map(lost =>
+          '<small class="final-snapshot-loss"><strong>' + escapeHTML(lost.name) + '</strong>' +
+          memberAffiliationMarkup(lost) + '</small>'
+        ).join("");
+        const pickMarkup = pick
+          ? '<strong>' + escapeHTML(memberName) + '</strong>' + memberAffiliationMarkup(pick)
+          : '<strong>—</strong>';
+        return '<td title="' + escapeHTML(details) + '">' + lossMarkup + pickMarkup + '</td>';
       }).join("")}
     </tr>
   `).join("");
@@ -3498,7 +3574,7 @@ function renderDraft() {
   } else {
     $("draftHint").textContent =
       (canControlTeam(currentTeam)
-        ? `2巡目以降は${orderMode === "snake" ? "前巡の逆順" : orderMode === "random" ? "毎巡くじ引き" : "チーム順固定"}。${displayTeamName(currentTeam)}は候補を選び、確認後に提出してね。`
+        ? `2巡目以降は${orderMode === "snake" ? "前巡の逆順" : "チーム順固定"}。${displayTeamName(currentTeam)}は候補を選び、確認後に提出してね。`
         : `${displayTeamName(currentTeam)}が指名中です。自分のチームの順番を待っています。`);
     $("selectedMember").textContent = pendingIdol
       ? `${pendingIdol.japaneseName}を選択中です。確認ボタンを押すと指名が提出されます。`
@@ -3506,7 +3582,7 @@ function renderDraft() {
   }
 
   const locked = gameStarted && !finished;
-  ["playMode", "aiCount", "localTeamCount", "pickLimit", "orderMode"].forEach(id => {
+  ["playMode", "aiCount", "localTeamCount", "pickLimit", "orderMode", "startOrderMode"].forEach(id => {
     $(id).disabled = locked;
   });
   $("teamNameInputs").querySelectorAll("input").forEach(input => {
@@ -3539,11 +3615,11 @@ function renderDraft() {
     const current = gameStarted && !finished && round === pickRound && currentTeam === team;
     const losses = pickRound === 1 ? (firstRoundLotteryLosses[team] || []) : [];
     const lossMarkup = losses.length ? `
-      <div class="draft-lottery-history" aria-label="1巡目の抽選で外れた候補">
+      <div class="draft-lottery-history" aria-label="1巡目の競合候補">
         ${losses.map(lost => `
           <div class="draft-cell-card draft-lottery-loss">
             <strong>${escapeHTML(lost.name)}</strong>
-            <span>${escapeHTML(lost.group)}</span>
+            ${memberAffiliationMarkup(lost)}
           </div>
         `).join("")}
       </div>
@@ -3552,7 +3628,7 @@ function renderDraft() {
     if (pick) {
       return `${lossMarkup}<div class="draft-cell-card draft-pick-confirmed">
         <strong>${escapeHTML(pick.name)}</strong>
-        <span>${escapeHTML(pick.group)}</span>
+        ${memberAffiliationMarkup(pick)}
       </div>`;
     }
 
@@ -3570,7 +3646,7 @@ function renderDraft() {
         return `${lossMarkup}<div class="draft-cell-card draft-nomination">
           <small>入札公開・抽選待ち</small>
           <strong>${escapeHTML(nominee.japaneseName)}</strong>
-          <span>${escapeHTML(nominee.group)}</span>
+          ${memberAffiliationMarkup(nominee)}
         </div>`;
       }
       if (!r1Started && r1NominationOrder.includes(team)) {
@@ -3646,3 +3722,17 @@ if (invitedRoomCode) {
   updateModeSetup();
   setOnlineStatus("招待リンクから参加できます。名前を確認して「コードで参加」を押してください。");
 }
+
+// Open the short site information panel from the persistent header.
+const siteInfoDialog = $('siteInfoDialog');
+$('siteInfoOpen').addEventListener('click', () => siteInfoDialog.showModal());
+$('siteInfoClose').addEventListener('click', () => siteInfoDialog.close());
+siteInfoDialog.addEventListener('click', event => {
+  if (event.target === siteInfoDialog) siteInfoDialog.close();
+});
+$('siteInfoDetailsLink').addEventListener('click', event => {
+  event.preventDefault();
+  siteInfoDialog.close();
+  document.querySelectorAll('.site-notice').forEach(notice => { notice.open = true; });
+  requestAnimationFrame(() => $('siteFooter').scrollIntoView({ behavior: 'smooth', block: 'start' }));
+});

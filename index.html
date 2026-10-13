@@ -27,6 +27,7 @@
     <nav>
       <a href="#draft">ドラフトルーム</a>
       <a href="#pool">候補一覧</a>
+      <button class="site-info-button" id="siteInfoOpen" type="button" aria-haspopup="dialog" aria-controls="siteInfoDialog">ⓘ サイト情報</button>
     </nav>
     <span class="live-badge"><i></i> DRAFT BOARD</span>
   </header>
@@ -122,11 +123,17 @@
           </select>
         </label>
         <label>
+          <span>開始時のチーム順</span>
+          <select id="startOrderMode">
+            <option value="fixed" selected>設定した順番のまま</option>
+            <option value="random">開始前にランダム抽選</option>
+          </select>
+        </label>
+        <label>
           <span>2巡目以降の指名順</span>
           <select id="orderMode">
             <option value="snake" selected>前巡の逆順（ウェーバー）</option>
             <option value="fixed">チーム順に固定</option>
-            <option value="random">毎巡くじ引き</option>
           </select>
         </label>
         <div class="team-name-settings" id="teamNameSettings">
@@ -316,7 +323,7 @@
       </aside>
     </div>
 
-    <footer class="site-footer">
+    <footer class="site-footer" id="siteFooter">
       <div class="site-footer-heading">
         <span>STAGE PICK</span>
         <p>非公式ファン制作のドラフトゲームです。各グループ・事務所・情報元とは関係ありません。</p>
@@ -343,6 +350,19 @@
         </details>
       </div>
     </footer>
+  <dialog class="site-info-dialog" id="siteInfoDialog" aria-labelledby="siteInfoTitle">
+    <div class="site-info-dialog-inner">
+      <button class="site-info-close" id="siteInfoClose" type="button" aria-label="閉じる">×</button>
+      <p class="eyebrow">STAGE PICK</p>
+      <h2 id="siteInfoTitle">サイト情報</h2>
+      <div class="site-info-highlights">
+        <p><strong>非公式のファン制作ゲームです。</strong><br>芸能事務所、グループ、メンバー、ランキング運営元とは関係ありません。</p>
+        <p><strong>星評価は独自のゲーム用目安です。</strong><br>公式順位・評価ではなく、公開情報を参考に算出しています。</p>
+        <p><strong>オンライン対戦では情報が共有されます。</strong><br>表示名・チーム名・ドラフト結果が同じルームの参加者に見えます。本名や連絡先などは入力しないでください。</p>
+      </div>
+      <a class="site-info-details-link" id="siteInfoDetailsLink" href="#siteFooter">出典・権利表記・プライバシーの詳細を見る</a>
+    </div>
+  </dialog>
   </main>
 
   <div class="pick-reveal" id="pickReveal" hidden role="dialog" aria-modal="true" aria-labelledby="pickRevealName" aria-describedby="pickRevealAgency pickRevealGroup">
@@ -364,8 +384,10 @@
           </div>
           <div class="pick-flip-face pick-flip-front">
             <span class="pick-reveal-name" id="pickRevealName"></span>
-            <span class="pick-reveal-agency" id="pickRevealAgency"></span>
-            <span class="pick-reveal-group" id="pickRevealGroup"></span>
+            <div class="pick-reveal-affiliation">
+              <span class="pick-reveal-agency" id="pickRevealAgency"></span>
+              <span class="pick-reveal-group" id="pickRevealGroup"></span>
+            </div>
           </div>
         </div>
       </div>
