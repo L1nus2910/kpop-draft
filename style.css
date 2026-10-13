@@ -3070,12 +3070,16 @@ footer span:first-child {
   text-decoration: underline;
 }
 
-.candidate-popularity {
+.candidate-title-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 5px;
-  margin: 0 0 7px;
+  flex-wrap: wrap;
+  gap: 7px;
+  min-width: 0;
+}
+
+.candidate-title-row .candidate-name {
+  margin: 0;
 }
 
 .candidate-stars {
@@ -3087,11 +3091,16 @@ footer span:first-child {
   text-shadow: 0 1px 0 rgba(255, 255, 255, 0.8);
 }
 
-.candidate-popularity small {
+.candidate-rank-details {
+  display: block;
+  margin: 0 0 8px;
   color: #7d8c9b;
   font-size: 9px;
   font-weight: 700;
-  text-align: right;
+}
+
+.candidate-group {
+  margin-bottom: 4px;
 }
 
 @media (max-width: 520px) {

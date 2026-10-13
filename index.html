@@ -38,14 +38,14 @@
       <div>
         <p class="eyebrow">PLAY MODE</p>
         <h2 id="modeTitle">遊び方</h2>
-        <p class="mode-copy" id="modeDescription">指名人数と指名順を決めて、4チームで遊べます。</p>
+        <p class="mode-copy" id="modeDescription">ひとりでAIと対戦できます。AIの人数や指名人数を選んでね。</p>
       </div>
       <div class="mode-controls">
         <label>
           <span>プレイ形式</span>
           <select id="playMode">
-            <option value="local">友達と同じ画面で（4人）</option>
-            <option value="ai">ひとりでAIと対戦</option>
+            <option value="ai" selected>ひとりでAIと対戦</option>
+            <option value="local">友達と同じ画面で</option>
           </select>
         </label>
         <label id="aiCountWrap" hidden>
@@ -92,7 +92,7 @@
           </div>
           <div class="team-name-inputs" id="teamNameInputs"></div>
         </div>
-        <button class="button button-primary" id="startGame" type="button">4チームで始める</button>
+        <button class="button button-primary" id="startGame" type="button">AI対戦を始める</button>
       </div>
     </section>
 
@@ -143,7 +143,7 @@
         <div class="filter-grid">
           <label class="search-field">
             <span>名前で検索</span>
-            <input id="searchInput" type="search" placeholder="例：モモ / Momo">
+            <input id="searchInput" type="search" placeholder="例：モモ / Momo / 모모">
           </label>
           <label>
             <span>世代</span>
@@ -232,7 +232,7 @@
 
     <footer>
       <span>STAGE PICK</span>
-    <span>グループ一覧を参考に、活動中・活動休止中のグループを順次追加しています。メンバー名はカタカナでも検索できます。</span>
+    <span>グループ一覧を参考に、活動中・活動休止中のグループを順次追加しています。メンバー名は英字・カタカナ・ハングルで検索できます。</span>
     </footer>
   </main>
 

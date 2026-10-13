@@ -685,6 +685,82 @@ function toJapaneseMemberName(name) {
   }).join("").replace(/[a-z]/gi, "");
 }
 
+const koreanNameOverrides = {
+  taeyeon: "태연", hyoyeon: "효연", yuri: "유리", yoona: "윤아", seohyun: "서현",
+  jessica: "제시카", sunny: "써니", tiffany: "티파니", sooyoung: "수영",
+  jisoo: "지수", jennie: "제니", "rosé": "로제", rose: "로제", lisa: "리사",
+  nayeon: "나연", jeongyeon: "정연", momo: "모모", sana: "사나", jihyo: "지효",
+  mina: "미나", dahyun: "다현", chaeyoung: "채영", tzuyu: "쯔위",
+  irene: "아이린", seulgi: "슬기", wendy: "웬디", joy: "조이", yeri: "예리",
+  somi: "소미", sejeong: "세정", chungha: "청하", yoojung: "유정", doyeon: "도연",
+  yeonjung: "연정", sohye: "소혜", nayoung: "나영", kyulkyung: "주결경",
+  yeji: "예지", lia: "리아", ryujin: "류진", chaeryeong: "채령", yuna: "유나",
+  karina: "카리나", giselle: "지젤", winter: "윈터", ningning: "닝닝",
+  yujin: "유진", gaeul: "가을", rei: "레이", wonyoung: "원영", liz: "리즈", leeseo: "이서",
+  sakura: "사쿠라", chaewon: "채원", yunjin: "윤진", kazuha: "카즈하", eunchae: "은채",
+  yunah: "윤아", minju: "민주", moka: "모카", wonhee: "원희", iroha: "이로하",
+  julie: "줄리", natty: "나띠", belle: "벨", haneul: "하늘", ahyeon: "아현",
+  ruka: "루카", pharita: "파리타", asa: "아사", rami: "라미", rora: "로라",
+  chiquita: "치키타", mako: "마코", rio: "리오", maya: "마야", riku: "리쿠",
+  ayaka: "아야카", mayuka: "마유카", rima: "리마", miihi: "미이히", nina: "니나",
+  hikaru: "히카루", haewon: "해원", hayoung: "하영 오하영",
+  eunji: "은지 정은지", "chanelle moon": "샤넬 문", "moon sua": "문수아",
+  "kim lip": "김립", "go won": "고원", "a-na": "에이나", juun: "주은",
+  "ye-eun": "예은", "yi hani": "이하니", "lee sem": "이샘", lily: "리리",
+  shuhua: "슈화", hyuna: "현아", seunghee: "승희", gyuri: "규리"
+};
+
+const koreanRomanSyllables = {
+  yeong: "영", young: "영", yeon: "연", hyeong: "형", hyung: "형", hyeon: "현", hyun: "현",
+  seung: "승", hee: "희", hwi: "휘", soo: "수", gyu: "규", gyung: "경", yoon: "윤",
+  yun: "윤", chan: "찬", joo: "주", eo: "어", seol: "설", yeol: "열", eul: "을",
+  eung: "응", eun: "은", seong: "성", sung: "성", seon: "선", jeong: "정", jung: "정",
+  jong: "종", chae: "채", choi: "최", cheo: "처", hye: "혜", yeo: "여", seo: "서",
+  sye: "셰", syo: "쇼", shi: "시", sh: "시", ch: "치", ts: "츠", ae: "애", oe: "외",
+  ui: "의", eu: "으", oo: "우", woo: "우", yoo: "유", yu: "유", yae: "얘", ya: "야",
+  ye: "예", yo: "요", wa: "와", wae: "왜", we: "웨", wi: "위", wo: "워", hyo: "효",
+  hyu: "휴", hwa: "화", hyeo: "혀", kye: "계", kyu: "규", ryu: "류", ry: "리",
+  ga: "가", gi: "기", gu: "구", ge: "게", go: "고", ka: "카", ki: "키", ku: "쿠",
+  ke: "케", ko: "코", na: "나", ni: "니", nu: "누", ne: "네", no: "노", da: "다",
+  di: "디", du: "두", de: "데", do: "도", ta: "타", ti: "티", tu: "투", te: "테",
+  to: "토", tae: "태", sa: "사", si: "시", su: "수", se: "세", so: "소", ja: "자",
+  ji: "지", ju: "주", je: "제", jo: "조", cha: "차", chi: "치", chu: "추", che: "체",
+  cho: "초", ha: "하", hi: "히", hu: "후", he: "헤", ho: "호", ma: "마", mi: "미",
+  mu: "무", me: "메", mo: "모", ra: "라", ri: "리", ru: "루", re: "레", ro: "로",
+  ba: "바", bi: "비", bu: "부", be: "베", bo: "보", pa: "파", pi: "피", pu: "푸",
+  pe: "페", po: "포", la: "라", li: "리", lu: "루", le: "레", lo: "로", a: "아",
+  i: "이", u: "우", e: "에", o: "오", won: "원", sul: "설", seul: "슬", ning: "닝",
+  bin: "빈", min: "민", jin: "진", rin: "린", ram: "람", lim: "림", in: "인", an: "안",
+  on: "온", un: "운", ing: "잉", ong: "옹", ang: "앙", eng: "엥", oh: "오"
+};
+const koreanSyllableKeys = Object.keys(koreanRomanSyllables)
+  .sort((a, b) => b.length - a.length);
+
+function toKoreanMemberName(name) {
+  const normalized = String(name).trim().toLowerCase().replace(/\s+/g, " ");
+  if (koreanNameOverrides[normalized]) return koreanNameOverrides[normalized];
+
+  return String(name).toLowerCase().split(/(\s+|-)/).map(part => {
+    if (/^\s+$/.test(part) || part === "-") return " ";
+    let source = part.replace(/[^a-z]/g, "");
+    let result = "";
+    while (source) {
+      const match = koreanSyllableKeys.find(syllable => source.startsWith(syllable));
+      if (!match) {
+        source = source.slice(1);
+        continue;
+      }
+      result += koreanRomanSyllables[match];
+      source = source.slice(match.length);
+    }
+    return result;
+  }).join("").trim();
+}
+
+function normalizeSearchText(value) {
+  return String(value).normalize("NFKC").toLocaleLowerCase().replace(/[\s·._-]/g, "");
+}
+
 const agencyByGroup = {
   "Girls' Generation": "SM Entertainment",
   BLACKPINK: "YG Entertainment",
@@ -787,6 +863,7 @@ const idols = groups.flatMap(group =>
     id: String(nextId++),
     name: member[0],
     japaneseName: toJapaneseMemberName(member[0]),
+    koreanName: toKoreanMemberName(member[0]),
     nationality: member[1],
     group: group.name,
     agency: agencyByGroup[group.name] || "未確認",
@@ -970,7 +1047,7 @@ const dependentFilters = [
 ];
 
 function getCandidates(ignoreFilter = "") {
-  const query = $("searchInput").value.trim().toLowerCase();
+  const query = normalizeSearchText($("searchInput").value.trim());
   const generation = ignoreFilter === "generationFilter" ? "" : $("generationFilter").value;
   const nationality = ignoreFilter === "nationalityFilter" ? "" : $("nationalityFilter").value;
   const agency = ignoreFilter === "agencyFilter" ? "" : $("agencyFilter").value;
@@ -979,7 +1056,8 @@ function getCandidates(ignoreFilter = "") {
 
   return idols.filter(idol => {
     const matchesText = !query ||
-      [idol.name, idol.japaneseName, idol.group, idol.nationality, idol.agency].join(" ").toLowerCase().includes(query);
+      [idol.name, idol.japaneseName, idol.koreanName, idol.group, idol.nationality, idol.agency]
+        .some(value => normalizeSearchText(value).includes(query));
 
     return matchesText &&
       (!generation || idol.generation === generation) &&
@@ -1061,16 +1139,15 @@ function renderCandidates() {
     return `
       <article class="candidate-card ${isSelected ? "is-selected" : ""} ${isExcluded ? "is-excluded" : ""}" data-candidate-id="${idol.id}">
         <button class="candidate-select" type="button" data-action="select" data-id="${idol.id}" aria-pressed="${isSelected}" ${isUnavailable ? "disabled" : ""}>
-          <span class="candidate-popularity" aria-label="人気参考ランク ${idol.popularityStars}つ星">
-            <span class="candidate-stars" aria-hidden="true">${"★".repeat(idol.popularityStars)}${"☆".repeat(5 - idol.popularityStars)}</span>
-            <small>${rankingDetails}</small>
+          <span class="candidate-title-row">
+            <span class="candidate-name">${escapeHTML(idol.japaneseName)}</span>
+            <span class="candidate-stars" aria-label="人気参考ランク ${idol.popularityStars}つ星">${"★".repeat(idol.popularityStars)}${"☆".repeat(5 - idol.popularityStars)}</span>
           </span>
-          <span class="candidate-name">${escapeHTML(idol.japaneseName)}</span>
           <span class="candidate-group">${escapeHTML(idol.group)}</span>
+          <span class="candidate-rank-details">${rankingDetails}</span>
           <span class="tags">
             <span class="tag">${escapeHTML(idol.generation)}</span>
             <span class="tag">${escapeHTML(idol.nationality)}</span>
-            <span class="tag">${escapeHTML(idol.activity)}</span>
           </span>
           <span class="candidate-select-hint">${selectHint}</span>
         </button>
@@ -1284,7 +1361,9 @@ function updateModeSetup() {
   const aiMode = mode === "ai";
   $("aiCountWrap").hidden = !aiMode;
   $("localTeamCountWrap").hidden = aiMode;
-  $("startGame").textContent = "ドラフトを始める";
+  $("startGame").textContent = aiMode
+    ? "AI対戦を始める"
+    : `${$("localTeamCount").value}チームで始める`;
 
   if (aiMode) {
     $("teamNameHelp").textContent = "AIチーム名は自動で設定されます。";
@@ -1951,7 +2030,7 @@ function renderDraft() {
   });
   $("startGame").disabled = locked;
   $("startGame").textContent = !gameStarted
-    ? (activeMode === "ai" ? "AI対戦を始める" : `${$("localTeamCount").value}チームで始める`)
+    ? ($("playMode").value === "ai" ? "AI対戦を始める" : `${$("localTeamCount").value}チームで始める`)
     : finished
       ? "もう一度遊ぶ"
       : "ドラフト進行中";
