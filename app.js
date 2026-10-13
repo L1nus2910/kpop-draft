@@ -2508,7 +2508,7 @@ function actionMatchesCurrentReveal(action) {
   if (action.revealKey === currentRevealKey()) return true;
   // Accept the pre-session-key format for an already-open reveal. This lets a
   // device with a cached app finish its confirmation while the host is current.
-  if (action.kind !== "next" || action.revealPhase !== "revealed") return false;
+  if (action.kind !== "next") return false;
   const idolId = activePickReveal.idol?.id || activePickReveal.idolId || "";
   const legacyKey = `${activePickReveal.type}:${activePickReveal.team}:${activePickReveal.round}:${idolId}`;
   return action.revealKey === legacyKey;
@@ -2982,7 +2982,10 @@ function submitOnlineAction(action) {
   renderCandidates();
   const actionRef = onlineRoomRef.child("actions").push();
   const payload = { uid: onlineUid, ...action, createdAt: Date.now() };
-  if (["envelope", "next", "skip"].includes(action.kind)) payload.revealKey = currentRevealKey();
+  if (["envelope", "next", "skip"].includes(action.kind)) {
+    payload.revealKey = currentRevealKey();
+    payload.revealPhase = pickRevealPhase;
+  }
   onlinePendingAction = {
     key: actionRef.key,
     kind: action.kind,
