@@ -1597,6 +1597,7 @@ let onlineStateWriteChain = Promise.resolve();
 let onlineStateRevision = 0;
 let onlineAppliedStateRevision = -1;
 let onlineActionQueue = Promise.resolve();
+let onlineGuestStatePollTimer = null;
 let onlineListenersAttached = false;
 let onlineHandledActionIds = new Set();
 let onlineJoinQueue = Promise.resolve();
@@ -2127,6 +2128,10 @@ function normalizeOnlineName(value, fallback = "プレイヤー") {
 }
 
 function setOnlineRoomConnected(code, isHost, initialPlayers = null, deferGameActions = false) {
+  if (onlineGuestStatePollTimer !== null) {
+    clearTimeout(onlineGuestStatePollTimer);
+    onlineGuestStatePollTimer = null;
+  }
   onlineRoomCode = code;
   onlineRoomRef = firebase.database().ref(`rooms/${code}`);
   onlineIsHost = isHost;
@@ -2269,13 +2274,37 @@ async function acceptOnlineJoinRequest(snapshot) {
   await snapshot.ref.remove();
 }
 
+function scheduleOnlineGuestStatePoll() {
+  if (onlineGuestStatePollTimer !== null || onlineIsHost || !onlineRoomRef) return;
+  onlineGuestStatePollTimer = window.setTimeout(async () => {
+    onlineGuestStatePollTimer = null;
+    const roomRef = onlineRoomRef;
+    if (!roomRef || roomRef !== onlineRoomRef || onlineIsHost) return;
+    if (onlineGameStatus === "playing") {
+      try {
+        const snapshot = await roomRef.child("state").once("value");
+        const state = snapshot.val();
+        if (state) applyOnlineGameState(state);
+      } catch (error) {
+        setOnlineStatus(error.message || "共有状態を再取得できませんでした。接続を確認してください。");
+      }
+    }
+    scheduleOnlineGuestStatePoll();
+  }, 900);
+}
+
 function attachOnlineGuestListeners() {
-  if (onlineIsHost || onlineListenersAttached || !onlineRoomRef) return;
-  onlineListenersAttached = true;
-  onlineRoomRef.child("state").on("value", snapshot => {
-    const state = snapshot.val();
-    if (state) applyOnlineGameState(state);
-  });
+  if (onlineIsHost || !onlineRoomRef) return;
+  if (!onlineListenersAttached) {
+    onlineListenersAttached = true;
+    onlineRoomRef.child("state").on("value", snapshot => {
+      const state = snapshot.val();
+      if (state) applyOnlineGameState(state);
+    }, error => {
+      setOnlineStatus(error.message || "共有状態を受信できません。接続を確認してください。");
+    });
+  }
+  scheduleOnlineGuestStatePoll();
 }
 
 async function createOnlineRoom() {
@@ -2408,6 +2437,10 @@ async function leaveOnlineRoom() {
     roomRef.child(`joinRequests/${onlineUid}`).off();
     roomRef.child("settings").off();
     roomRef.child("state").off();
+    if (onlineGuestStatePollTimer !== null) {
+      clearTimeout(onlineGuestStatePollTimer);
+      onlineGuestStatePollTimer = null;
+    }
     onlineRoomRef = null;
     onlineRoomCode = "";
     onlineIsHost = false;
@@ -2568,7 +2601,7 @@ function serializeOnlineReveal(reveal) {
     teams: reveal.teams || [],
     drawOrder: reveal.drawOrder || [],
     envelopes: reveal.envelopes || [],
-    winningEnvelope: reveal.winningEnvelope,
+    winningEnvelope: Number.isInteger(reveal.winningEnvelope) ? reveal.winningEnvelope : null,
     drawIndex: reveal.drawIndex || 0,
     selections: reveal.selections ? [...reveal.selections.entries()] : [],
     opened: reveal.opened ? [...reveal.opened] : [],
@@ -2665,13 +2698,25 @@ function serializeOnlineGame() {
   };
 }
 
+function makeFirebaseSafe(value) {
+  if (value === undefined) return null;
+  if (typeof value === "number" && !Number.isFinite(value)) return null;
+  if (Array.isArray(value)) return value.map(makeFirebaseSafe);
+  if (value && typeof value === "object") {
+    return Object.fromEntries(Object.entries(value)
+      .filter(([, entry]) => entry !== undefined)
+      .map(([key, entry]) => [key, makeFirebaseSafe(entry)]));
+  }
+  return value;
+}
+
 function queueOnlineStateWrite() {
   const roomRef = onlineRoomRef;
   onlineStateWriteChain = onlineStateWriteChain
     .catch(() => {})
     .then(async () => {
       if (!roomRef || roomRef !== onlineRoomRef || !onlineIsHost || activeMode !== "online" || !gameStarted) return;
-      const state = serializeOnlineGame();
+      const state = makeFirebaseSafe(serializeOnlineGame());
       state.stateRevision = ++onlineStateRevision;
       await roomRef.child("state").set(state);
     })
