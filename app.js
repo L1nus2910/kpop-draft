@@ -1952,6 +1952,7 @@ function updateModeSetup() {
   const aiMode = mode === "ai";
   const localMode = mode === "local";
   const onlineMode = mode === "online";
+  $("modePanel").classList.toggle("is-online-mode", onlineMode);
   $("aiCountWrap").hidden = !aiMode;
   $("localTeamCountWrap").hidden = !localMode;
   $("onlineControls").hidden = !onlineMode;
