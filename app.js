@@ -2531,22 +2531,30 @@ function updateOnlineRevealConfirmation() {
       });
     hint.textContent = `${waitingTeams.join("・")}の確認後に次へ進みます。`;
   } else if (onlineActionPending) {
-    hint.textContent = "確認を送っています。全員の確認後に進みます。";
+    hint.textContent = "確認を送っています。対象チームの確認後に進みます。";
   } else if (alreadyConfirmed) {
     hint.textContent = `確認済みです。他の対象チームの確認を待っています（${count} / ${total}）。`;
-  } else if (onlineRevealAutoAdvanceDelay() > 0) {
-    hint.textContent = `全員が確認するとすぐ進みます。未確認でも数秒後に自動で次へ進みます（${count} / ${total}）。`;
   } else {
-    hint.textContent = `全員が確認すると次の画面へ進みます（${count} / ${total}）。`;
+    hint.textContent = `対象チーム全員の確認後に次の画面へ進みます（${count} / ${total}）。`;
   }
   return true;
 }
 
 function serializeOnlineReveal(reveal) {
   if (!reveal) return null;
+  const idol = reveal.idol || {};
   return {
     team: reveal.team,
-    idolId: reveal.idol?.id || "",
+    idolId: idol.id || "",
+    idolData: {
+      id: idol.id || "",
+      personKey: idol.personKey || "",
+      japaneseName: idol.japaneseName || "",
+      group: idol.group || "",
+      agency: idol.agency || "",
+      generation: idol.generation || "",
+      nationality: idol.nationality || ""
+    },
     round: reveal.round,
     type: reveal.type,
     teams: reveal.teams || [],
@@ -2564,8 +2572,14 @@ function serializeOnlineReveal(reveal) {
 
 function restoreOnlineReveal(source) {
   if (!source) return null;
-  const idol = idols.find(item => item.id === source.idolId);
-  if (!idol) return null;
+  const snapshot = source.idolData || {};
+  const idol = idols.find(item => item.id === source.idolId) ||
+    (snapshot.personKey && idols.find(item => item.personKey === snapshot.personKey)) ||
+    (snapshot.japaneseName && snapshot.group && idols.find(item =>
+      item.japaneseName === snapshot.japaneseName && item.group === snapshot.group
+    )) ||
+    (snapshot.japaneseName ? { ...snapshot, id: snapshot.id || source.idolId } : null);
+  if (!idol?.id || !idol.japaneseName) return null;
   return {
     ...source,
     idol,
@@ -2779,8 +2793,12 @@ function applyOnlineGameState(state) {
     firstRoundLotteryLosses = state.firstRoundLotteryLosses || {};
     gameSessionId = incomingGameSessionId || gameSessionId;
     onlineActionAcks = state.actionAcks || {};
-    pickRevealQueue = (state.pickRevealQueue || []).map(restoreOnlineReveal).filter(Boolean);
+    const serializedRevealQueue = state.pickRevealQueue || [];
+    pickRevealQueue = serializedRevealQueue.map(restoreOnlineReveal).filter(Boolean);
     activePickReveal = restoreOnlineReveal(state.activePickReveal);
+    if ((state.activePickReveal && !activePickReveal) || pickRevealQueue.length !== serializedRevealQueue.length) {
+      setOnlineStatus("発表データを読み込めませんでした。全端末を再読み込みして、新しいルームで開始してください。");
+    }
     pickRevealPhase = state.pickRevealPhase || "closed";
     onlineRevealAcks = new Set(state.pickRevealAcks || []);
     selectedId = null;
