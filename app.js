@@ -1589,6 +1589,8 @@ let onlineUid = "";
 let onlineIsHost = false;
 let onlinePlayers = {};
 let onlineActionPending = false;
+let onlinePendingAction = null;
+let onlineActionAcks = {};
 let onlineStateApplying = false;
 let onlineStateWriteTimer = null;
 let onlineListenersAttached = false;
@@ -1736,7 +1738,7 @@ function renderCandidates() {
     return;
   }
 
-  const nominatedPersonKeys = areOnlineR1BidsSealed()
+  const nominatedPersonKeys = areR1BidsSealed()
     ? new Set()
     : new Set(r1Nominations.map(item =>
       idols.find(idol => idol.id === item.id)?.personKey
@@ -1755,9 +1757,13 @@ function renderCandidates() {
     const selectHint = isUnavailable
       ? (isExcluded ? "除外中" : "指名済み")
       : gameStarted && !canPickNow
-        ? (ownOnlineBidSubmitted && areOnlineR1BidsSealed()
-          ? "入札提出済み・開示待ち"
-          : "あなたの指名番ではありません")
+        ? pendingR1Resolution
+          ? "抽選結果の発表待ち"
+          : !$("pickReveal").hidden
+            ? "指名発表を確認してね"
+            : ownOnlineBidSubmitted && areR1BidsSealed()
+              ? "入札提出済み・開示待ち"
+              : "あなたの指名番ではありません"
       : pendingDraftPickId === idol.id
         ? "✓ 選択中・確認して提出"
         : isNominated
@@ -1842,6 +1848,13 @@ function confirmDraftPick(submittingUid = "") {
   }
   const team = submittingUid ? onlineTeamForUid(submittingUid) : currentTeamName();
   if (!team || !canControlTeam(team, submittingUid || onlineUid)) return;
+  if (!r1Started && !canSubmitR1Nomination(team)) {
+    if (activeMode === "online") setOnlineStatus("入札状態が更新されました。画面を確認して、もう一度選んでください。");
+    pendingDraftPickId = null;
+    renderDraft();
+    renderCandidates();
+    return;
+  }
   if (activeMode === "online" && !onlineIsHost) {
     submitOnlineAction({ kind: "pick", idolId: idol.id });
     return;
@@ -1850,10 +1863,8 @@ function confirmDraftPick(submittingUid = "") {
   pendingDraftPickId = null;
   selectedId = null;
   if (!r1Started) {
-    if (!canSubmitR1Nomination(team)) return;
     r1Nominations.push({ team, id: idol.id });
     r1NominationIndex += 1;
-    if (activeMode !== "online") queuePickReveal(team, idol, 1, "nomination");
     if (r1NominationIndex >= r1NominationOrder.length) {
       resolveFirstRound();
     }
@@ -1974,7 +1985,7 @@ function renderNominations() {
 
   $("nominationList").innerHTML = teamNames.map(team => {
     const nomination = r1Nominations.find(item => item.team === team);
-    const sealed = areOnlineR1BidsSealed();
+    const sealed = areR1BidsSealed();
     const idol = nomination && !sealed && idols.find(item => item.id === nomination.id);
     const firstPick = (picks[team] || []).find(item => item.round === 1);
     const isCurrent = team === currentTeamName();
@@ -2109,6 +2120,8 @@ function setOnlineRoomConnected(code, isHost, initialPlayers = null, deferGameAc
   onlineGameStatus = "lobby";
   onlineListenersAttached = false;
   onlineActionPending = false;
+  onlinePendingAction = null;
+  onlineActionAcks = {};
   onlineHandledActionIds = new Set();
   $("onlineRoomCode").value = code;
   $("onlineRoomCodeLabel").textContent = code;
@@ -2444,6 +2457,31 @@ function restoreOnlineReveal(source) {
   };
 }
 
+function onlineStateReflectsAction(action, state) {
+  if (!action || !state) return false;
+  const team = action.team;
+  if (action.kind === "pick" && team) {
+    const submittedNomination = (state.r1Nominations || []).some(item => item.team === team);
+    const teamPicks = state.picks?.[team] || [];
+    return submittedNomination || teamPicks.length > action.pickCount ||
+      teamPicks.some(item => item.id === action.idolId);
+  }
+
+  const reveal = state.activePickReveal;
+  const revealKey = reveal
+    ? `${reveal.type}:${reveal.team}:${reveal.round}:${reveal.idolId || ""}`
+    : "";
+  if (action.kind === "envelope") {
+    return revealKey !== action.revealKey || (reveal?.selections || []).some(([envelope, selectedTeam]) =>
+      Number(envelope) === Number(action.envelope) && selectedTeam === team
+    );
+  }
+  if (action.kind === "next" || action.kind === "skip") {
+    return revealKey !== action.revealKey || (state.pickRevealPhase || "closed") !== action.revealPhase;
+  }
+  return false;
+}
+
 function serializeOnlineGame() {
   const sealR1Bids = !r1Started && !pendingR1Resolution &&
     r1NominationIndex < r1NominationOrder.length;
@@ -2474,6 +2512,7 @@ function serializeOnlineGame() {
     orderMode,
     startOrderMode,
     firstRoundLotteryLosses,
+    actionAcks: onlineActionAcks,
     pickRevealQueue: pickRevealQueue.map(serializeOnlineReveal),
     activePickReveal: serializeOnlineReveal(activePickReveal),
     pickRevealPhase
@@ -2564,6 +2603,11 @@ function applyOnlineGameState(state) {
   if ((onlineIsHost && !onlineHostRestoring) || !state || onlineStateApplying) return;
   onlineStateApplying = true;
   try {
+    const localPendingPickId = pendingDraftPickId;
+    const actionAck = onlineUid ? state.actionAcks?.[onlineUid] : null;
+    const actionWasAcknowledged = Boolean(onlinePendingAction && actionAck?.key === onlinePendingAction.key);
+    const actionWasAccepted = onlineStateReflectsAction(onlinePendingAction, state) ||
+      (actionWasAcknowledged && Boolean(actionAck.accepted));
     teamNames = state.teamNames || [];
     gameStarted = Boolean(state.gameStarted);
     activeMode = "online";
@@ -2590,12 +2634,31 @@ function applyOnlineGameState(state) {
     orderMode = state.orderMode === "random" ? "fixed" : (state.orderMode || "snake");
     startOrderMode = state.startOrderMode || "fixed";
     firstRoundLotteryLosses = state.firstRoundLotteryLosses || {};
+    onlineActionAcks = state.actionAcks || {};
     pickRevealQueue = (state.pickRevealQueue || []).map(restoreOnlineReveal).filter(Boolean);
     activePickReveal = restoreOnlineReveal(state.activePickReveal);
     pickRevealPhase = state.pickRevealPhase || "closed";
-    pendingDraftPickId = null;
     selectedId = null;
-    onlineActionPending = false;
+    if (actionWasAccepted) {
+      onlinePendingAction = null;
+      onlineActionPending = false;
+      pendingDraftPickId = null;
+    } else if (actionWasAcknowledged) {
+      onlinePendingAction = null;
+      onlineActionPending = false;
+      setOnlineStatus("操作が反映されませんでした。順番を確認して、もう一度試してください。");
+    } else {
+      pendingDraftPickId = localPendingPickId;
+      onlineActionPending = Boolean(onlinePendingAction);
+    }
+    const ownTeam = onlineTeamForUid(onlineUid);
+    const pendingIdol = idols.find(item => item.id === pendingDraftPickId);
+    const stillOwnTurn = ownTeam && (r1Started
+      ? currentTeamName() === ownTeam
+      : canSubmitR1Nomination(ownTeam));
+    if (!pendingIdol || !stillOwnTurn || excluded.has(pendingIdol.id) || personHasBeenDrafted(pendingIdol)) {
+      pendingDraftPickId = null;
+    }
     updateModeSetup();
     renderNominations();
     renderOnlinePickReveal();
@@ -2640,21 +2703,38 @@ function submitOnlineAction(action) {
   onlineActionPending = true;
   renderDraft();
   renderOnlinePickReveal();
+  renderCandidates();
+  const actionRef = onlineRoomRef.child("actions").push();
   const payload = { uid: onlineUid, ...action, createdAt: Date.now() };
   if (["envelope", "next", "skip"].includes(action.kind)) payload.revealKey = currentRevealKey();
-  onlineRoomRef.child("actions").push(payload)
+  onlinePendingAction = {
+    key: actionRef.key,
+    kind: action.kind,
+    idolId: action.idolId || "",
+    team: onlineTeamForUid(onlineUid),
+    round: round,
+    pickCount: (picks[onlineTeamForUid(onlineUid)] || []).length,
+    revealKey: payload.revealKey || "",
+    revealPhase: pickRevealPhase,
+    envelope: action.envelope
+  };
+  actionRef.set(payload)
     .catch(error => {
+      onlinePendingAction = null;
       onlineActionPending = false;
       setOnlineStatus(error.message || "操作を送れませんでした。もう一度試してください。");
       renderDraft();
       renderOnlinePickReveal();
+      renderCandidates();
     });
   window.setTimeout(() => {
-    if (!onlineActionPending) return;
+    if (!onlineActionPending || onlinePendingAction?.key !== actionRef.key) return;
+    onlinePendingAction = null;
     onlineActionPending = false;
     setOnlineStatus("応答を待っています。画面が更新されない場合はホストに確認してください。");
     renderDraft();
     renderOnlinePickReveal();
+    renderCandidates();
   }, 12000);
 }
 
@@ -2662,14 +2742,17 @@ async function processOnlineAction(snapshot) {
   if (!onlineIsHost || !onlineRoomRef || onlineHandledActionIds.has(snapshot.key)) return;
   onlineHandledActionIds.add(snapshot.key);
   const action = snapshot.val();
-  const ownerTeam = onlinePlayers[action?.uid]?.teamName || "";
+  const ownerTeam = onlineTeamForUid(action?.uid);
   const revealMatches = Boolean(action?.revealKey && action.revealKey === currentRevealKey());
+  let actionAccepted = false;
   try {
     if (!action || !onlinePlayers[action.uid]) return;
     const canAcceptPick = action?.kind === "pick" && ownerTeam && (
       !r1Started ? canSubmitR1Nomination(ownerTeam) : ownerTeam === currentTeamName()
     );
     if (canAcceptPick) {
+      const wasFirstRound = !r1Started;
+      const previousPickCount = (picks[ownerTeam] || []).length;
       const localPendingPickId = pendingDraftPickId;
       pendingDraftPickId = String(action.idolId || "");
       try {
@@ -2680,15 +2763,28 @@ async function processOnlineAction(snapshot) {
         renderDraft();
         renderCandidates();
       }
+      actionAccepted = wasFirstRound
+        ? r1Nominations.some(item => item.team === ownerTeam) || (picks[ownerTeam] || []).length > previousPickCount
+        : (picks[ownerTeam] || []).length > previousPickCount;
     } else if (action?.kind === "envelope" && revealMatches && activePickReveal?.type === "lottery") {
       const drawer = activePickReveal.drawOrder[activePickReveal.drawIndex];
-      if (drawer && teamOwnerUid(drawer) === action.uid) selectLotteryEnvelope(action.envelope, false, action.uid);
+      if (drawer && teamOwnerUid(drawer) === action.uid) {
+        selectLotteryEnvelope(action.envelope, false, action.uid);
+        actionAccepted = activePickReveal?.selections?.get(Number(action.envelope)) === drawer;
+      }
     } else if (action?.kind === "next" && revealMatches) {
+      const previousPhase = pickRevealPhase;
       advancePickReveal();
+      actionAccepted = currentRevealKey() !== action.revealKey || pickRevealPhase !== previousPhase;
     } else if (action?.kind === "skip" && revealMatches) {
+      const previousPhase = pickRevealPhase;
       skipCurrentPickReveal();
+      actionAccepted = currentRevealKey() !== action.revealKey || pickRevealPhase !== previousPhase;
     }
   } finally {
+    if (action?.uid) {
+      onlineActionAcks[action.uid] = { key: snapshot.key, accepted: actionAccepted, at: Date.now() };
+    }
     await snapshot.ref.remove().catch(() => {});
     syncOnlineState();
     window.setTimeout(() => onlineHandledActionIds.delete(snapshot.key), 30000);
@@ -2846,8 +2942,8 @@ function canSubmitR1Nomination(team) {
   return activeMode === "online" || team === r1NominationOrder[r1NominationIndex];
 }
 
-function areOnlineR1BidsSealed() {
-  return activeMode === "online" && !r1Started && !pendingR1Resolution &&
+function areR1BidsSealed() {
+  return !r1Started && !pendingR1Resolution &&
     r1NominationIndex < r1NominationOrder.length;
 }
 
@@ -3354,11 +3450,10 @@ function advanceAI() {
     const idol = chooseAIIdol(team);
     r1Nominations.push({ team, id: idol?.id || "" });
     r1NominationIndex += 1;
-    if (idol) queuePickReveal(team, idol, 1, "nomination");
     if (r1NominationIndex >= r1NominationOrder.length) {
       resolveFirstRound();
-    } else if (!idol) {
-      window.setTimeout(advanceAI, 0);
+    } else {
+      scheduleAIAdvance(idol ? 420 : 0);
     }
   } else {
     const team = currentTeamName();
@@ -3513,6 +3608,7 @@ function renderDraft() {
   const canConfirm = Boolean(
     gameStarted && currentTeam && pendingIdol &&
     canControlTeam(currentTeam) &&
+    $("pickReveal").hidden &&
     !onlineActionPending &&
     !pendingR1Resolution
   );
@@ -3539,12 +3635,9 @@ function renderDraft() {
     $("draftHint").textContent = "設定を選んで「ドラフトを始める」を押してね。";
     $("selectedMember").textContent = "開始後は候補カードを選び、確認してから指名を提出できます。";
   } else if (pendingR1Resolution) {
-    $("draftHint").textContent = activeMode === "online"
-      ? "全チームの1巡目入札を一斉公開しました。抽選がある場合は、当選チームを決めています。"
-      : "1巡目の指名を順番に発表しています。抽選がある場合は、外れたチームが再指名します。";
+    $("draftHint").textContent = "全チームの1巡目入札を一斉公開しました。抽選がある場合は、当選チームを決めています。";
     $("selectedMember").textContent = "発表が終わるまで次の指名はできません。";
   } else if (!r1Started) {
-    const secured = teamNames.filter(team => (picks[team] || []).some(item => item.round === 1)).length;
     const currentStage = r1NominationAttempt === 1 ? "初回指名" : `${r1NominationAttempt}回目の再指名`;
     $("draftHint").textContent = activeMode === "online"
       ? ownOnlineSubmitted
@@ -3556,7 +3649,7 @@ function renderDraft() {
             : "他チームの入札がそろうのを待っています。"
       : currentTeam
         ? canControlTeam(currentTeam)
-          ? `${displayTeamName(currentTeam)}の${currentStage}番です。候補を選んで確認し、指名を提出してください。`
+          ? `${displayTeamName(currentTeam)}の${currentStage}番です。候補を選んで提出してください。入札内容は全員の提出後に一斉公開します。`
           : `${displayTeamName(currentTeam)}の${currentStage}です。相手が指名しています。`
         : "次の指名チームを準備しています。";
     $("selectedMember").textContent = pendingIdol
@@ -3567,14 +3660,16 @@ function renderDraft() {
           : ownOnlineFirstPick
             ? "あなたの1巡目指名は確定しました。"
             : "候補カードを選んで、すぐ下の確認ボタンから入札を提出してください。"
-        : `${secured} / ${teamNames.length}チームの1巡目指名が確定。外れたチームは当たるまで再指名できます。`;
+        : `${r1NominationIndex} / ${r1NominationOrder.length}チームが入札提出済み。全員の提出後に内容を一斉公開します。`;
   } else if (!currentTeam) {
     $("draftHint").textContent = "全チームの指名が完了しました。";
     $("selectedMember").textContent = "ドラフト終了！設定を変えて、もう一度遊べるよ。";
   } else {
     $("draftHint").textContent =
       (canControlTeam(currentTeam)
-        ? `2巡目以降は${orderMode === "snake" ? "前巡の逆順" : "チーム順固定"}。${displayTeamName(currentTeam)}は候補を選び、確認後に提出してね。`
+        ? !$("pickReveal").hidden
+          ? `${displayTeamName(currentTeam)}の指名発表中です。画面の「次へ進む」を押すと候補から指名できます。`
+          : `2巡目以降は${orderMode === "snake" ? "前巡の逆順" : "チーム順固定"}。${displayTeamName(currentTeam)}は候補を選び、確認後に提出してね。`
         : `${displayTeamName(currentTeam)}が指名中です。自分のチームの順番を待っています。`);
     $("selectedMember").textContent = pendingIdol
       ? `${pendingIdol.japaneseName}を選択中です。確認ボタンを押すと指名が提出されます。`
@@ -3602,8 +3697,8 @@ function renderDraft() {
     ? `各チーム${pickLimit}人。ドラフト開始後、巡目ごとに表示します。`
     : finished
       ? "全チームの指名が完了しました。"
-      : areOnlineR1BidsSealed()
-        ? `${r1NominationIndex} / ${r1NominationOrder.length}チームが入札を提出。対象チームがそろうと一斉公開します。`
+      : areR1BidsSealed()
+        ? `${r1NominationIndex} / ${r1NominationOrder.length}チームが入札を提出。全チームの提出後に一斉公開します。`
       : !r1Started
         ? teamNames.filter(team => (picks[team] || []).some(item => item.round === 1)).length + " / " + teamNames.length + "チームが1巡目確定。重複は抽選し、落選チームは再指名します。"
         : `${round}巡目を進行中です。`;
@@ -3635,7 +3730,7 @@ function renderDraft() {
     if (pickRound === 1 && gameStarted) {
       const nomination = r1Nominations.find(item => item.team === team);
       const nominee = nomination && idols.find(item => item.id === nomination.id);
-      if (areOnlineR1BidsSealed() && nomination) {
+      if (areR1BidsSealed() && nomination) {
         return `${lossMarkup}<div class="draft-cell-card draft-nomination">
           <small>1巡目入札</small>
           <strong>提出済み・非公開</strong>
