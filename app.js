@@ -1590,6 +1590,7 @@ let onlineIsHost = false;
 let onlinePlayers = {};
 let onlineActionPending = false;
 let onlinePendingAction = null;
+let lastPickRevealPointerActionAt = 0;
 let onlineActionAcks = {};
 let onlineStateApplying = false;
 let onlineStateWriteTimer = null;
@@ -2552,6 +2553,7 @@ function updateOnlineRevealConfirmation() {
 
   const button = $("pickRevealNext");
   const hint = $("pickRevealActionHint");
+  button.setAttribute("aria-busy", String(onlineActionPending));
   if (onlineRevealAutoAdvanceDelay() > 0) {
     button.disabled = true;
     button.textContent = pickRevealPhase === "revealed" ? "自動で次へ進みます" : "発表演出中…";
@@ -2862,6 +2864,7 @@ function applyOnlineGameState(state) {
     }
     const localPendingPickId = gameSessionChanged ? null : pendingDraftPickId;
     const actionAck = onlineUid ? state.actionAcks?.[onlineUid] : null;
+    const pendingActionKind = onlinePendingAction?.kind || "";
     const actionWasAcknowledged = Boolean(onlinePendingAction && actionAck?.key === onlinePendingAction.key);
     const actionWasRejected = actionWasAcknowledged && !Boolean(actionAck.accepted);
     const actionWasAccepted = !actionWasRejected && (
@@ -2932,6 +2935,9 @@ function applyOnlineGameState(state) {
     renderOnlinePickReveal();
     renderDraft();
     renderCandidates();
+    if (actionWasAcknowledged && actionWasRejected && pendingActionKind === "next" && activePickReveal) {
+      $("pickRevealActionHint").textContent = actionAck.reason || "確認を受け付けられませんでした。もう一度押してください。";
+    }
   } finally {
     onlineStateApplying = false;
   }
@@ -3010,6 +3016,9 @@ function submitOnlineAction(action) {
       renderDraft();
       renderOnlinePickReveal();
       renderCandidates();
+      if (action.kind === "next") {
+        $("pickRevealActionHint").textContent = `確認を送れませんでした：${error.message || "通信を確認して、もう一度押してください。"}`;
+      }
     });
   window.setTimeout(() => {
     if (!onlineActionPending || onlinePendingAction?.key !== actionRef.key) return;
@@ -3019,6 +3028,9 @@ function submitOnlineAction(action) {
     renderDraft();
     renderOnlinePickReveal();
     renderCandidates();
+    if (action.kind === "next") {
+      $("pickRevealActionHint").textContent = "確認を送信しましたが、ホストから応答がありません。通信状態を確認して、もう一度押してください。";
+    }
   }, 12000);
 }
 
@@ -3798,7 +3810,18 @@ function advancePickReveal() {
   )) showNextPickReveal();
 }
 
-$("pickRevealNext").addEventListener("click", advancePickReveal);
+const pickRevealNextButton = $("pickRevealNext");
+pickRevealNextButton.addEventListener("pointerup", event => {
+  if (event.pointerType === "mouse" && event.button !== 0) return;
+  lastPickRevealPointerActionAt = Date.now();
+  advancePickReveal();
+});
+pickRevealNextButton.addEventListener("click", event => {
+  // Pointer devices already advanced on pointerup; retain click for keyboard
+  // activation and browsers without Pointer Events.
+  if (event.detail > 0 && Date.now() - lastPickRevealPointerActionAt < 800) return;
+  advancePickReveal();
+});
 $("pickRevealSkip").addEventListener("click", skipCurrentPickReveal);
 $("lotteryTickets").addEventListener("click", event => {
   const button = event.target.closest("button[data-lottery-envelope]");
