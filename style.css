@@ -3030,3 +3030,76 @@ footer span:first-child {
   min-width: 0;
   padding: 10px;
 }
+
+.recommendation-guide {
+  margin: 14px 0;
+  padding: 13px 15px;
+  background: linear-gradient(135deg, #f4f9fd 0%, #eaf4fb 100%);
+  border: 1px solid #d3e4f1;
+  border-radius: 13px;
+}
+
+.recommendation-guide-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: #174f7d;
+  font-size: 13px;
+}
+
+.recommendation-guide-title span {
+  color: #d99a19;
+  font-size: 17px;
+}
+
+.recommendation-guide p {
+  margin: 5px 0;
+  color: #586d80;
+  font-size: 11px;
+  line-height: 1.65;
+}
+
+.recommendation-guide a {
+  color: #1765a4;
+  font-size: 11px;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.recommendation-guide a:hover {
+  text-decoration: underline;
+}
+
+.candidate-popularity {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 5px;
+  margin: 0 0 7px;
+}
+
+.candidate-stars {
+  color: #d79a1d;
+  font-size: 13px;
+  letter-spacing: 1px;
+  line-height: 1;
+  white-space: nowrap;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.candidate-popularity small {
+  color: #7d8c9b;
+  font-size: 9px;
+  font-weight: 700;
+  text-align: right;
+}
+
+@media (max-width: 520px) {
+  .recommendation-guide {
+    padding: 11px 12px;
+  }
+
+  .candidate-stars {
+    font-size: 12px;
+  }
+}

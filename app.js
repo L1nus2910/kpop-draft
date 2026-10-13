@@ -795,6 +795,69 @@ const idols = groups.flatMap(group =>
   }))
 );
 
+const individualPopularityRanks = [
+  ["NiziU", "Maya", 1], ["BABYMONSTER", "Ahyeon", 2], ["NiziU", "Mako", 3],
+  ["IVE", "Leeseo", 4], ["CLASS:y", "Boeun", 5], ["aespa", "Winter", 6],
+  ["NiziU", "Ayaka", 7], ["NiziU", "Rima", 8], ["NiziU", "Riku", 9],
+  ["NiziU", "Miihi", 10], ["Kep1er", "Hikaru", 11], ["NiziU", "Mayuka", 12],
+  ["NiziU", "Rio", 13], ["aespa", "Ningning", 14], ["aespa", "Karina", 15],
+  ["NiziU", "Nina", 16], ["LE SSERAFIM", "Sakura", 17], ["IVE", "Yujin", 18],
+  ["Hearts2Hearts", "Carmen", 19], ["NMIXX", "Haewon", 20],
+  ["TWICE", "Tzuyu", 1], ["BLACKPINK", "Lisa", 2], ["TWICE", "Mina", 2],
+  ["TWICE", "Momo", 4], ["BLACKPINK", "Jennie", 5], ["TWICE", "Jeongyeon", 6],
+  ["I.O.I", "Sejeong", 12], ["TWICE", "Nayeon", 8], ["TWICE", "Sana", 9],
+  ["TWICE", "Dahyun", 10], ["BLACKPINK", "Jisoo", 11], ["TWICE", "Jihyo", 13],
+  ["TWICE", "Chaeyoung", 14], ["BLACKPINK", "Rosé", 15], ["Apink", "Hayoung", 16],
+  ["ITZY", "Yeji", 17], ["Girls' Generation", "Taeyeon", 18], ["Apink", "Eunji", 19],
+  ["ITZY", "Yuna", 20]
+];
+
+const groupPopularityRanks = [
+  ["NiziU", 1], ["NMIXX", 2], ["QWER", 3], ["ISEGYE IDOL", 4],
+  ["SECRET NUMBER", 5], ["NewJeans", 6], ["RESCENE", 7], ["Hearts2Hearts", 8],
+  ["IVE", 9], ["aespa", 10], ["Lapillus", 11], ["VIVIZ", 12],
+  ["BABYMONSTER", 13], ["LE SSERAFIM", 14], ["Kep1er", 15], ["izna", 16],
+  ["TUIDE", 17], ["OURBIRTHDAY", 18], ["Billlie", 19], ["KISS OF LIFE", 20],
+  ["TWICE", 1], ["BLACKPINK", 2], ["OH MY GIRL", 3], ["Dreamcatcher", 4],
+  ["Red Velvet", 5], ["Lovelyz", 6], ["ITZY", 7], ["MOMOLAND", 8],
+  ["Apink", 9], ["BBGIRLS", 10], ["GFRIEND", 11], ["Girls' Generation", 12],
+  ["MAMAMOO", 13], ["fromis", 14], ["i-dle", 15]
+];
+
+const rankingGroupAliases = { fromis: "fromis_9" };
+const normalizeRankingName = value => String(value).toLowerCase().replace(/[^a-z0-9]/g, "");
+const memberRankByKey = new Map();
+const groupRankByKey = new Map();
+const memberRankingKey = (group, member) =>
+  `${normalizeRankingName(rankingGroupAliases[group] || group)}:${normalizeRankingName(member)}`;
+
+individualPopularityRanks.forEach(([group, member, rank]) => {
+  const key = memberRankingKey(group, member);
+  memberRankByKey.set(key, Math.min(memberRankByKey.get(key) || Infinity, rank));
+});
+groupPopularityRanks.forEach(([group, rank]) => {
+  const key = normalizeRankingName(rankingGroupAliases[group] || group);
+  groupRankByKey.set(key, rank);
+});
+
+function starsForMonthlyRank(rank) {
+  if (!rank) return 1;
+  if (rank <= 5) return 5;
+  if (rank <= 10) return 4;
+  if (rank <= 15) return 3;
+  return 2;
+}
+
+idols.forEach(idol => {
+  const memberRank = memberRankByKey.get(memberRankingKey(idol.group, idol.name)) || null;
+  const groupRank = groupRankByKey.get(normalizeRankingName(idol.group)) || null;
+  idol.popularityStars = Math.max(starsForMonthlyRank(memberRank), starsForMonthlyRank(groupRank));
+  idol.individualPopularityRank = memberRank;
+  idol.groupPopularityRank = groupRank;
+  idol.popularitySortScore = (memberRank ? 1000 + (21 - memberRank) : 0) +
+    (groupRank ? 100 + (21 - groupRank) : 0);
+});
+
 const $ = id => document.getElementById(id);
 const localTeamNames = [
   "チームA", "チームB", "チームC", "チームD", "チームE",
@@ -925,7 +988,11 @@ function getCandidates(ignoreFilter = "") {
       (!group || idol.group === group) &&
       (!hideDrafted || !drafted.has(idol.id)) &&
       ($("showExcluded").checked || !excluded.has(idol.id));
-  });
+  }).sort((a, b) =>
+    b.popularityStars - a.popularityStars ||
+    b.popularitySortScore - a.popularitySortScore ||
+    a.japaneseName.localeCompare(b.japaneseName, "ja")
+  );
 }
 
 function updateDependentFilters() {
@@ -987,9 +1054,17 @@ function renderCandidates() {
           : gameStarted
             ? "クリックして選択"
             : "クリックして選択";
+    const rankingDetails = [
+      idol.individualPopularityRank ? `個人${idol.individualPopularityRank}位` : "個人未掲載",
+      idol.groupPopularityRank ? `グループ${idol.groupPopularityRank}位` : "グループ未掲載"
+    ].join("・");
     return `
       <article class="candidate-card ${isSelected ? "is-selected" : ""} ${isExcluded ? "is-excluded" : ""}" data-candidate-id="${idol.id}">
         <button class="candidate-select" type="button" data-action="select" data-id="${idol.id}" aria-pressed="${isSelected}" ${isUnavailable ? "disabled" : ""}>
+          <span class="candidate-popularity" aria-label="人気参考ランク ${idol.popularityStars}つ星">
+            <span class="candidate-stars" aria-hidden="true">${"★".repeat(idol.popularityStars)}${"☆".repeat(5 - idol.popularityStars)}</span>
+            <small>${rankingDetails}</small>
+          </span>
           <span class="candidate-name">${escapeHTML(idol.japaneseName)}</span>
           <span class="candidate-group">${escapeHTML(idol.group)}</span>
           <span class="tags">
@@ -1334,7 +1409,8 @@ function chooseAIIdol(team) {
       (groupCount === 0 ? strategy.group : -strategy.group * groupCount) +
       strategy.generation / (generationCount + 1) +
       strategy.nationality / (nationalityCount + 1) +
-      (idol.activity === "活動中" ? strategy.activity : 0);
+      (idol.activity === "活動中" ? strategy.activity : 0) +
+      (idol.popularityStars - 1) * 2.2;
     return { idol, score };
   }).sort((a, b) => b.score - a.score);
 
