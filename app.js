@@ -1688,7 +1688,7 @@ function renderCandidates() {
       idols.find(idol => idol.id === item.id)?.personKey
     ).filter(Boolean));
   const currentTeam = gameStarted ? currentTeamName() : "";
-  const ownOnlineTeam = activeMode === "online" ? teamOwnerUid(onlineUid) : "";
+  const ownOnlineTeam = activeMode === "online" ? onlineTeamForUid(onlineUid) : "";
   const ownOnlineBidSubmitted = Boolean(ownOnlineTeam && r1Nominations.some(item => item.team === ownOnlineTeam));
   const canPickNow = !gameStarted || Boolean(
     currentTeam && canControlTeam(currentTeam) && !onlineActionPending && $("pickReveal").hidden && !pendingR1Resolution
@@ -1786,7 +1786,7 @@ function confirmDraftPick(submittingUid = "") {
     cancelDraftPick();
     return;
   }
-  const team = submittingUid ? teamOwnerUid(submittingUid) : currentTeamName();
+  const team = submittingUid ? onlineTeamForUid(submittingUid) : currentTeamName();
   if (!team || !canControlTeam(team, submittingUid || onlineUid)) return;
   if (activeMode === "online" && !onlineIsHost) {
     submitOnlineAction({ kind: "pick", idolId: idol.id });
@@ -2334,6 +2334,11 @@ function teamOwnerUid(team) {
   )?.[0] || "";
 }
 
+function onlineTeamForUid(uid) {
+  const player = onlinePlayers[uid];
+  return player?.teamName || player?.name || "";
+}
+
 function canControlTeam(team, actorUid = onlineUid) {
   if (activeMode === "online") return Boolean(actorUid && teamOwnerUid(team) === actorUid);
   return !aiTeams.has(team);
@@ -2777,7 +2782,7 @@ function currentTeamName() {
   if (!gameStarted) return null;
   if (!r1Started) {
     if (activeMode === "online") {
-      const ownTeam = teamOwnerUid(onlineUid);
+      const ownTeam = onlineTeamForUid(onlineUid);
       return canSubmitR1Nomination(ownTeam) ? ownTeam : null;
     }
     return r1NominationOrder[r1NominationIndex] || null;
@@ -3406,7 +3411,7 @@ function renderFinalSnapshot() {
 
 function renderDraft() {
   const currentTeam = currentTeamName();
-  const ownOnlineTeam = activeMode === "online" ? teamOwnerUid(onlineUid) : "";
+  const ownOnlineTeam = activeMode === "online" ? onlineTeamForUid(onlineUid) : "";
   const ownOnlineSubmitted = Boolean(ownOnlineTeam && r1Nominations.some(item => item.team === ownOnlineTeam));
   const ownOnlineFirstPick = Boolean(ownOnlineTeam && (picks[ownOnlineTeam] || []).some(item => item.round === 1));
   const finished = Boolean(
