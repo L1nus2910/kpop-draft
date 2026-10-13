@@ -1,0 +1,45 @@
+{
+  "rules": {
+    "rooms": {
+      "$roomId": {
+        ".write": "auth != null && ((!data.exists() && newData.child('hostUid').val() == auth.uid) || (data.child('hostUid').val() == auth.uid && !newData.exists()))",
+        "hostUid": {
+          ".read": false,
+          ".write": false
+        },
+        "status": {
+          ".read": "auth != null",
+          ".write": "auth != null && root.child('rooms').child($roomId).child('hostUid').val() == auth.uid"
+        },
+        "settings": {
+          ".read": "auth != null",
+          ".write": "auth != null && root.child('rooms').child($roomId).child('hostUid').val() == auth.uid"
+        },
+        "state": {
+          ".read": "auth != null",
+          ".write": "auth != null && root.child('rooms').child($roomId).child('hostUid').val() == auth.uid"
+        },
+        "players": {
+          ".read": "auth != null",
+          "$uid": {
+            ".write": "auth != null && (root.child('rooms').child($roomId).child('hostUid').val() == auth.uid || (auth.uid == $uid && root.child('rooms').child($roomId).child('status').val() == 'lobby' && !newData.exists()))"
+          }
+        },
+        "joinRequests": {
+          ".read": "auth != null && root.child('rooms').child($roomId).child('hostUid').val() == auth.uid",
+          "$uid": {
+            ".read": "auth != null && (auth.uid == $uid || root.child('rooms').child($roomId).child('hostUid').val() == auth.uid)",
+            ".write": "auth != null && ((auth.uid == $uid && ((!data.exists() && newData.exists()) || (data.exists() && !newData.exists()))) || root.child('rooms').child($roomId).child('hostUid').val() == auth.uid)"
+          }
+        },
+        "actions": {
+          ".read": "auth != null && root.child('rooms').child($roomId).child('hostUid').val() == auth.uid",
+          "$actionId": {
+            ".write": "auth != null && ((!data.exists() && auth.uid == newData.child('uid').val() && root.child('rooms').child($roomId).child('players').child(auth.uid).exists()) || root.child('rooms').child($roomId).child('hostUid').val() == auth.uid)",
+            ".validate": "!newData.exists() || (newData.hasChildren(['uid', 'kind']) && newData.child('uid').val() == auth.uid && (newData.child('kind').val() == 'pick' || newData.child('kind').val() == 'envelope' || newData.child('kind').val() == 'next' || newData.child('kind').val() == 'skip'))"
+          }
+        }
+      }
+    }
+  }
+}

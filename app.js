@@ -1528,6 +1528,20 @@ let lotterySummary = "";
 let pickLimit = 5;
 let orderMode = "snake";
 let firstRoundLotteryLosses = {};
+let onlineRoomRef = null;
+let onlineRoomCode = "";
+let onlineGameStatus = "";
+let onlineUid = "";
+let onlineIsHost = false;
+let onlinePlayers = {};
+let onlineActionPending = false;
+let onlineStateApplying = false;
+let onlineStateWriteTimer = null;
+let onlineListenersAttached = false;
+let onlineHandledActionIds = new Set();
+let onlineJoinQueue = Promise.resolve();
+let onlineShownRevealKey = "";
+let onlineHostRestoring = false;
 
 const teamColorPalette = [
   "#bf435a", "#3d70c4", "#16877c", "#bd792e", "#7957b8",
@@ -1671,6 +1685,10 @@ function renderCandidates() {
   const nominatedPersonKeys = new Set(r1Nominations.map(item =>
     idols.find(idol => idol.id === item.id)?.personKey
   ).filter(Boolean));
+  const currentTeam = gameStarted ? currentTeamName() : "";
+  const canPickNow = !gameStarted || Boolean(
+    currentTeam && canControlTeam(currentTeam) && !onlineActionPending && $("pickReveal").hidden && !pendingR1Resolution
+  );
   $("candidateList").innerHTML = list.map(idol => {
     const isExcluded = excluded.has(idol.id);
     const isNominated = !r1Started && nominatedPersonKeys.has(idol.personKey);
@@ -1678,6 +1696,8 @@ function renderCandidates() {
     const isSelected = selectedId === idol.id || pendingDraftPickId === idol.id || isNominated;
     const selectHint = isUnavailable
       ? (isExcluded ? "除外中" : "指名済み")
+      : gameStarted && !canPickNow
+        ? "あなたの指名番ではありません"
       : pendingDraftPickId === idol.id
         ? "✓ 選択中・確認して提出"
         : isNominated
@@ -1695,7 +1715,7 @@ function renderCandidates() {
       : '<span class="candidate-stars" aria-label="ランキング未掲載のため星1つ" title="ランキング未掲載">★☆☆☆☆</span>';
     return `
       <article class="candidate-card ${isSelected ? "is-selected" : ""} ${isExcluded ? "is-excluded" : ""}" data-candidate-id="${idol.id}">
-        <button class="candidate-select" type="button" data-action="select" data-id="${idol.id}" aria-pressed="${isSelected}" ${isUnavailable ? "disabled" : ""}>
+        <button class="candidate-select" type="button" data-action="select" data-id="${idol.id}" aria-pressed="${isSelected}" ${isUnavailable || !canPickNow ? "disabled" : ""}>
           <span class="candidate-title-row">
             <span class="candidate-name">${escapeHTML(idol.japaneseName)}</span>
             ${rankingStars}
@@ -1736,9 +1756,9 @@ function selectMember(id) {
     return;
   }
 
-  if (!$("pickReveal").hidden || pendingR1Resolution) return;
+  if (!$("pickReveal").hidden || pendingR1Resolution || onlineActionPending) return;
   const team = currentTeamName();
-  if (!team || (activeMode === "ai" && aiTeams.has(team))) return;
+  if (!team || !canControlTeam(team)) return;
   if (!r1Started && team !== r1NominationOrder[r1NominationIndex]) return;
 
   pendingDraftPickId = idol.id;
@@ -1761,7 +1781,11 @@ function confirmDraftPick() {
     return;
   }
   const team = currentTeamName();
-  if (!team || (activeMode === "ai" && aiTeams.has(team))) return;
+  if (!team || !canControlTeam(team)) return;
+  if (activeMode === "online" && !onlineIsHost) {
+    submitOnlineAction({ kind: "pick", idolId: idol.id });
+    return;
+  }
 
   pendingDraftPickId = null;
   selectedId = null;
@@ -1916,8 +1940,13 @@ function renderNominations() {
 function updateModeSetup() {
   const mode = $("playMode").value;
   const aiMode = mode === "ai";
+  const localMode = mode === "local";
+  const onlineMode = mode === "online";
   $("aiCountWrap").hidden = !aiMode;
-  $("localTeamCountWrap").hidden = aiMode;
+  $("localTeamCountWrap").hidden = !localMode;
+  $("onlineControls").hidden = !onlineMode;
+  $("teamNameSettings").hidden = onlineMode;
+  $("startGame").hidden = onlineMode;
   $("startGame").textContent = aiMode
     ? "AI対戦を始める"
     : `${$("localTeamCount").value}チームで始める`;
@@ -1933,7 +1962,7 @@ function updateModeSetup() {
     $("playerTeamName").addEventListener("input", event => {
       playerTeamNameValue = event.currentTarget.value;
     });
-  } else {
+  } else if (localMode) {
     const count = Number($("localTeamCount").value);
     $("teamNameHelp").textContent = "空欄にすると初期名を使います。";
     $("teamNameInputs").innerHTML = Array.from({ length: count }, (_, index) => `
@@ -1948,14 +1977,647 @@ function updateModeSetup() {
         localTeamNameValues[index] = event.currentTarget.value;
       });
     });
+  } else {
+    $("teamNameHelp").textContent = "オンラインでは各参加者の名前をチーム名にします。";
+    $("teamNameInputs").innerHTML = "";
   }
 
   const teams = aiMode
     ? `あなたとAI${$("aiCount").value}人の合計${Number($("aiCount").value) + 1}チーム`
-    : `同じ画面の${$("localTeamCount").value}チーム`;
-  $("modeDescription").textContent =
-    `${teams}で、各チーム${$("pickLimit").value}人を指名します。` +
-    "1巡目は指名が重なったら抽選し、外れたチームは当たるまで再指名します。再指名同士が重なった場合も抽選します。2巡目以降は設定した順番で進みます。";
+    : localMode
+      ? `同じ画面の${$("localTeamCount").value}チーム`
+      : "ルームコードで友達と最大10人";
+  $("modeDescription").textContent = onlineMode
+    ? `${teams}で参加し、指名・抽選・結果をリアルタイム共有します。無料のFirebase設定後に使えます。`
+    : `${teams}で、各チーム${$("pickLimit").value}人を指名します。` +
+      "1巡目は指名が重なったら抽選し、外れたチームは当たるまで再指名します。再指名同士が重なった場合も抽選します。2巡目以降は設定した順番で進みます。";
+
+  const remoteGuest = onlineMode && onlineRoomRef && !onlineIsHost;
+  $("pickLimit").disabled = remoteGuest || (onlineMode && onlineGameStatus === "playing") || (gameStarted && !allTeamsComplete());
+  $("orderMode").disabled = remoteGuest || (onlineMode && onlineGameStatus === "playing") || (gameStarted && !allTeamsComplete());
+}
+
+function setOnlineStatus(message) {
+  $("onlineRoomStatus").textContent = message;
+}
+
+function firebaseConfigurationReady() {
+  const config = window.STAGE_PICK_FIREBASE_CONFIG;
+  return Boolean(config && config.apiKey && config.projectId && config.databaseURL &&
+    !JSON.stringify(config).includes("YOUR_"));
+}
+
+async function ensureOnlineIdentity() {
+  if (!firebaseConfigurationReady() || !window.firebase?.auth || !window.firebase?.database) {
+    throw new Error("Firebaseの無料プロジェクト設定がまだです。firebase-config.jsに設定を入れてください。");
+  }
+  if (!firebase.apps.length) firebase.initializeApp(window.STAGE_PICK_FIREBASE_CONFIG);
+  const auth = firebase.auth();
+  if (!auth.currentUser) await auth.signInAnonymously();
+  onlineUid = auth.currentUser.uid;
+  return onlineUid;
+}
+
+function makeRoomCode() {
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  const bytes = new Uint8Array(8);
+  crypto.getRandomValues(bytes);
+  return [...bytes].map(byte => alphabet[byte % alphabet.length]).join("");
+}
+
+function normalizeOnlineName(value, fallback = "プレイヤー") {
+  const cleaned = String(value || "").replace(/[.#$\/\[\]]/g, "").trim().slice(0, 24);
+  return cleaned || fallback;
+}
+
+function setOnlineRoomConnected(code, isHost, initialPlayers = null, deferGameActions = false) {
+  onlineRoomCode = code;
+  onlineRoomRef = firebase.database().ref(`rooms/${code}`);
+  onlineIsHost = isHost;
+  onlinePlayers = initialPlayers || {};
+  onlineGameStatus = "lobby";
+  onlineListenersAttached = false;
+  onlineActionPending = false;
+  onlineHandledActionIds = new Set();
+  $("onlineRoomCode").value = code;
+  $("onlineRoomCodeLabel").textContent = code;
+  $("onlineLobby").hidden = false;
+  $("createOnlineRoom").hidden = true;
+  $("joinOnlineRoom").hidden = true;
+  $("onlineRoomCode").disabled = true;
+  renderOnlineLobby();
+
+  onlineRoomRef.child("players").on("value", snapshot => {
+    onlinePlayers = snapshot.val() || {};
+    renderOnlineLobby();
+  });
+  onlineRoomRef.child("status").on("value", snapshot => {
+    onlineGameStatus = snapshot.val() || "closed";
+    renderOnlineLobby();
+    if (onlineGameStatus === "playing" && !onlineIsHost) {
+      attachOnlineGuestListeners();
+    }
+    if (onlineGameStatus === "closed") setOnlineStatus("このルームは終了しました");
+  });
+
+  if (isHost) {
+    onlineRoomRef.child("joinRequests").on("child_added", snapshot => {
+      onlineJoinQueue = onlineJoinQueue.then(() => acceptOnlineJoinRequest(snapshot));
+    });
+    if (!deferGameActions) onlineRoomRef.child("actions").on("child_added", processOnlineAction);
+  } else {
+    onlineRoomRef.child(`players/${onlineUid}`).on("value", snapshot => {
+      if (snapshot.exists()) {
+        attachOnlineGuestListeners();
+      } else {
+        setOnlineStatus("参加申請を送っています。ホストの承認を待っています…");
+      }
+    });
+    onlineRoomRef.child(`joinRequests/${onlineUid}`).on("value", snapshot => {
+      const request = snapshot.val();
+      if (request?.status === "full") setOnlineStatus("このルームは満員です。別のルームを作ってください。");
+      if (request?.status === "closed") setOnlineStatus("このルームはすでに開始されています。");
+    });
+  }
+
+  onlineRoomRef.child("settings").on("value", snapshot => {
+    if (onlineIsHost) return;
+    const settings = snapshot.val();
+    if (!settings) return;
+    $("pickLimit").value = String(settings.pickLimit || 5);
+    $("orderMode").value = settings.orderMode || "snake";
+    updateModeSetup();
+  });
+
+  if (new URLSearchParams(location.search).get("room") !== code) {
+    const url = new URL(location.href);
+    url.searchParams.set("room", code);
+    history.replaceState(null, "", url);
+  }
+}
+
+function renderOnlineLobby() {
+  const players = Object.entries(onlinePlayers).sort(([, a], [, b]) =>
+    Number(a.order || 0) - Number(b.order || 0)
+  );
+  $("onlinePlayerList").innerHTML = players.map(([, player], index) => `
+    <li><span class="online-player-number">${index + 1}</span><strong>${escapeHTML(player.teamName || player.name || "プレイヤー")}</strong><small>${player.host ? "ホスト" : "参加者"}</small></li>
+  `).join("");
+  const hostCanStart = onlineIsHost && onlineGameStatus === "lobby" && players.length >= 2;
+  $("startOnlineGame").hidden = !onlineIsHost || onlineGameStatus !== "lobby";
+  $("startOnlineGame").disabled = !hostCanStart;
+  $("startOnlineGame").textContent = hostCanStart
+    ? `${players.length}人でドラフト開始`
+    : `参加者待ち（${players.length} / 10人）`;
+  const finished = onlineGameStatus === "playing" && gameStarted && allTeamsComplete();
+  $("onlineLobbyHint").textContent = onlineGameStatus === "playing"
+    ? finished ? "ドラフトが終了しました。結果を保存した後、ホストがルームを閉じられます。" : "ドラフト進行中です。ルームを開いたまま遊んでください。"
+    : "2〜10人で遊べます。参加者がそろったらホストが開始します。";
+  $("closeOnlineRoom").hidden = !onlineIsHost || (onlineGameStatus !== "lobby" && !finished);
+  $("leaveOnlineRoom").hidden = onlineIsHost || !["lobby", "closed"].includes(onlineGameStatus);
+  $("closeOnlineRoom").textContent = onlineGameStatus === "lobby" ? "ルームを閉じる" : "対戦ルームを閉じる";
+  if (onlineGameStatus === "playing") setOnlineStatus(finished ? "ドラフト終了・結果を確認できます" : "ドラフト進行中");
+  else if (onlineGameStatus === "lobby") setOnlineStatus(onlineIsHost ? "友達の参加を待っています" : "ルームに参加しました");
+  $("pickLimit").disabled = onlineGameStatus === "playing" || (!onlineIsHost && Boolean(onlineRoomRef));
+  $("orderMode").disabled = onlineGameStatus === "playing" || (!onlineIsHost && Boolean(onlineRoomRef));
+}
+
+async function acceptOnlineJoinRequest(snapshot) {
+  if (!onlineIsHost || onlineGameStatus !== "lobby") return;
+  const uid = snapshot.key;
+  const request = snapshot.val();
+  if (!uid || !request) return;
+  if (onlinePlayers[uid]) {
+    await snapshot.ref.remove();
+    return;
+  }
+  if (Object.keys(onlinePlayers).length >= 10) {
+    await snapshot.ref.update({ status: "full" });
+    return;
+  }
+  const baseName = normalizeOnlineName(request.name);
+  const occupied = new Set(Object.values(onlinePlayers).map(player => player.teamName));
+  let teamName = baseName;
+  let suffix = 2;
+  while (occupied.has(teamName)) teamName = `${baseName} ${suffix++}`;
+  const order = Math.max(-1, ...Object.values(onlinePlayers).map(player => Number(player.order || 0))) + 1;
+  await onlineRoomRef.child(`players/${uid}`).set({
+    name: baseName,
+    teamName,
+    order,
+    host: false
+  });
+  onlinePlayers[uid] = { name: baseName, teamName, order, host: false };
+  renderOnlineLobby();
+  await snapshot.ref.remove();
+}
+
+function attachOnlineGuestListeners() {
+  if (onlineIsHost || onlineListenersAttached || !onlineRoomRef) return;
+  onlineListenersAttached = true;
+  onlineRoomRef.child("state").on("value", snapshot => {
+    const state = snapshot.val();
+    if (state) applyOnlineGameState(state);
+  });
+}
+
+async function createOnlineRoom() {
+  try {
+    setOnlineStatus("Firebaseに接続しています…");
+    const uid = await ensureOnlineIdentity();
+    const baseName = normalizeOnlineName($("onlinePlayerName").value, "ホスト");
+    let code = makeRoomCode();
+    let roomRef = firebase.database().ref(`rooms/${code}`);
+    for (let attempt = 0; attempt < 4 && (await roomRef.child("status").once("value")).exists(); attempt += 1) {
+      code = makeRoomCode();
+      roomRef = firebase.database().ref(`rooms/${code}`);
+    }
+    await roomRef.set({
+      hostUid: uid,
+      status: "lobby",
+      settings: { pickLimit: Number($("pickLimit").value), orderMode: $("orderMode").value },
+      players: { [uid]: { name: baseName, teamName: baseName, order: 0, host: true } }
+    });
+    setOnlineRoomConnected(code, true);
+    setOnlineStatus("ルームを作りました。招待リンクを友達に送ってください。");
+  } catch (error) {
+    setOnlineStatus(error.message || "ルームを作れませんでした。Firebase設定を確認してください。");
+  }
+}
+
+async function joinOnlineRoom() {
+  try {
+    setOnlineStatus("ルームを探しています…");
+    const uid = await ensureOnlineIdentity();
+    const code = $("onlineRoomCode").value.trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+    if (code.length !== 8) throw new Error("8文字のルームコードを入力してください。");
+    const roomRef = firebase.database().ref(`rooms/${code}`);
+    const statusSnapshot = await roomRef.child("status").once("value");
+    if (!statusSnapshot.exists()) throw new Error("そのルームが見つかりません。コードを確認してください。");
+    const memberSnapshot = await roomRef.child(`players/${uid}`).once("value");
+    if (memberSnapshot.exists()) {
+      const playersSnapshot = await roomRef.child("players").once("value");
+      const isHost = Boolean(memberSnapshot.val()?.host);
+      const isPlaying = statusSnapshot.val() === "playing";
+      setOnlineRoomConnected(code, isHost, playersSnapshot.val() || {}, isHost && isPlaying);
+      if (isHost && isPlaying) {
+        const stateSnapshot = await roomRef.child("state").once("value");
+        if (stateSnapshot.exists()) {
+          onlineHostRestoring = true;
+          try {
+            applyOnlineGameState(stateSnapshot.val());
+          } finally {
+            onlineHostRestoring = false;
+          }
+        }
+        onlineRoomRef.child("actions").on("child_added", processOnlineAction);
+        resumeOnlineHostProgress();
+        setOnlineStatus("進行中のルームにホストとして再接続しました。");
+      } else if (!isHost && isPlaying) {
+        attachOnlineGuestListeners();
+        setOnlineStatus("進行中のドラフトに再接続しました。");
+      } else {
+        setOnlineStatus(isHost ? "作成済みのルームに再接続しました。" : "参加済みのルームに再接続しました。");
+      }
+      return;
+    }
+    if (statusSnapshot.val() !== "lobby") throw new Error("このルームはすでに開始されています。参加済みの端末から再接続してください。");
+    setOnlineRoomConnected(code, false);
+    await roomRef.child(`joinRequests/${uid}`).set({
+      name: normalizeOnlineName($("onlinePlayerName").value),
+      createdAt: Date.now()
+    });
+    setOnlineStatus("参加申請を送っています。ホストの承認を待っています…");
+  } catch (error) {
+    setOnlineStatus(error.message || "参加できませんでした。コードを確認してください。");
+  }
+}
+
+async function copyOnlineInvite() {
+  if (!onlineRoomCode) return;
+  const invite = new URL(location.href);
+  invite.searchParams.set("room", onlineRoomCode);
+  try {
+    await navigator.clipboard.writeText(invite.toString());
+    setOnlineStatus("招待リンクをコピーしました。友達に送ってください。");
+  } catch {
+    window.prompt("この招待リンクをコピーして友達に送ってください", invite.toString());
+  }
+}
+
+async function closeOnlineRoom() {
+  const finished = onlineGameStatus === "playing" && gameStarted && allTeamsComplete();
+  if (!onlineIsHost || (onlineGameStatus !== "lobby" && !finished) || !onlineRoomRef) return;
+  if (!window.confirm("このルームを閉じますか？参加者はルームに入れなくなります。")) return;
+  try {
+    if (onlineStateWriteTimer !== null) {
+      clearTimeout(onlineStateWriteTimer);
+      onlineStateWriteTimer = null;
+    }
+    await onlineRoomRef.remove();
+    setOnlineStatus("ルームを閉じました。");
+    $("onlineLobbyHint").textContent = "ルームを閉じました。新しいルームを作れます。";
+    $("onlineLobby").hidden = true;
+    $("createOnlineRoom").hidden = false;
+    $("joinOnlineRoom").hidden = false;
+    $("onlineRoomCode").disabled = false;
+    onlineRoomRef = null;
+    onlineRoomCode = "";
+    onlineIsHost = false;
+    onlinePlayers = {};
+    onlineGameStatus = "";
+    const url = new URL(location.href);
+    url.searchParams.delete("room");
+    history.replaceState(null, "", url);
+    renderOnlineLobby();
+  } catch (error) {
+    setOnlineStatus(error.message || "ルームを閉じられませんでした。");
+  }
+}
+
+async function leaveOnlineRoom() {
+  if (!onlineRoomRef || onlineIsHost || !["lobby", "closed"].includes(onlineGameStatus)) return;
+  const roomRef = onlineRoomRef;
+  try {
+    if (onlineGameStatus === "lobby" && onlineUid) {
+      await Promise.all([
+        roomRef.child(`players/${onlineUid}`).remove(),
+        roomRef.child(`joinRequests/${onlineUid}`).remove()
+      ]);
+    }
+    roomRef.child("players").off();
+    roomRef.child("status").off();
+    roomRef.child(`players/${onlineUid}`).off();
+    roomRef.child(`joinRequests/${onlineUid}`).off();
+    roomRef.child("settings").off();
+    roomRef.child("state").off();
+    onlineRoomRef = null;
+    onlineRoomCode = "";
+    onlineIsHost = false;
+    onlinePlayers = {};
+    onlineGameStatus = "";
+    onlineListenersAttached = false;
+    $("onlineLobby").hidden = true;
+    $("createOnlineRoom").hidden = false;
+    $("joinOnlineRoom").hidden = false;
+    $("onlineRoomCode").disabled = false;
+    $("onlineRoomCode").value = "";
+    const url = new URL(location.href);
+    url.searchParams.delete("room");
+    history.replaceState(null, "", url);
+    updateModeSetup();
+    setOnlineStatus("ルームを退出しました。別のルームに参加できます。");
+  } catch (error) {
+    setOnlineStatus(error.message || "ルームを退出できませんでした。");
+  }
+}
+
+function teamOwnerUid(team) {
+  return Object.entries(onlinePlayers).find(([, player]) =>
+    (player.teamName || player.name) === team
+  )?.[0] || "";
+}
+
+function canControlTeam(team) {
+  if (activeMode === "online") return Boolean(onlineUid && teamOwnerUid(team) === onlineUid);
+  return !aiTeams.has(team);
+}
+
+function currentRevealKey() {
+  const reveal = activePickReveal;
+  return reveal ? `${reveal.type}:${reveal.team}:${reveal.round}:${reveal.idol?.id || ""}` : "";
+}
+
+function serializeOnlineReveal(reveal) {
+  if (!reveal) return null;
+  return {
+    team: reveal.team,
+    idolId: reveal.idol?.id || "",
+    round: reveal.round,
+    type: reveal.type,
+    teams: reveal.teams || [],
+    drawOrder: reveal.drawOrder || [],
+    envelopes: reveal.envelopes || [],
+    winningEnvelope: reveal.winningEnvelope,
+    drawIndex: reveal.drawIndex || 0,
+    selections: reveal.selections ? [...reveal.selections.entries()] : [],
+    opened: reveal.opened ? [...reveal.opened] : [],
+    opening: Boolean(reveal.opening),
+    revealing: Boolean(reveal.revealing),
+    winner: reveal.winner || null
+  };
+}
+
+function restoreOnlineReveal(source) {
+  if (!source) return null;
+  const idol = idols.find(item => item.id === source.idolId);
+  if (!idol) return null;
+  return {
+    ...source,
+    idol,
+    selections: new Map(source.selections || []),
+    opened: new Set(source.opened || [])
+  };
+}
+
+function serializeOnlineGame() {
+  return {
+    teamNames,
+    gameStarted,
+    picks,
+    drafted: [...drafted],
+    round,
+    r1Started,
+    r1NominationOrder,
+    r1NominationIndex,
+    r1NominationAttempt,
+    r1Nominations,
+    r1Queue,
+    pendingR1Resolution: pendingR1Resolution ? {
+      batchOrder: pendingR1Resolution.batchOrder,
+      waiting: [...pendingR1Resolution.waiting],
+      results: pendingR1Resolution.results
+    } : null,
+    waiverOrder,
+    firstRoundWaiverOrder,
+    turnIndex,
+    lotterySummary,
+    pickLimit,
+    orderMode,
+    firstRoundLotteryLosses,
+    pickRevealQueue: pickRevealQueue.map(serializeOnlineReveal),
+    activePickReveal: serializeOnlineReveal(activePickReveal),
+    pickRevealPhase
+  };
+}
+
+function syncOnlineState() {
+  if (activeMode !== "online" || !onlineIsHost || !onlineRoomRef || !gameStarted || onlineStateApplying) return;
+  if (onlineStateWriteTimer !== null) clearTimeout(onlineStateWriteTimer);
+  onlineStateWriteTimer = window.setTimeout(() => {
+    onlineStateWriteTimer = null;
+    onlineRoomRef.child("state").set(serializeOnlineGame()).catch(error => {
+      setOnlineStatus(error.message || "ゲーム状態を共有できませんでした。");
+    });
+  }, 35);
+}
+
+function renderOnlinePickReveal() {
+  const reveal = activePickReveal;
+  if (!reveal) {
+    onlineShownRevealKey = "";
+    $("pickReveal").hidden = true;
+    return;
+  }
+  const isLottery = reveal.type === "lottery";
+  const revealKey = `${reveal.type}:${reveal.team}:${reveal.round}:${reveal.idol.id}`;
+  const isNewReveal = revealKey !== onlineShownRevealKey;
+  onlineShownRevealKey = revealKey;
+  const card = $("pickRevealCard");
+  const teamIndex = Math.max(0, teamNames.indexOf(isLottery ? reveal.drawOrder[0] : reveal.team));
+  card.style.setProperty("--reveal-team-color", teamColorPalette[teamIndex % teamColorPalette.length]);
+  card.classList.toggle("is-lottery", isLottery);
+  $("pickRevealRound").textContent = isLottery ? "1巡目 / 重複指名の抽選" : `${reveal.round}巡目`;
+  $("pickRevealLabel").textContent = isLottery
+    ? "指名が重複しました"
+    : reveal.type === "nomination" ? "1巡目入札メンバー" : `${reveal.round}巡目指名`;
+  $("pickRevealTeamLabel").textContent = "指名チーム";
+  $("pickRevealTeam").textContent = displayTeamName(reveal.team);
+  $("pickRevealTeamBand").hidden = isLottery;
+  $("pickRevealCaption").textContent = isLottery ? "封筒を選んで、交渉権を引き当てよう" : "選ばれたメンバーは…";
+  $("pickRevealName").textContent = reveal.idol.japaneseName;
+  $("pickRevealAgency").textContent = "所属事務所：" + (reveal.idol.agency || "未確認");
+  $("pickRevealGroup").textContent = "グループ：" + reveal.idol.group;
+  $("lotteryBoard").hidden = !isLottery;
+  $("pickRevealSkip").hidden = isLottery || pickRevealPhase !== "intro";
+  $("pickRevealSkip").textContent = "演出をスキップ";
+  $("pickReveal").hidden = false;
+  if (isNewReveal) {
+    $("pickRevealFlipCard").classList.remove("is-flipped");
+    card.classList.remove("is-visible");
+    void card.offsetWidth;
+    card.classList.add("is-visible");
+  }
+  $("pickRevealFlipCard").classList.toggle("is-flipped", pickRevealPhase === "revealed");
+
+  if (isLottery) {
+    renderLotteryTickets(reveal);
+    reveal.selections.forEach((team, envelope) => {
+      const button = [...$("lotteryTickets").querySelectorAll("[data-lottery-envelope]")]
+        .find(item => Number(item.dataset.lotteryEnvelope) === Number(envelope));
+      if (!button) return;
+      button.classList.add("is-chosen", "is-selected");
+      button.querySelector(".lottery-envelope-hint").textContent = "選択済み";
+      if (reveal.winner || reveal.opening) {
+        const won = Number(envelope) === Number(reveal.winningEnvelope);
+        const result = button.querySelector(".lottery-envelope-result");
+        result.querySelector("strong").textContent = displayTeamName(team);
+        result.querySelector("small").textContent = won ? "当選！交渉権獲得" : "落選・再指名へ";
+        button.style.setProperty("--lottery-team-color", teamColorPalette[Math.max(0, teamNames.indexOf(team)) % teamColorPalette.length]);
+        button.classList.add(reveal.opening ? "is-opening" : "is-open");
+        if (reveal.winner) button.classList.add(won ? "is-winner" : "is-loser");
+      }
+    });
+    updateLotteryProgress();
+  } else {
+    $("lotteryTickets").innerHTML = "";
+    $("pickRevealNext").disabled = onlineActionPending;
+    $("pickRevealNext").textContent = pickRevealPhase === "intro"
+      ? "発表を確認"
+      : pickRevealQueue.length ? `次の指名へ（あと${pickRevealQueue.length}件）` : "次へ進む";
+    $("pickRevealActionHint").textContent = onlineActionPending
+      ? "ホストの画面で進行しています…"
+      : "指名の発表は全員の画面に同期されます。";
+  }
+}
+
+function applyOnlineGameState(state) {
+  if ((onlineIsHost && !onlineHostRestoring) || !state || onlineStateApplying) return;
+  onlineStateApplying = true;
+  try {
+    teamNames = state.teamNames || [];
+    gameStarted = Boolean(state.gameStarted);
+    activeMode = "online";
+    aiTeams = new Set();
+    picks = state.picks || Object.fromEntries(teamNames.map(team => [team, []]));
+    drafted = new Set(state.drafted || []);
+    round = Number(state.round || 1);
+    r1Started = Boolean(state.r1Started);
+    r1NominationOrder = state.r1NominationOrder || [];
+    r1NominationIndex = Number(state.r1NominationIndex || 0);
+    r1NominationAttempt = Number(state.r1NominationAttempt || 1);
+    r1Nominations = state.r1Nominations || [];
+    r1Queue = state.r1Queue || [];
+    pendingR1Resolution = state.pendingR1Resolution ? {
+      batchOrder: state.pendingR1Resolution.batchOrder || [],
+      waiting: new Set(state.pendingR1Resolution.waiting || []),
+      results: state.pendingR1Resolution.results || []
+    } : null;
+    waiverOrder = state.waiverOrder || [];
+    firstRoundWaiverOrder = state.firstRoundWaiverOrder || [];
+    turnIndex = Number(state.turnIndex || 0);
+    lotterySummary = state.lotterySummary || "";
+    pickLimit = Number(state.pickLimit || 5);
+    orderMode = state.orderMode || "snake";
+    firstRoundLotteryLosses = state.firstRoundLotteryLosses || {};
+    pickRevealQueue = (state.pickRevealQueue || []).map(restoreOnlineReveal).filter(Boolean);
+    activePickReveal = restoreOnlineReveal(state.activePickReveal);
+    pickRevealPhase = state.pickRevealPhase || "closed";
+    pendingDraftPickId = null;
+    selectedId = null;
+    onlineActionPending = false;
+    updateModeSetup();
+    renderNominations();
+    renderOnlinePickReveal();
+    renderDraft();
+    renderCandidates();
+  } finally {
+    onlineStateApplying = false;
+  }
+}
+
+function resumeOnlineHostProgress() {
+  if (!onlineIsHost || !gameStarted) return;
+  if (!activePickReveal) {
+    if (pickRevealQueue.length) showNextPickReveal();
+    else {
+      renderDraft();
+      renderCandidates();
+    }
+    return;
+  }
+  if (activePickReveal.type === "lottery") {
+    if (activePickReveal.winner) return;
+    if (activePickReveal.revealing || activePickReveal.opening) {
+      pickRevealTimer = window.setTimeout(() => revealLotteryResults(activePickReveal), 350);
+    } else if (pickRevealPhase === "intro") {
+      pickRevealTimer = window.setTimeout(revealPickCard, 450);
+    } else {
+      scheduleAINextLotteryEnvelope();
+    }
+    return;
+  }
+  if (pickRevealPhase === "intro") {
+    pickRevealTimer = window.setTimeout(revealPickCard, 450);
+  } else if (pickRevealPhase === "revealed") {
+    const delay = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 1300 : 2600;
+    pickRevealTimer = window.setTimeout(showNextPickReveal, delay);
+  }
+}
+
+function submitOnlineAction(action) {
+  if (!onlineRoomRef || onlineIsHost || onlineActionPending) return;
+  onlineActionPending = true;
+  renderDraft();
+  renderOnlinePickReveal();
+  const payload = { uid: onlineUid, ...action, createdAt: Date.now() };
+  if (["envelope", "next", "skip"].includes(action.kind)) payload.revealKey = currentRevealKey();
+  onlineRoomRef.child("actions").push(payload)
+    .catch(error => {
+      onlineActionPending = false;
+      setOnlineStatus(error.message || "操作を送れませんでした。もう一度試してください。");
+      renderDraft();
+      renderOnlinePickReveal();
+    });
+  window.setTimeout(() => {
+    if (!onlineActionPending) return;
+    onlineActionPending = false;
+    setOnlineStatus("応答を待っています。画面が更新されない場合はホストに確認してください。");
+    renderDraft();
+    renderOnlinePickReveal();
+  }, 12000);
+}
+
+async function processOnlineAction(snapshot) {
+  if (!onlineIsHost || !onlineRoomRef || onlineHandledActionIds.has(snapshot.key)) return;
+  onlineHandledActionIds.add(snapshot.key);
+  const action = snapshot.val();
+  const ownerTeam = onlinePlayers[action?.uid]?.teamName || "";
+  const revealMatches = Boolean(action?.revealKey && action.revealKey === currentRevealKey());
+  try {
+    if (!action || !onlinePlayers[action.uid]) return;
+    if (action?.kind === "pick" && ownerTeam && ownerTeam === currentTeamName()) {
+      pendingDraftPickId = String(action.idolId || "");
+      confirmDraftPick();
+    } else if (action?.kind === "envelope" && revealMatches && activePickReveal?.type === "lottery") {
+      const drawer = activePickReveal.drawOrder[activePickReveal.drawIndex];
+      if (drawer && teamOwnerUid(drawer) === action.uid) selectLotteryEnvelope(action.envelope, false, action.uid);
+    } else if (action?.kind === "next" && revealMatches) {
+      advancePickReveal();
+    } else if (action?.kind === "skip" && revealMatches) {
+      skipCurrentPickReveal();
+    }
+  } finally {
+    await snapshot.ref.remove().catch(() => {});
+    syncOnlineState();
+    window.setTimeout(() => onlineHandledActionIds.delete(snapshot.key), 30000);
+  }
+}
+
+function onlinePlayersInDraftOrder() {
+  return Object.entries(onlinePlayers).sort(([, a], [, b]) =>
+    Number(a.order || 0) - Number(b.order || 0)
+  );
+}
+
+async function startOnlineGame() {
+  if (!onlineIsHost || onlineGameStatus !== "lobby") return;
+  const players = onlinePlayersInDraftOrder();
+  if (players.length < 2 || players.length > 10) {
+    setOnlineStatus("オンライン対戦は2〜10人で開始できます。参加者の人数を確認してください。");
+    return;
+  }
+  try {
+    const onlineSettings = {
+      pickLimit: Number($("pickLimit").value),
+      orderMode: $("orderMode").value
+    };
+    await onlineRoomRef.child("settings").set(onlineSettings);
+    await onlineRoomRef.child("status").set("playing");
+    startGame("online");
+  } catch (error) {
+    setOnlineStatus(error.message || "ドラフトを開始できませんでした。");
+  }
 }
 
 function startGame(mode, aiCount = 3) {
@@ -1969,7 +2631,9 @@ function startGame(mode, aiCount = 3) {
   orderMode = $("orderMode").value;
   teamNames = mode === "ai"
     ? [(playerTeamNameValue.trim() || "あなた"), ...Array.from({ length: aiCount }, (_, index) => `AI${index + 1}`)]
-    : localTeamNames.slice(0, Number($("localTeamCount").value)).map((defaultName, index) =>
+    : mode === "online"
+      ? onlinePlayersInDraftOrder().map(([, player]) => player.teamName || player.name || "プレイヤー")
+      : localTeamNames.slice(0, Number($("localTeamCount").value)).map((defaultName, index) =>
         localTeamNameValues[index].trim() || defaultName
       );
   aiTeams = new Set(mode === "ai" ? teamNames.slice(1) : []);
@@ -2001,6 +2665,7 @@ function startGame(mode, aiCount = 3) {
   updateModeSetup();
   renderDraft();
   advanceAI();
+  syncOnlineState();
   requestAnimationFrame(() => {
     $("pool").scrollIntoView({ behavior: "smooth", block: "start" });
     $("pool").focus({ preventScroll: true });
@@ -2012,10 +2677,27 @@ $("aiCount").addEventListener("change", updateModeSetup);
 $("localTeamCount").addEventListener("change", updateModeSetup);
 $("pickLimit").addEventListener("change", updateModeSetup);
 $("orderMode").addEventListener("change", updateModeSetup);
+$("pickLimit").addEventListener("change", () => {
+  if (onlineIsHost && onlineGameStatus === "lobby") {
+    onlineRoomRef.child("settings").update({ pickLimit: Number($("pickLimit").value) });
+  }
+});
+$("orderMode").addEventListener("change", () => {
+  if (onlineIsHost && onlineGameStatus === "lobby") {
+    onlineRoomRef.child("settings").update({ orderMode: $("orderMode").value });
+  }
+});
+$("createOnlineRoom").addEventListener("click", createOnlineRoom);
+$("joinOnlineRoom").addEventListener("click", joinOnlineRoom);
+$("copyOnlineInvite").addEventListener("click", copyOnlineInvite);
+$("closeOnlineRoom").addEventListener("click", closeOnlineRoom);
+$("leaveOnlineRoom").addEventListener("click", leaveOnlineRoom);
+$("startOnlineGame").addEventListener("click", startOnlineGame);
 $("startGame").addEventListener("click", () => {
   const mode = $("playMode").value;
   if (mode === "ai") startGame("ai", Number($("aiCount").value));
-  else startGame("local");
+  else if (mode === "local") startGame("local");
+  else startOnlineGame();
 });
 
 function setFinalScreenshotMode(enabled, shouldScroll = true) {
@@ -2222,7 +2904,8 @@ function updateLotteryProgress() {
   $("pickRevealNext").disabled = true;
   $("pickRevealNext").textContent = "全員の封筒選択を待っています";
   $("pickRevealActionHint").textContent = `${displayTeamName(drawer)}の番です。封筒を一つ選ぶと、全員の選択後に一斉開示します。`;
-  const canChoose = pickRevealPhase === "revealed" && !reveal.opening && !aiTeams.has(drawer);
+  const canChoose = pickRevealPhase === "revealed" && !reveal.opening &&
+    !onlineActionPending && Boolean(drawer && canControlTeam(drawer));
   $("lotteryTickets").querySelectorAll("[data-lottery-envelope]").forEach(button => {
     const envelope = Number(button.dataset.lotteryEnvelope);
     button.disabled = !canChoose || reveal.selections.has(envelope);
@@ -2245,13 +2928,23 @@ function scheduleAINextLotteryEnvelope() {
   }, 700);
 }
 
-function selectLotteryEnvelope(envelope, automatic = false) {
+function selectLotteryEnvelope(envelope, automatic = false, actorUid = onlineUid) {
   const reveal = activePickReveal;
   if (!reveal || reveal.type !== "lottery" || reveal.winner || reveal.opening || reveal.revealing) return;
   const team = reveal.drawOrder[reveal.drawIndex];
   const envelopeId = Number(envelope);
   if (!team || !reveal.envelopes.includes(envelopeId) || reveal.selections.has(envelopeId)) return;
-  if (aiTeams.has(team) !== automatic || pickRevealPhase !== "revealed") return;
+  if (pickRevealPhase !== "revealed") return;
+  if (activeMode === "online" && !onlineIsHost && !automatic) {
+    if (teamOwnerUid(team) !== onlineUid) return;
+    submitOnlineAction({ kind: "envelope", envelope: envelopeId });
+    return;
+  }
+  if (activeMode === "online") {
+    if (!automatic && teamOwnerUid(team) !== actorUid) return;
+  } else if (aiTeams.has(team) !== automatic || (!automatic && !canControlTeam(team))) {
+    return;
+  }
 
   if (!automatic && pickRevealTimer !== null) {
     clearTimeout(pickRevealTimer);
@@ -2270,12 +2963,14 @@ function selectLotteryEnvelope(envelope, automatic = false) {
   if (reveal.drawIndex >= reveal.drawOrder.length) {
     reveal.revealing = true;
     updateLotteryProgress();
+    syncOnlineState();
     const revealDelay = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 850;
     pickRevealTimer = window.setTimeout(() => revealLotteryResults(reveal), revealDelay);
     return;
   }
 
   updateLotteryProgress();
+  syncOnlineState();
   scheduleAINextLotteryEnvelope();
 }
 
@@ -2300,6 +2995,7 @@ function revealLotteryResults(reveal) {
     button.classList.add("is-opening");
     button.disabled = true;
   });
+  syncOnlineState();
 
   const openingDelay = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 560;
   pickRevealTimer = window.setTimeout(() => {
@@ -2344,11 +3040,16 @@ function revealLotteryResults(reveal) {
     renderDraft();
     renderCandidates();
     updateLotteryProgress();
+    syncOnlineState();
   }, openingDelay);
 }
 
 function skipCurrentPickReveal() {
   if (activePickReveal?.type === "lottery") return;
+  if (activeMode === "online" && !onlineIsHost) {
+    submitOnlineAction({ kind: "skip" });
+    return;
+  }
   revealPickCard();
 }
 
@@ -2366,6 +3067,7 @@ function showNextPickReveal() {
     if (pendingR1Resolution) finishFirstRoundResolution();
     else renderDraft();
     advanceAI();
+    syncOnlineState();
     return;
   }
 
@@ -2428,6 +3130,7 @@ function showNextPickReveal() {
     ? 80
     : isLottery ? 1050 : 720;
   pickRevealTimer = window.setTimeout(revealPickCard, introDelay);
+  syncOnlineState();
 }
 
 function revealPickCard() {
@@ -2443,6 +3146,7 @@ function revealPickCard() {
   if (activePickReveal?.type === "lottery") {
     updateLotteryProgress();
     scheduleAINextLotteryEnvelope();
+    syncOnlineState();
     return;
   }
   $("pickRevealNext").disabled = false;
@@ -2454,10 +3158,17 @@ function revealPickCard() {
     : "指名内容を確認したら「次へ進む」で結果表に戻れます。";
 
   const revealDelay = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 1300 : 2600;
-  pickRevealTimer = window.setTimeout(showNextPickReveal, revealDelay);
+  if (!(activeMode === "online" && !onlineIsHost)) {
+    pickRevealTimer = window.setTimeout(showNextPickReveal, revealDelay);
+  }
+  syncOnlineState();
 }
 
 function advancePickReveal() {
+  if (activeMode === "online" && !onlineIsHost) {
+    submitOnlineAction({ kind: "next" });
+    return;
+  }
   if (pickRevealPhase === "intro") revealPickCard();
   else if (pickRevealPhase === "revealed" && (
     activePickReveal?.type !== "lottery" ||
@@ -2656,7 +3367,8 @@ function renderDraft() {
   const pendingIdol = idols.find(item => item.id === pendingDraftPickId);
   const canConfirm = Boolean(
     gameStarted && currentTeam && pendingIdol &&
-    !(activeMode === "ai" && aiTeams.has(currentTeam)) &&
+    canControlTeam(currentTeam) &&
+    !onlineActionPending &&
     !pendingR1Resolution
   );
 
@@ -2688,7 +3400,9 @@ function renderDraft() {
     const secured = teamNames.filter(team => (picks[team] || []).some(item => item.round === 1)).length;
     const currentStage = r1NominationAttempt === 1 ? "初回指名" : `${r1NominationAttempt}回目の再指名`;
     $("draftHint").textContent = currentTeam
-      ? `${displayTeamName(currentTeam)}の${currentStage}番です。候補を選んで確認し、指名を提出してください。`
+      ? canControlTeam(currentTeam)
+        ? `${displayTeamName(currentTeam)}の${currentStage}番です。候補を選んで確認し、指名を提出してください。`
+        : `${displayTeamName(currentTeam)}の${currentStage}です。相手が指名しています。`
       : "次の指名チームを準備しています。";
     $("selectedMember").textContent = pendingIdol
       ? `${pendingIdol.japaneseName}を選択中です。確認ボタンを押すと指名が提出されます。`
@@ -2698,7 +3412,9 @@ function renderDraft() {
     $("selectedMember").textContent = "ドラフト終了！設定を変えて、もう一度遊べるよ。";
   } else {
     $("draftHint").textContent =
-      `2巡目以降は${orderMode === "snake" ? "前巡の逆順" : orderMode === "random" ? "毎巡くじ引き" : "チーム順固定"}。${displayTeamName(currentTeam)}は候補を選び、確認後に提出してね。`;
+      (canControlTeam(currentTeam)
+        ? `2巡目以降は${orderMode === "snake" ? "前巡の逆順" : orderMode === "random" ? "毎巡くじ引き" : "チーム順固定"}。${displayTeamName(currentTeam)}は候補を選び、確認後に提出してね。`
+        : `${displayTeamName(currentTeam)}が指名中です。自分のチームの順番を待っています。`);
     $("selectedMember").textContent = pendingIdol
       ? `${pendingIdol.japaneseName}を選択中です。確認ボタンを押すと指名が提出されます。`
       : "候補カードを押すと、指名内容の確認画面が表示されます。";
@@ -2820,6 +3536,8 @@ function renderDraft() {
     $("finalSnapshotGrid").innerHTML = "";
   }
   finalResultsWasVisible = finished;
+  if (activeMode === "online" && onlineRoomRef) renderOnlineLobby();
+  syncOnlineState();
 }
 
 renderNominations();
@@ -2827,3 +3545,10 @@ refreshPresets();
 renderCandidates();
 renderDraft();
 updateModeSetup();
+const invitedRoomCode = new URLSearchParams(location.search).get("room");
+if (invitedRoomCode) {
+  $("playMode").value = "online";
+  $("onlineRoomCode").value = invitedRoomCode.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8);
+  updateModeSetup();
+  setOnlineStatus("招待リンクから参加できます。名前を確認して「コードで参加」を押してください。");
+}

@@ -5,6 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>STAGE PICK — K-POP Draft</title>
   <link rel="stylesheet" href="style.css">
+  <script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-database-compat.js"></script>
+  <script src="firebase-config.js" defer></script>
   <script src="app.js" defer></script>
 </head>
 <body>
@@ -46,6 +50,7 @@
           <select id="playMode">
             <option value="ai" selected>ひとりでAIと対戦</option>
             <option value="local">友達と同じ画面で</option>
+            <option value="online">友達とオンラインで</option>
           </select>
         </label>
         <label id="aiCountWrap" hidden>
@@ -68,6 +73,36 @@
             <option value="9">9チーム</option><option value="10">10チーム</option>
           </select>
         </label>
+        <div class="online-controls" id="onlineControls" hidden>
+          <label class="online-name-field">
+            <span>あなたの名前・チーム名</span>
+            <input id="onlinePlayerName" type="text" maxlength="24" value="プレイヤー" placeholder="名前を入力">
+          </label>
+          <div class="online-room-actions">
+            <button class="button button-primary" id="createOnlineRoom" type="button">ルームを作る</button>
+            <label>
+              <span>ルームコード</span>
+              <input id="onlineRoomCode" type="text" maxlength="8" placeholder="8文字のコード">
+            </label>
+            <button class="button button-secondary" id="joinOnlineRoom" type="button">コードで参加</button>
+          </div>
+          <section class="online-lobby" id="onlineLobby" hidden aria-live="polite">
+            <div class="online-lobby-heading">
+              <div><strong>オンラインルーム</strong><span id="onlineRoomStatus">接続中…</span></div>
+              <button class="button button-secondary" id="copyOnlineInvite" type="button">招待リンクをコピー</button>
+            </div>
+            <p class="online-room-code-line">ルームコード <strong id="onlineRoomCodeLabel"></strong></p>
+            <ol class="online-player-list" id="onlinePlayerList"></ol>
+            <div class="online-lobby-footer">
+              <span id="onlineLobbyHint">2〜10人で遊べます。</span>
+              <div class="online-lobby-actions">
+                <button class="button button-secondary" id="leaveOnlineRoom" type="button" hidden>ルームを退出</button>
+                <button class="button button-secondary" id="closeOnlineRoom" type="button" hidden>ルームを閉じる</button>
+                <button class="button button-primary" id="startOnlineGame" type="button" disabled>参加者が集まるまで待機</button>
+              </div>
+            </div>
+          </section>
+        </div>
         <label>
           <span>各チームの指名人数</span>
           <select id="pickLimit">

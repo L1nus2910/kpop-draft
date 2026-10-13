@@ -3428,6 +3428,197 @@ body.final-screenshot-mode .final-snapshot-grid {
   }
 }
 
+.online-controls {
+  flex: 1 0 100%;
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: linear-gradient(145deg, #fff, #f4f8fc);
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.9);
+}
+
+.online-name-field input,
+.online-room-actions input {
+  width: 100%;
+  min-height: 42px;
+  padding: 9px 11px;
+  color: var(--ink);
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.online-room-actions {
+  display: grid;
+  grid-template-columns: minmax(130px, 1fr) minmax(170px, 1.25fr) auto;
+  align-items: end;
+  gap: 9px;
+}
+
+.online-room-actions label {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.online-lobby {
+  display: grid;
+  gap: 11px;
+  padding: 13px;
+  border: 1px solid #cfe0ef;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.8);
+}
+
+.online-lobby-heading,
+.online-lobby-footer,
+.online-lobby-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 9px;
+}
+
+.online-lobby-heading > div {
+  display: grid;
+  gap: 3px;
+}
+
+.online-lobby-heading strong,
+.online-room-code-line strong {
+  color: var(--ink);
+}
+
+.online-lobby-heading span,
+.online-lobby-footer > span {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.online-room-code-line {
+  margin: 0;
+  padding: 9px 11px;
+  border-radius: 9px;
+  background: #eef5fb;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.online-room-code-line strong {
+  margin-left: 5px;
+  color: var(--violet);
+  font-size: 17px;
+  letter-spacing: 0.15em;
+}
+
+.online-player-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
+  gap: 7px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.online-player-list li {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 25px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 7px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: #fff;
+}
+
+.online-player-number {
+  width: 23px;
+  height: 23px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #e6f2fb;
+  color: var(--violet);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.online-player-list strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+}
+
+.online-player-list small {
+  color: var(--muted);
+  font-size: 9px;
+}
+
+.online-lobby-actions {
+  justify-content: flex-end;
+}
+
+@media (max-width: 650px) {
+  .online-controls {
+    padding: 10px;
+  }
+
+  .online-room-actions {
+    grid-template-columns: minmax(0, 1fr) minmax(115px, auto);
+    align-items: end;
+    gap: 7px;
+  }
+
+  .online-room-actions #createOnlineRoom {
+    grid-column: 1 / -1;
+  }
+
+  .online-room-actions label {
+    font-size: 10px;
+  }
+
+  .online-room-actions input,
+  .online-name-field input {
+    min-height: 44px;
+    font-size: 16px;
+  }
+
+  .online-lobby {
+    padding: 9px;
+  }
+
+  .online-lobby-heading,
+  .online-lobby-footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .online-lobby-heading .button,
+  .online-lobby-actions .button {
+    min-height: 42px;
+  }
+
+  .online-lobby-actions {
+    width: 100%;
+  }
+
+  .online-lobby-actions .button-primary {
+    flex: 1;
+  }
+
+  .online-player-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 @media (max-width: 400px) {
   .recommendation-guide-summary {
     gap: 5px;
