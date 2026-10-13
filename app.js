@@ -875,7 +875,7 @@ const idols = groups.flatMap(group =>
 const popularityRankingSources = [
   {
     id: "brandReputation",
-    weight: 50,
+    weight: 55,
     topN: 30,
     snapshots: [
       {
@@ -987,8 +987,30 @@ const popularityRankingSources = [
     ]
   },
   {
+    id: "idolChartAnnual",
+    weight: 20,
+    topN: 20,
+    snapshots: [
+      {
+        period: "2025-annual",
+        weight: 0.65,
+        ranks: [
+          ["BLACKPINK", "Jennie", 3], ["BLACKPINK", "Rosé", 7]
+        ]
+      },
+      {
+        period: "2024-annual",
+        weight: 0.35,
+        ranks: [
+          ["BLACKPINK", "Rosé", 11], ["Girls' Generation", "Taeyeon", 14],
+          ["BLACKPINK", "Jennie", 17]
+        ]
+      }
+    ]
+  },
+  {
     id: "choeaedol",
-    weight: 25,
+    weight: 10,
     topN: 20,
     snapshots: [
       {
@@ -1075,7 +1097,7 @@ const popularityRankingSources = [
   },
   {
     id: "starnews",
-    weight: 15,
+    weight: 10,
     topN: 5,
     snapshots: [{
       period: "2026-10-current",
@@ -1089,7 +1111,7 @@ const popularityRankingSources = [
   },
   {
     id: "fannstar",
-    weight: 10,
+    weight: 5,
     topN: 16,
     snapshots: [{
       period: "2026-10-current",
@@ -1155,19 +1177,30 @@ const rankedIdols = idols
   .sort((a, b) => b.popularityScore - a.popularityScore ||
     a.japaneseName.localeCompare(b.japaneseName, "ja"));
 
-for (let start = 0; start < rankedIdols.length;) {
-  let end = start + 1;
-  while (end < rankedIdols.length &&
-    rankedIdols[end].popularityScore === rankedIdols[start].popularityScore) {
-    end += 1;
+const rankedIdolsByGeneration = new Map();
+rankedIdols.forEach(idol => {
+  const generationIdols = rankedIdolsByGeneration.get(idol.generation) || [];
+  generationIdols.push(idol);
+  rankedIdolsByGeneration.set(idol.generation, generationIdols);
+});
+
+rankedIdolsByGeneration.forEach(generationIdols => {
+  for (let start = 0; start < generationIdols.length;) {
+    let end = start + 1;
+    while (end < generationIdols.length &&
+      generationIdols[end].popularityScore === generationIdols[start].popularityScore) {
+      end += 1;
+    }
+    const midpointPercentile = ((start + end - 1) / 2) / generationIdols.length;
+    const stars = starsForPopularityPercentile(midpointPercentile);
+    const withinGenerationScore = Math.round((1 - midpointPercentile) * 1000) / 10;
+    for (let index = start; index < end; index += 1) {
+      generationIdols[index].popularityStars = stars;
+      generationIdols[index].popularitySortScore = withinGenerationScore;
+    }
+    start = end;
   }
-  const midpointPercentile = ((start + end) / 2) / rankedIdols.length;
-  const stars = starsForPopularityPercentile(midpointPercentile);
-  for (let index = start; index < end; index += 1) {
-    rankedIdols[index].popularityStars = stars;
-  }
-  start = end;
-}
+});
 
 const $ = id => document.getElementById(id);
 const localTeamNames = [
@@ -1370,7 +1403,7 @@ function renderCandidates() {
       ? `人気参考スコア ${Math.round(idol.popularityScore)}点`
       : "参照した個人ランキングに掲載なし";
     const rankingStars = idol.popularityScore > 0
-      ? `<span class="candidate-stars" aria-label="人気参考ランク ${idol.popularityStars}つ星">${"★".repeat(idol.popularityStars)}${"☆".repeat(5 - idol.popularityStars)}</span>`
+      ? `<span class="candidate-stars" aria-label="同世代内人気参考ランク ${idol.popularityStars}つ星">${"★".repeat(idol.popularityStars)}${"☆".repeat(5 - idol.popularityStars)}</span>`
       : '<span class="candidate-stars" aria-label="ランキング未掲載のため星1つ" title="ランキング未掲載">★☆☆☆☆</span>';
     return `
       <article class="candidate-card ${isSelected ? "is-selected" : ""} ${isExcluded ? "is-excluded" : ""}" data-candidate-id="${idol.id}">
@@ -1720,12 +1753,15 @@ function chooseAIIdol(team) {
     const groupCount = teamPicks.filter(pick => pick.group === idol.group).length;
     const generationCount = teamPicks.filter(pick => pick.generation === idol.generation).length;
     const nationalityCount = teamPicks.filter(pick => pick.nationality === idol.nationality).length;
+    const popularityAssist = idol.popularityStars > 1
+      ? idol.popularityStars * 0.45 + idol.popularitySortScore / 100
+      : 0;
     const score = Math.random() * 4 +
       (groupCount === 0 ? strategy.group : -strategy.group * groupCount) +
       strategy.generation / (generationCount + 1) +
       strategy.nationality / (nationalityCount + 1) +
       (idol.activity === "活動中" ? strategy.activity : 0) +
-      idol.popularityScore / 20;
+      popularityAssist;
     return { idol, score };
   }).sort((a, b) => b.score - a.score);
 
