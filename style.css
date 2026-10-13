@@ -3451,3 +3451,119 @@ body.final-screenshot-mode .final-snapshot-grid {
     padding: 0;
   }
 }
+
+@media (max-width: 700px) {
+  body.final-screenshot-mode .page {
+    padding: 2px;
+  }
+
+  body.final-screenshot-mode #finalResults {
+    padding: 4px;
+  }
+
+  body.final-screenshot-mode .final-results-heading {
+    align-items: center;
+    gap: 4px;
+    margin-bottom: 5px;
+  }
+
+  body.final-screenshot-mode .final-results-heading .eyebrow,
+  body.final-screenshot-mode .final-results-status {
+    display: none;
+  }
+
+  body.final-screenshot-mode .final-results-heading h2 {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.2;
+  }
+
+  body.final-screenshot-mode .final-results-heading p:last-child {
+    margin: 2px 0 0;
+    font-size: 9px;
+    line-height: 1.2;
+  }
+
+  body.final-screenshot-mode .final-results-actions .button {
+    min-height: 24px;
+    padding: 3px 6px;
+    font-size: 9px;
+  }
+
+  body.final-screenshot-mode .final-snapshot-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 4px;
+  }
+
+  body.final-screenshot-mode .final-snapshot-team {
+    border-top-width: 3px;
+    border-radius: 7px;
+    box-shadow: none;
+  }
+
+  body.final-screenshot-mode .final-snapshot-team > header {
+    min-height: 21px;
+    gap: 3px;
+    padding: 3px 4px;
+  }
+
+  body.final-screenshot-mode .final-snapshot-team > header strong {
+    overflow: hidden;
+    font-size: 9px;
+    line-height: 1.1;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  body.final-screenshot-mode .final-snapshot-team > header span {
+    font-size: 8px;
+  }
+
+  body.final-screenshot-mode .final-snapshot-team ol {
+    padding: 1px 4px 3px;
+  }
+
+  body.final-screenshot-mode .final-snapshot-team li {
+    grid-template-columns: 17px minmax(0, 1fr);
+    align-items: center;
+    gap: 2px;
+    padding: 1px 0;
+  }
+
+  body.final-screenshot-mode .final-snapshot-round {
+    padding: 0;
+    font-size: 8px;
+    line-height: 1.1;
+  }
+
+  body.final-screenshot-mode .final-snapshot-member strong {
+    overflow: hidden;
+    font-size: 9px;
+    line-height: 1.1;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  body.final-screenshot-mode .final-snapshot-member small {
+    display: none;
+  }
+
+  body.final-screenshot-mode .final-snapshot-grid.is-ultra-compact {
+    gap: 3px;
+  }
+
+  body.final-screenshot-mode .final-snapshot-grid.is-ultra-compact .final-snapshot-team > header {
+    min-height: 19px;
+    padding: 2px 3px;
+  }
+
+  body.final-screenshot-mode .final-snapshot-grid.is-ultra-compact .final-snapshot-team > header strong,
+  body.final-screenshot-mode .final-snapshot-grid.is-ultra-compact .final-snapshot-member strong {
+    font-size: 8px;
+  }
+
+  body.final-screenshot-mode .final-snapshot-grid.is-ultra-compact .final-snapshot-team li {
+    grid-template-columns: 15px minmax(0, 1fr);
+    padding: 0;
+  }
+}

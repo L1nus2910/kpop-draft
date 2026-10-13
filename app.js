@@ -1535,11 +1535,14 @@ const teamColorPalette = [
 ];
 
 const aiStrategies = [
-  { label: "バランス型", group: 5, generation: 5, nationality: 4, activity: 3 },
-  { label: "グループ分散型", group: 10, generation: 3, nationality: 2, activity: 1 },
-  { label: "国籍ミックス型", group: 3, generation: 2, nationality: 10, activity: 1 },
-  { label: "活動重視型", group: 3, generation: 2, nationality: 2, activity: 9 },
-  { label: "世代バランス型", group: 3, generation: 10, nationality: 2, activity: 1 }
+  { label: "バランス型", style: "balanced" },
+  { label: "国籍ミックス型", style: "nationalityMix" },
+  { label: "同事務所ドリーム型", style: "agencyFocus" },
+  { label: "事務所ミックス型", style: "agencyMix" },
+  { label: "同世代ユニット型", style: "generationFocus" },
+  { label: "世代ミックス型", style: "generationMix" },
+  { label: "現役中心型", style: "active" },
+  { label: "完全ランダム型", style: "random" }
 ];
 
 function aiStrategyFor(team) {
@@ -2068,20 +2071,66 @@ function chooseAIIdol(team) {
   if (!available.length) return null;
 
   const strategy = aiStrategyFor(team);
+  if (strategy.style === "random") {
+    return available[Math.floor(Math.random() * available.length)];
+  }
+
   const teamPicks = picks[team] || [];
+  const firstKnownAgency = teamPicks.find(pick => pick.agency && pick.agency !== "未確認")?.agency;
   const ranked = available.map(idol => {
     const groupCount = teamPicks.filter(pick => pick.group === idol.group).length;
     const generationCount = teamPicks.filter(pick => pick.generation === idol.generation).length;
     const nationalityCount = teamPicks.filter(pick => pick.nationality === idol.nationality).length;
-    const popularityAssist = idol.popularityStars > 1
-      ? idol.popularityStars * 0.45 + idol.popularitySortScore / 100
+    const agency = idol.agency !== "未確認" ? idol.agency : "";
+    const agencyCount = agency
+      ? teamPicks.filter(pick => pick.agency === agency).length
       : 0;
-    const score = Math.random() * 4 +
-      (groupCount === 0 ? strategy.group : -strategy.group * groupCount) +
-      strategy.generation / (generationCount + 1) +
-      strategy.nationality / (nationalityCount + 1) +
-      (idol.activity === "活動中" ? strategy.activity : 0) +
-      popularityAssist;
+    const popularity = idol.popularityStars > 1
+      ? (idol.popularityStars - 1) * 1.4 + idol.popularitySortScore / 20
+      : 0;
+
+    let compositionScore = 0;
+    switch (strategy.style) {
+      case "nationalityMix":
+        compositionScore += 9 / (nationalityCount + 1);
+        compositionScore += agency ? 2 / (agencyCount + 1) : 0;
+        compositionScore += groupCount === 0 ? 2 : -groupCount;
+        break;
+      case "agencyFocus":
+        if (agency && firstKnownAgency) {
+          compositionScore += agency === firstKnownAgency ? 10 : -7;
+        } else if (agency) {
+          compositionScore += 2;
+        }
+        compositionScore += popularity * 0.25;
+        break;
+      case "agencyMix":
+        compositionScore += agency ? 10 / (agencyCount + 1) : 0;
+        compositionScore += groupCount === 0 ? 3 : -groupCount;
+        compositionScore += popularity * 0.2;
+        break;
+      case "generationFocus":
+        compositionScore += generationCount > 0 ? 9 * generationCount : 0;
+        compositionScore += popularity * 0.3;
+        break;
+      case "generationMix":
+        compositionScore += 9 / (generationCount + 1);
+        compositionScore += nationalityCount === 0 ? 2 : 0;
+        compositionScore += popularity * 0.35;
+        break;
+      case "active":
+        compositionScore += idol.activity === "活動中" ? 8 : 0;
+        compositionScore += popularity * 0.25;
+        break;
+      default:
+        compositionScore += groupCount === 0 ? 5 : -2 * groupCount;
+        compositionScore += 5 / (generationCount + 1);
+        compositionScore += 4 / (nationalityCount + 1);
+        compositionScore += (agency && agencyCount === 0 ? 2 : 0);
+        compositionScore += popularity * 0.55;
+        break;
+    }
+    const score = Math.random() * 4 + compositionScore;
     return { idol, score };
   }).sort((a, b) => b.score - a.score);
 
@@ -2579,6 +2628,8 @@ function resolveFirstRound() {
 }
 
 function renderFinalSnapshot() {
+  const dense = teamNames.length >= 8 || pickLimit >= 7;
+  $("finalSnapshotGrid").classList.toggle("is-ultra-compact", dense);
   $("finalSnapshotGrid").innerHTML = teamNames.map((team, index) => {
     const teamPicks = picks[team] || [];
     const rows = Array.from({ length: pickLimit }, (_, roundIndex) => {
@@ -2586,7 +2637,7 @@ function renderFinalSnapshot() {
       const memberName = pick?.name || "—";
       const groupName = pick?.group || "グループ情報なし";
       return "<li><span class=\"final-snapshot-round\">" + (roundIndex + 1) +
-        "巡</span><span class=\"final-snapshot-member\"><strong>" + escapeHTML(memberName) +
+        "巡</span><span class=\"final-snapshot-member\" title=\"" + escapeHTML(groupName) + "\"><strong>" + escapeHTML(memberName) +
         "</strong><small>" + escapeHTML(groupName) + "</small></span></li>";
     }).join("");
     return "<article class=\"final-snapshot-team\" style=\"--team-color: " +
