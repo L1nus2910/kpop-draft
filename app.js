@@ -411,7 +411,7 @@ const groups = [
     name: "NewJeans",
     generation: "4世代",
     activity: "活動休止",
-    members: [["Minji", "韓国"], ["Hanni", "オーストラリア"], ["Haerin", "韓国"], ["Hyein", "韓国"]]
+    members: [["Minji", "韓国"], ["Hanni", "オーストラリア"], ["Danielle", "オーストラリア"], ["Haerin", "韓国"], ["Hyein", "韓国"]]
   },
   {
     name: "fromis_9",
@@ -629,7 +629,33 @@ Object.assign(japaneseNameOverrides, {
   "song sun": "ソン・ソン",
   "mi i": "マイ",
   "ma i": "マイ",
-  "yihyun": "イヒョン"
+  "yihyun": "イヒョン",
+  "chorong": "チョロン",
+  "namjoo": "ナムジュ",
+  "gyuri": "ギュリ",
+  "nicole": "ニコル",
+  "moonbyul": "ムンビョル",
+  "wheein": "フィイン",
+  "hwasa": "ファサ",
+  "hyojung": "ヒョジョン",
+  "j": "ジェイ",
+  "elly": "エリー",
+  "keena": "キーナ",
+  "soram": "ソラム",
+  "sunmi": "ソンミ",
+  "jooyeon": "ジュヨン",
+  "uee": "ユイ",
+  "lizzy": "リジ",
+  "soyee": "ソイ",
+  "eunice": "ユニス",
+  "alice": "アリス",
+  "hu'e": "ヒュイ",
+  "vin": "ビン",
+  "euaerin": "イユエリン",
+  "meu": "ミユ",
+  "sally": "サリー",
+  "ej": "イジェイ",
+  "danielle": "ダニエル"
 });
 
 const romanSyllables = {
@@ -704,11 +730,20 @@ const koreanNameOverrides = {
   ruka: "루카", pharita: "파리타", asa: "아사", rami: "라미", rora: "로라",
   chiquita: "치키타", mako: "마코", rio: "리오", maya: "마야", riku: "리쿠",
   ayaka: "아야카", mayuka: "마유카", rima: "리마", miihi: "미이히", nina: "니나",
-  hikaru: "히카루", haewon: "해원", hayoung: "하영 오하영",
-  eunji: "은지 정은지", "chanelle moon": "샤넬 문", "moon sua": "문수아",
+  hikaru: "히카루", haewon: "해원", hayoung: "하영",
+  eunji: "은지", "chanelle moon": "샤넬 문", "moon sua": "문수아",
   "kim lip": "김립", "go won": "고원", "a-na": "에이나", juun: "주은",
   "ye-eun": "예은", "yi hani": "이하니", "lee sem": "이샘", lily: "리리",
-  shuhua: "슈화", hyuna: "현아", seunghee: "승희", gyuri: "규리"
+  shuhua: "슈화", hyuna: "현아", seunghee: "승희", gyuri: "규리",
+  chorong: "초롱", namjoo: "남주", nicole: "니콜", moonbyul: "문별",
+  wheein: "휘인", hwasa: "화사", hyojung: "효정", j: "재이", elly: "엘리",
+  "hu'e": "휴이", vin: "빈", keena: "키나", soram: "소람", sunmi: "선미",
+  jooyeon: "주연", uee: "유이", lizzy: "리지", soyee: "소이", eunice: "유니스",
+  alice: "앨리스", danielle: "다니엘", euaerin: "이유애린", meu: "미유",
+  sally: "샐리", "e.ji": "이지", ej: "이제이", xiaoting: "샤오팅",
+  bahiyyih: "바히에", minnie: "민니", tsuki: "츠키", cocona: "코코나",
+  harvey: "하비", "e:u": "이유", raina: "레이나", lynn: "린",
+  cl: "씨엘", vv: "브이브이"
 };
 
 const koreanRomanSyllables = {
@@ -1439,6 +1474,7 @@ let playerTeamNameValue = "あなた";
 let teamNames = localTeamNames.slice(0, 4);
 let activeMode = "local";
 let aiTeams = new Set();
+let aiAdvanceTimer = null;
 let pickRevealQueue = [];
 let pickRevealTimer = null;
 let pickRevealPhase = "closed";
@@ -1920,6 +1956,10 @@ function updateModeSetup() {
 }
 
 function startGame(mode, aiCount = 3) {
+  if (aiAdvanceTimer !== null) {
+    clearTimeout(aiAdvanceTimer);
+    aiAdvanceTimer = null;
+  }
   setFinalScreenshotMode(false, false);
   activeMode = mode;
   pickLimit = Number($("pickLimit").value);
@@ -2104,10 +2144,10 @@ function updateLotteryProgress() {
     $("pickRevealNext").disabled = false;
     $("pickRevealNext").textContent = pickRevealQueue.length
       ? "次の発表へ"
-      : "ドラフトに戻る";
+      : "次へ進む";
     $("pickRevealActionHint").textContent = pickRevealQueue.length
       ? "抽選結果を確認したら「次の発表へ」で続けられます。"
-      : "抽選結果を確認したら「ドラフトに戻る」で表に戻れます。";
+      : "抽選結果を確認したら「次へ進む」で表に戻れます。";
     $("lotteryTickets").querySelectorAll("[data-lottery-envelope]").forEach(button => {
       button.disabled = true;
     });
@@ -2359,10 +2399,10 @@ function revealPickCard() {
   $("pickRevealNext").disabled = false;
   $("pickRevealNext").textContent = pickRevealQueue.length
     ? "次の指名へ（あと" + pickRevealQueue.length + "件）"
-    : "ドラフトに戻る";
+    : "次へ進む";
   $("pickRevealActionHint").textContent = pickRevealQueue.length
     ? "指名内容を確認したら「次の指名へ」で次の発表に進みます。"
-    : "指名内容を確認したら「ドラフトに戻る」で結果表に戻れます。";
+    : "指名内容を確認したら「次へ進む」で結果表に戻れます。";
 
   const revealDelay = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 1300 : 2600;
   pickRevealTimer = window.setTimeout(showNextPickReveal, revealDelay);
@@ -2409,9 +2449,17 @@ function recordPick(team, idol) {
   advanceAfterPick();
 }
 
+function scheduleAIAdvance(delay = 420) {
+  if (aiAdvanceTimer !== null) return;
+  aiAdvanceTimer = window.setTimeout(() => {
+    aiAdvanceTimer = null;
+    advanceAI();
+  }, delay);
+}
+
 function advanceAI() {
   if (
-    activeMode !== "ai" || !gameStarted || !$("pickReveal").hidden ||
+    activeMode !== "ai" || !gameStarted || aiAdvanceTimer !== null || !$("pickReveal").hidden ||
     pickRevealQueue.length || pendingR1Resolution
   ) return;
 
@@ -2437,6 +2485,10 @@ function advanceAI() {
   renderNominations();
   renderDraft();
   renderCandidates();
+  if (r1Started) {
+    const nextTeam = currentTeamName();
+    if (nextTeam && aiTeams.has(nextTeam)) scheduleAIAdvance();
+  }
 }
 
 function enterSecondRound() {
