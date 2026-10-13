@@ -1593,6 +1593,10 @@ let onlinePendingAction = null;
 let onlineActionAcks = {};
 let onlineStateApplying = false;
 let onlineStateWriteTimer = null;
+let onlineStateWriteChain = Promise.resolve();
+let onlineStateRevision = 0;
+let onlineAppliedStateRevision = -1;
+let onlineActionQueue = Promise.resolve();
 let onlineListenersAttached = false;
 let onlineHandledActionIds = new Set();
 let onlineJoinQueue = Promise.resolve();
@@ -1868,7 +1872,7 @@ function confirmDraftPick(submittingUid = "") {
   if (!r1Started) {
     r1Nominations.push({ team, id: idol.id });
     r1NominationIndex += 1;
-    if (r1NominationIndex >= r1NominationOrder.length) {
+    if (allR1BidsSubmitted()) {
       resolveFirstRound();
     }
   } else {
@@ -2129,6 +2133,9 @@ function setOnlineRoomConnected(code, isHost, initialPlayers = null, deferGameAc
   onlinePlayers = initialPlayers || {};
   onlineGameStatus = "lobby";
   onlineListenersAttached = false;
+  onlineStateRevision = 0;
+  onlineAppliedStateRevision = -1;
+  onlineActionQueue = Promise.resolve();
   onlineActionPending = false;
   onlinePendingAction = null;
   onlineActionAcks = {};
@@ -2165,7 +2172,7 @@ function setOnlineRoomConnected(code, isHost, initialPlayers = null, deferGameAc
     onlineRoomRef.child("joinRequests").on("child_added", snapshot => {
       onlineJoinQueue = onlineJoinQueue.then(() => acceptOnlineJoinRequest(snapshot));
     });
-    if (!deferGameActions) onlineRoomRef.child("actions").on("child_added", processOnlineAction);
+    if (!deferGameActions) onlineRoomRef.child("actions").on("child_added", enqueueOnlineAction);
   } else {
     onlineRoomRef.child(`players/${onlineUid}`).on("value", snapshot => {
       if (snapshot.exists()) {
@@ -2313,6 +2320,7 @@ async function joinOnlineRoom() {
       if (isHost && isPlaying) {
         const stateSnapshot = await roomRef.child("state").once("value");
         if (stateSnapshot.exists()) {
+          onlineStateRevision = Number(stateSnapshot.val()?.stateRevision || 0);
           onlineHostRestoring = true;
           try {
             applyOnlineGameState(stateSnapshot.val());
@@ -2320,7 +2328,7 @@ async function joinOnlineRoom() {
             onlineHostRestoring = false;
           }
         }
-        onlineRoomRef.child("actions").on("child_added", processOnlineAction);
+        onlineRoomRef.child("actions").on("child_added", enqueueOnlineAction);
         resumeOnlineHostProgress();
         setOnlineStatus("進行中のルームにホストとして再接続しました。");
       } else if (!isHost && isPlaying) {
@@ -2615,8 +2623,9 @@ function onlineStateReflectsAction(action, state) {
 }
 
 function serializeOnlineGame() {
+  const submittedTeams = new Set(r1Nominations.map(item => item.team));
   const sealR1Bids = !r1Started && !pendingR1Resolution &&
-    r1NominationIndex < r1NominationOrder.length;
+    r1NominationOrder.some(team => !submittedTeams.has(team));
   return {
     teamNames,
     gameStarted,
@@ -2648,6 +2657,7 @@ function serializeOnlineGame() {
     firstRoundLotteryLosses,
     gameSessionId,
     actionAcks: onlineActionAcks,
+    stateRevision: onlineStateRevision,
     pickRevealAcks: [...onlineRevealAcks],
     pickRevealQueue: pickRevealQueue.map(serializeOnlineReveal),
     activePickReveal: serializeOnlineReveal(activePickReveal),
@@ -2655,14 +2665,36 @@ function serializeOnlineGame() {
   };
 }
 
+function queueOnlineStateWrite() {
+  const roomRef = onlineRoomRef;
+  onlineStateWriteChain = onlineStateWriteChain
+    .catch(() => {})
+    .then(async () => {
+      if (!roomRef || roomRef !== onlineRoomRef || !onlineIsHost || activeMode !== "online" || !gameStarted) return;
+      const state = serializeOnlineGame();
+      state.stateRevision = ++onlineStateRevision;
+      await roomRef.child("state").set(state);
+    })
+    .catch(error => {
+      setOnlineStatus(error.message || "ゲーム状態を共有できませんでした。");
+    });
+  return onlineStateWriteChain;
+}
+
+function flushOnlineState() {
+  if (onlineStateWriteTimer !== null) {
+    clearTimeout(onlineStateWriteTimer);
+    onlineStateWriteTimer = null;
+  }
+  return queueOnlineStateWrite();
+}
+
 function syncOnlineState() {
   if (activeMode !== "online" || !onlineIsHost || !onlineRoomRef || !gameStarted || onlineStateApplying) return;
   if (onlineStateWriteTimer !== null) clearTimeout(onlineStateWriteTimer);
   onlineStateWriteTimer = window.setTimeout(() => {
     onlineStateWriteTimer = null;
-    onlineRoomRef.child("state").set(serializeOnlineGame()).catch(error => {
-      setOnlineStatus(error.message || "ゲーム状態を共有できませんでした。");
-    });
+    queueOnlineStateWrite();
   }, 35);
 }
 
@@ -2740,6 +2772,12 @@ function renderOnlinePickReveal() {
 
 function applyOnlineGameState(state) {
   if ((onlineIsHost && !onlineHostRestoring) || !state || onlineStateApplying) return;
+  const incomingRevision = Number(state.stateRevision);
+  if (onlineAppliedStateRevision >= 0 && (!Number.isFinite(incomingRevision) || incomingRevision <= onlineAppliedStateRevision)) return;
+  if (Number.isFinite(incomingRevision)) {
+    onlineAppliedStateRevision = incomingRevision;
+    onlineStateRevision = Math.max(onlineStateRevision, incomingRevision);
+  }
   onlineStateApplying = true;
   try {
     const incomingGameSessionId = String(state.gameSessionId || "");
@@ -2905,6 +2943,13 @@ function submitOnlineAction(action) {
   }, 12000);
 }
 
+function enqueueOnlineAction(snapshot) {
+  onlineActionQueue = onlineActionQueue
+    .then(() => processOnlineAction(snapshot))
+    .catch(error => setOnlineStatus(error.message || "操作を処理できませんでした。"));
+  return onlineActionQueue;
+}
+
 async function processOnlineAction(snapshot) {
   if (!onlineIsHost || !onlineRoomRef || onlineHandledActionIds.has(snapshot.key)) return;
   onlineHandledActionIds.add(snapshot.key);
@@ -3009,11 +3054,7 @@ async function restartOnlineGame() {
     onlineActionPending = false;
     onlineHandledActionIds.clear();
     startGame("online");
-    if (onlineStateWriteTimer !== null) {
-      clearTimeout(onlineStateWriteTimer);
-      onlineStateWriteTimer = null;
-    }
-    await onlineRoomRef.child("state").set(serializeOnlineGame());
+    await flushOnlineState();
   } catch (error) {
     setOnlineStatus(error.message || "同じルームで再戦を開始できませんでした。");
   } finally {
@@ -3165,9 +3206,20 @@ function canSubmitR1Nomination(team) {
   return activeMode === "online" || team === r1NominationOrder[r1NominationIndex];
 }
 
+function r1BidCount() {
+  const submittedTeams = new Set(r1Nominations.map(item => item.team));
+  return r1NominationOrder.filter(team => submittedTeams.has(team)).length;
+}
+
+function allR1BidsSubmitted() {
+  return r1NominationOrder.length > 0 && r1NominationOrder.every(team =>
+    r1Nominations.some(item => item.team === team)
+  );
+}
+
 function areR1BidsSealed() {
   return !r1Started && !pendingR1Resolution &&
-    r1NominationIndex < r1NominationOrder.length;
+    r1NominationOrder.some(team => !r1Nominations.some(item => item.team === team));
 }
 
 function currentTeamName() {
@@ -3691,7 +3743,7 @@ function advanceAI() {
     const idol = chooseAIIdol(team);
     r1Nominations.push({ team, id: idol?.id || "" });
     r1NominationIndex += 1;
-    if (r1NominationIndex >= r1NominationOrder.length) {
+    if (allR1BidsSubmitted()) {
       resolveFirstRound();
     } else {
       scheduleAIAdvance(idol ? 420 : 0);
@@ -3764,7 +3816,7 @@ function finishFirstRoundResolution() {
 }
 
 function resolveFirstRound() {
-  if (!gameStarted || r1Started || r1NominationIndex < r1NominationOrder.length) return;
+  if (!gameStarted || r1Started || !allR1BidsSubmitted()) return;
 
   const batchOrder = r1NominationOrder.slice();
   const nominations = batchOrder.map(team => {
@@ -3927,7 +3979,7 @@ function renderDraft() {
           : ownOnlineFirstPick
             ? "あなたの1巡目指名は確定しました。"
             : "候補カードを選んで、すぐ下の確認ボタンから入札を提出してください。"
-        : `${r1NominationIndex} / ${r1NominationOrder.length}チームが入札提出済み。全員の提出後に内容を一斉公開します。`;
+        : `${r1BidCount()} / ${r1NominationOrder.length}チームが入札提出済み。全員の提出後に内容を一斉公開します。`;
   } else if (!currentTeam) {
     $("draftHint").textContent = "全チームの指名が完了しました。";
     $("selectedMember").textContent = "ドラフト終了！設定を変えて、もう一度遊べるよ。";
@@ -3967,7 +4019,7 @@ function renderDraft() {
       : pendingR1Resolution
         ? `${pendingR1Resolution.revealedTeams.size} / ${(pendingR1Resolution.nominations || []).length}件の入札を順番に発表中。その後、競合を抽選します。`
       : areR1BidsSealed()
-        ? `${r1NominationIndex} / ${r1NominationOrder.length}チームが入札を提出。全員の提出後に順番に発表します。`
+        ? `${r1BidCount()} / ${r1NominationOrder.length}チームが入札を提出。全員の提出後に順番に発表します。`
       : !r1Started
         ? teamNames.filter(team => (picks[team] || []).some(item => item.round === 1)).length + " / " + teamNames.length + "チームが1巡目確定。重複は抽選し、落選チームは再指名します。"
         : `${round}巡目を進行中です。`;
