@@ -3947,6 +3947,63 @@ body.final-screenshot-mode .final-snapshot-grid {
   }
 }
 
+/* Keep the online setup form full-width on phones; flex/grid settings above
+   were leaving it inside a half-width column on some mobile browsers. */
+@media (max-width: 700px) {
+  .mode-panel {
+    display: flex;
+    width: 100%;
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .mode-panel > div:first-child,
+  .mode-controls {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .mode-controls {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: end;
+  }
+
+  .mode-controls > label:first-child {
+    grid-column: 1 / -1;
+  }
+
+  .mode-controls > *,
+  .online-controls {
+    box-sizing: border-box;
+    min-width: 0;
+    width: 100%;
+  }
+
+  .online-controls {
+    grid-column: 1 / -1;
+    flex: initial;
+  }
+
+  .online-room-actions {
+    width: 100%;
+    grid-template-columns: minmax(0, 1fr) minmax(130px, 0.8fr);
+  }
+
+  .online-room-actions label {
+    min-width: 0;
+  }
+
+  .online-room-actions label > span {
+    white-space: nowrap;
+  }
+
+  .online-room-actions input {
+    min-width: 0;
+    width: 100%;
+  }
+}
+
 @media print {
   body.final-screenshot-mode > .topbar,
   body.final-screenshot-mode .final-results-actions {
