@@ -2470,6 +2470,11 @@ function teamOwnerUid(team) {
 
 function onlineRevealParticipantUids(reveal = activePickReveal) {
   if (!reveal) return [];
+  // The host snapshots the exact participants when the reveal is queued. This
+  // avoids relying on each device resolving the same team-name-to-UID mapping.
+  if (Array.isArray(reveal.participantUids) && reveal.participantUids.length) {
+    return [...new Set(reveal.participantUids.filter(Boolean))];
+  }
   const teams = reveal.type === "lottery"
     ? (reveal.teams?.length ? reveal.teams : reveal.drawOrder || [])
     : reveal.type === "nomination"
@@ -2598,6 +2603,7 @@ function serializeOnlineReveal(reveal) {
     },
     round: reveal.round,
     type: reveal.type,
+    participantUids: reveal.participantUids || [],
     teams: reveal.teams || [],
     drawOrder: reveal.drawOrder || [],
     envelopes: reveal.envelopes || [],
@@ -3375,7 +3381,13 @@ function pickRecord(idol, pickRound = round) {
 }
 
 function queuePickReveal(team, idol, pickRound, type = "pick", extra = {}) {
-  pickRevealQueue.push({ team, idol, round: pickRound, type, ...extra });
+  const participantTeams = type === "lottery"
+    ? (extra.drawOrder?.length ? extra.drawOrder : extra.teams || [])
+    : [team];
+  const participantUids = activeMode === "online"
+    ? [...new Set(participantTeams.map(teamOwnerUid).filter(Boolean))]
+    : [];
+  pickRevealQueue.push({ team, idol, round: pickRound, type, ...extra, participantUids });
   if ($("pickReveal").hidden) showNextPickReveal();
 }
 
