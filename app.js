@@ -2066,6 +2066,13 @@ function setOnlineRoomConnected(code, isHost, initialPlayers = null, deferGameAc
   onlineRoomRef.child("players").on("value", snapshot => {
     onlinePlayers = snapshot.val() || {};
     renderOnlineLobby();
+    // The playing state can arrive before the player roster on a guest device.
+    // Re-render turn controls once the UID-to-team mapping is available.
+    if (gameStarted && activeMode === "online") {
+      renderNominations();
+      renderDraft();
+      renderCandidates();
+    }
   });
   onlineRoomRef.child("status").on("value", snapshot => {
     onlineGameStatus = snapshot.val() || "closed";
