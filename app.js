@@ -2135,11 +2135,11 @@ function renderOnlineLobby() {
     : `参加者待ち（${players.length} / 10人）`;
   const finished = onlineGameStatus === "playing" && gameStarted && allTeamsComplete();
   $("onlineLobbyHint").textContent = onlineGameStatus === "playing"
-    ? finished ? "ドラフトが終了しました。結果を保存した後、ホストがルームを閉じられます。" : "ドラフト進行中です。ルームを開いたまま遊んでください。"
-    : "2〜10人で遊べます。参加者がそろったらホストが開始します。";
-  $("closeOnlineRoom").hidden = !onlineIsHost || (onlineGameStatus !== "lobby" && !finished);
+    ? finished ? "ドラフトが終了しました。ホストはルームを終了してデータを削除できます。" : "ドラフト進行中です。ホストは必要に応じてルームを終了してデータを削除できます。"
+    : "2〜10人で遊べます。参加者がそろったらホストが開始します。終了時はルームを削除してください。";
+  $("closeOnlineRoom").hidden = !onlineIsHost || !onlineRoomRef;
   $("leaveOnlineRoom").hidden = onlineIsHost || !["lobby", "closed"].includes(onlineGameStatus);
-  $("closeOnlineRoom").textContent = onlineGameStatus === "lobby" ? "ルームを閉じる" : "対戦ルームを閉じる";
+  $("closeOnlineRoom").textContent = "ルーム終了・データ削除";
   if (onlineGameStatus === "playing") setOnlineStatus(finished ? "ドラフト終了・結果を確認できます" : "ドラフト進行中");
   else if (onlineGameStatus === "lobby") setOnlineStatus(onlineIsHost ? "友達の参加を待っています" : "ルームに参加しました");
   $("pickLimit").disabled = onlineGameStatus === "playing" || (!onlineIsHost && Boolean(onlineRoomRef));
@@ -2270,9 +2270,8 @@ async function copyOnlineInvite() {
 }
 
 async function closeOnlineRoom() {
-  const finished = onlineGameStatus === "playing" && gameStarted && allTeamsComplete();
-  if (!onlineIsHost || (onlineGameStatus !== "lobby" && !finished) || !onlineRoomRef) return;
-  if (!window.confirm("このルームを閉じますか？参加者はルームに入れなくなります。")) return;
+  if (!onlineIsHost || !onlineRoomRef) return;
+  if (!window.confirm("ルームを終了し、参加者名・設定・指名結果を含むルームデータを削除します。続けますか？")) return;
   try {
     if (onlineStateWriteTimer !== null) {
       clearTimeout(onlineStateWriteTimer);

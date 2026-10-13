@@ -4,6 +4,13 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>STAGE PICK — K-POP Draft</title>
+  <meta name="description" content="STAGE PICKは、K-POPアイドルを選んで楽しむ非公式ファン制作のドラフトゲームです。">
+  <meta name="theme-color" content="#eaf2f8">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="STAGE PICK — K-POP Draft">
+  <meta property="og:description" content="推しでつくる、夢のドラフト。非公式ファン制作のK-POPドラフトゲーム。">
+  <meta property="og:url" content="https://l1nus2910.github.io/kpop-draft/">
+  <meta name="twitter:card" content="summary">
   <link rel="stylesheet" href="style.css">
   <script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-auth-compat.js"></script>
@@ -87,6 +94,7 @@
             <button class="button button-secondary" id="joinOnlineRoom" type="button">コードで参加</button>
           </div>
           <p class="online-action-status" id="onlineActionStatus" role="status" aria-live="polite">ルーム作成や参加の結果がここに表示されます。</p>
+          <p class="online-privacy-hint">表示名・チーム名とドラフト結果はルーム参加者に共有されます。本名や連絡先などは入力しないでください。詳しくは画面下の「プライバシー・オンライン対戦」を確認できます。</p>
           <section class="online-lobby" id="onlineLobby" hidden aria-live="polite">
             <div class="online-lobby-heading">
               <div><strong>オンラインルーム</strong><span id="onlineRoomStatus">接続中…</span></div>
@@ -308,9 +316,32 @@
       </aside>
     </div>
 
-    <footer>
-      <span>STAGE PICK</span>
-    <span>グループ一覧を参考に、活動中・活動休止中のグループを順次追加しています。メンバー名は英字・カタカナ・ハングルで検索できます。</span>
+    <footer class="site-footer">
+      <div class="site-footer-heading">
+        <span>STAGE PICK</span>
+        <p>非公式ファン制作のドラフトゲームです。各グループ・事務所・情報元とは関係ありません。</p>
+      </div>
+      <div class="site-notices">
+        <details class="site-notice">
+          <summary>サイトについて・出典・権利表記</summary>
+          <div class="site-notice-content">
+            <p>このサイトは個人制作の非公式ファン向けゲームです。芸能事務所、グループ、メンバー、ランキング運営元から公式な監修・推薦を受けていません。</p>
+            <p>メンバー名、グループ名、事務所名などは候補を識別する目的で表示しています。これらに関する権利が認められる場合、その権利は各権利者に帰属します。このサイトでは公式写真、音源、ロゴ、ランキング記事の本文や表のデザインを掲載していません。</p>
+            <p>「人気おすすめ順」の星は、公開されている個人ランキング等を参考に独自の基準で算出したゲーム用の目安で、公式の順位・評価ではありません。データ、表記、集計には誤りや更新の遅れが含まれることがあります。参考資料へのリンクは候補一覧の「評価方法・参考資料」に掲載しています。出典リンクの表示は、元サイトの文章・画像・データベース等を転載する許可を意味しません。</p>
+            <p>誤記や権利に関する連絡は <a href="https://github.com/L1nus2910/kpop-draft/issues" target="_blank" rel="noopener noreferrer">GitHubの問い合わせページ</a>からお願いします。公開の投稿欄には個人情報を書かないでください。</p>
+          </div>
+        </details>
+        <details class="site-notice" id="privacyNotice">
+          <summary>プライバシー・オンライン対戦</summary>
+          <div class="site-notice-content">
+            <p>メールアドレスやパスワードによるアカウント登録はありません。候補の除外設定や保存した検索条件は、利用中のブラウザー内に保存されます。</p>
+            <p>オンライン対戦では、Firebaseの匿名認証とRealtime Databaseを使用します。匿名の識別子のほか、入力した表示名・チーム名、ルームコード、参加者、対戦設定、指名・抽選を含むゲーム進行情報を同期します。参加者には同じルーム内の表示名・チーム名とドラフト結果が表示されます。表示名には本名、住所、学校名、連絡先などを使わず、招待リンクやコードは参加してほしい相手だけに共有してください。</p>
+            <p>Realtime Databaseはシンガポール（asia-southeast1）に設定されています。Googleの案内ではFirebase Authenticationは米国内のデータセンターで運用され、サービス提供のためIPアドレスやブラウザー情報等が処理される場合があります。Firebase SDKもGoogleのサーバーから読み込まれます。詳しくは <a href="https://firebase.google.com/support/privacy" target="_blank" rel="noopener noreferrer">Firebaseのプライバシー案内</a>をご確認ください。</p>
+            <p>ルーム情報は、ホストが「ルーム終了・データ削除」を実行するまでRealtime Databaseに残ります。終了時はホストに削除を依頼してください。削除対象はこのアプリのルームデータです。サービス事業者側の技術ログ等は各社の規定に従います。サイトの配信元である <a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement" target="_blank" rel="noopener noreferrer">GitHubのプライバシー説明</a>もご確認ください。</p>
+            <p>不適切な表示名や他者の個人情報を入力せず、他の利用者に迷惑をかける目的で使わないでください。誤記・プライバシーに関する相談は <a href="https://github.com/L1nus2910/kpop-draft/issues" target="_blank" rel="noopener noreferrer">問い合わせページ</a>へお願いします。</p>
+          </div>
+        </details>
+      </div>
     </footer>
   </main>
 
