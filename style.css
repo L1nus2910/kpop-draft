@@ -3657,6 +3657,296 @@ body.final-screenshot-mode .final-snapshot-grid {
 
 }
 
+/* Stronger team colors, with a light gloss rather than a pale header wash. */
+.draft-results-table .team-column,
+.final-results .draft-results-table .team-column {
+  color: #fff;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.18) 0%, rgba(255, 255, 255, 0.04) 42%, rgba(0, 0, 0, 0.08) 100%),
+    var(--team-color);
+  border-top: 4px solid color-mix(in srgb, var(--team-color) 62%, #fff);
+  border-bottom-color: color-mix(in srgb, var(--team-color) 78%, #000);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.34), inset 0 -2px 0 rgba(0, 0, 0, 0.08);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.22);
+}
+
+.draft-results-table .team-column strong,
+.final-results .draft-results-table .team-column strong {
+  color: #fff;
+}
+
+.draft-results-table .team-column span,
+.final-results .draft-results-table .team-column span {
+  color: rgba(255, 255, 255, 0.86);
+}
+
+/* Screenshot mode mirrors the draft-result matrix and fits phone landscape. */
+.online-controls {
+  grid-column: 1 / -1;
+  width: 100%;
+}
+
+.final-snapshot-grid[hidden] {
+  display: none !important;
+}
+
+body.final-screenshot-mode .final-snapshot-grid {
+  display: block;
+  width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.final-snapshot-table {
+  width: 100%;
+  min-width: 0;
+  table-layout: fixed;
+  border: 1px solid #d4e0eb;
+  border-collapse: separate;
+  border-spacing: 0;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.final-snapshot-table th,
+.final-snapshot-table td {
+  min-width: 0;
+  padding: 9px 6px;
+  border-right: 1px solid #d7e0e9;
+  border-bottom: 1px solid #d7e0e9;
+}
+
+.final-snapshot-table tr > :last-child {
+  border-right: 0;
+}
+
+.final-snapshot-table tbody tr:last-child > * {
+  border-bottom: 0;
+}
+
+.final-snapshot-table thead th {
+  height: 58px;
+  text-align: center;
+}
+
+.final-snapshot-table .final-snapshot-round {
+  width: 62px;
+  min-width: 62px;
+  color: #233a52;
+  background: #edf3f8;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.final-snapshot-table thead .final-snapshot-team-header {
+  color: #fff;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.03) 50%, rgba(0, 0, 0, 0.1)),
+    var(--team-color);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.final-snapshot-team-header strong,
+.final-snapshot-team-header small,
+.final-snapshot-table td strong,
+.final-snapshot-table td small {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.final-snapshot-team-header strong {
+  font-size: 13px;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.final-snapshot-team-header small {
+  margin-top: 5px;
+  color: rgba(255, 255, 255, 0.86);
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.final-snapshot-table tbody th {
+  background: #f4f7fa;
+  text-align: center;
+}
+
+.final-snapshot-table tbody tr:nth-child(even) td {
+  background: #f7f9fb;
+}
+
+.final-snapshot-table td {
+  height: 68px;
+  text-align: center;
+  vertical-align: middle;
+}
+
+.final-snapshot-table td strong {
+  color: #182d43;
+  font-size: 13px;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.final-snapshot-table td small {
+  margin-top: 4px;
+  color: #6b7f93;
+  font-size: 10px;
+  line-height: 1.2;
+}
+
+@media (max-width: 700px) {
+  .online-controls {
+    grid-column: 1 / -1;
+    min-width: 0;
+  }
+
+  .online-room-actions {
+    grid-template-columns: minmax(0, 1fr) minmax(125px, 0.9fr);
+  }
+
+  .online-room-actions label > span {
+    white-space: nowrap;
+  }
+
+  body.final-screenshot-mode .final-snapshot-table {
+    min-width: calc(var(--team-count) * 72px + 48px);
+  }
+
+  body.final-screenshot-mode #finalResults::after {
+    display: block;
+    margin: 5px 0 0;
+    color: #627589;
+    content: "スマホを横向きにすると全チームを一画面で見られます";
+    font-size: 9px;
+    text-align: center;
+  }
+
+  body.final-screenshot-mode .final-results-heading {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  body.final-screenshot-mode .final-results-actions {
+    display: flex;
+  }
+}
+
+@media (max-width: 900px) and (orientation: landscape) {
+  body.final-screenshot-mode .page {
+    width: 100%;
+    max-width: none;
+    margin: 0;
+    padding: 3px max(5px, env(safe-area-inset-left)) 3px max(5px, env(safe-area-inset-right));
+  }
+
+  body.final-screenshot-mode #finalResults {
+    padding: 4px 6px;
+  }
+
+  body.final-screenshot-mode .final-results-heading {
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+  }
+
+  body.final-screenshot-mode .final-results-heading .eyebrow,
+  body.final-screenshot-mode .final-results-status {
+    display: none;
+  }
+
+  body.final-screenshot-mode .final-results-heading h2 {
+    margin: 0;
+    font-size: 13px;
+    line-height: 1.15;
+  }
+
+  body.final-screenshot-mode .final-results-heading p:last-child {
+    margin: 1px 0 0;
+    font-size: 8px;
+    line-height: 1.15;
+  }
+
+  body.final-screenshot-mode .final-results-actions .button {
+    min-height: 22px;
+    padding: 2px 7px;
+    font-size: 8px;
+  }
+
+  body.final-screenshot-mode .final-snapshot-grid {
+    overflow: visible;
+  }
+
+  body.final-screenshot-mode .final-snapshot-table {
+    width: 100%;
+    min-width: 0;
+    border-radius: 7px;
+  }
+
+  body.final-screenshot-mode .final-snapshot-table th,
+  body.final-screenshot-mode .final-snapshot-table td {
+    padding: 3px 2px;
+  }
+
+  body.final-screenshot-mode .final-snapshot-table thead th {
+    height: 38px;
+  }
+
+  body.final-screenshot-mode .final-snapshot-table .final-snapshot-round {
+    width: 36px;
+    min-width: 36px;
+    font-size: 8px;
+  }
+
+  body.final-screenshot-mode .final-snapshot-team-header strong {
+    display: -webkit-box;
+    overflow: hidden;
+    font-size: clamp(8px, 1.45vw, 11px);
+    line-height: 1.05;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+
+  body.final-screenshot-mode .final-snapshot-team-header small {
+    margin-top: 2px;
+    font-size: 7px;
+  }
+
+  body.final-screenshot-mode .final-snapshot-table td {
+    height: clamp(27px, 8vh, 42px);
+  }
+
+  body.final-screenshot-mode .final-snapshot-table td strong {
+    display: -webkit-box;
+    font-size: clamp(8px, 1.35vw, 10px);
+    line-height: 1.05;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+
+  body.final-screenshot-mode .final-snapshot-table td small {
+    margin-top: 1px;
+    font-size: 7px;
+    line-height: 1.05;
+  }
+
+  body.final-screenshot-mode .final-snapshot-grid.is-ultra-compact .final-snapshot-table td small {
+    display: none;
+  }
+
+  body.final-screenshot-mode #finalResults::after {
+    display: none;
+  }
+}
+
 @media print {
   body.final-screenshot-mode > .topbar,
   body.final-screenshot-mode .final-results-actions {

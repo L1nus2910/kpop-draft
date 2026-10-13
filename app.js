@@ -1544,8 +1544,8 @@ let onlineShownRevealKey = "";
 let onlineHostRestoring = false;
 
 const teamColorPalette = [
-  "#bf435a", "#3d70c4", "#16877c", "#bd792e", "#7957b8",
-  "#328552", "#bd5187", "#287f99", "#967824", "#536b9c"
+  "#a72e45", "#24539d", "#116d68", "#98500f", "#6740a5",
+  "#21693b", "#a32e64", "#12627c", "#78571b", "#3f5687"
 ];
 
 const aiStrategies = [
@@ -3399,21 +3399,29 @@ function resolveFirstRound() {
 function renderFinalSnapshot() {
   const dense = teamNames.length >= 8 || pickLimit >= 7;
   $("finalSnapshotGrid").classList.toggle("is-ultra-compact", dense);
-  $("finalSnapshotGrid").innerHTML = teamNames.map((team, index) => {
-    const teamPicks = picks[team] || [];
-    const rows = Array.from({ length: pickLimit }, (_, roundIndex) => {
-      const pick = teamPicks.find(item => item.round === roundIndex + 1);
-      const memberName = pick?.name || "—";
-      const groupName = pick?.group || "グループ情報なし";
-      return "<li><span class=\"final-snapshot-round\">" + (roundIndex + 1) +
-        "巡</span><span class=\"final-snapshot-member\" title=\"" + escapeHTML(groupName) + "\"><strong>" + escapeHTML(memberName) +
-        "</strong><small>" + escapeHTML(groupName) + "</small></span></li>";
-    }).join("");
-    return "<article class=\"final-snapshot-team\" style=\"--team-color: " +
-      teamColorPalette[index % teamColorPalette.length] + "\"><header><strong>" +
-      escapeHTML(displayTeamName(team)) + "</strong><span>" + teamPicks.length + " / " +
-      pickLimit + "人</span></header><ol>" + rows + "</ol></article>";
-  }).join("");
+  const headers = teamNames.map((team, index) => `
+    <th scope="col" class="final-snapshot-team-header" style="--team-color:${teamColorPalette[index % teamColorPalette.length]}">
+      <strong>${escapeHTML(displayTeamName(team))}</strong>
+      <small>${(picks[team] || []).length} / ${pickLimit}人</small>
+    </th>
+  `).join("");
+  const rows = Array.from({ length: pickLimit }, (_, roundIndex) => `
+    <tr>
+      <th scope="row" class="final-snapshot-round">${roundIndex + 1}巡</th>
+      ${teamNames.map(team => {
+        const pick = (picks[team] || []).find(item => item.round === roundIndex + 1);
+        const memberName = pick?.name || "—";
+        const groupName = pick?.group || "";
+        return `<td title="${escapeHTML(groupName)}"><strong>${escapeHTML(memberName)}</strong>${groupName ? `<small>${escapeHTML(groupName)}</small>` : ""}</td>`;
+      }).join("")}
+    </tr>
+  `).join("");
+  $("finalSnapshotGrid").innerHTML = `
+    <table class="final-snapshot-table" style="--team-count:${teamNames.length};--round-count:${pickLimit}">
+      <thead><tr><th scope="col" class="final-snapshot-round">巡目</th>${headers}</tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  `;
 }
 
 function renderDraft() {
