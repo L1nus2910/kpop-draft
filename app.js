@@ -2498,7 +2498,20 @@ function canControlTeam(team, actorUid = onlineUid) {
 
 function currentRevealKey() {
   const reveal = activePickReveal;
-  return reveal ? `${reveal.type}:${reveal.team}:${reveal.round}:${reveal.idol?.id || ""}` : "";
+  if (!reveal) return "";
+  const idolId = reveal.idol?.id || reveal.idolId || "";
+  return `${gameSessionId}:${reveal.type}:${reveal.round}:${idolId}`;
+}
+
+function actionMatchesCurrentReveal(action) {
+  if (!action?.revealKey || !activePickReveal) return false;
+  if (action.revealKey === currentRevealKey()) return true;
+  // Accept the pre-session-key format for an already-open reveal. This lets a
+  // device with a cached app finish its confirmation while the host is current.
+  if (action.kind !== "next" || action.revealPhase !== "revealed") return false;
+  const idolId = activePickReveal.idol?.id || activePickReveal.idolId || "";
+  const legacyKey = `${activePickReveal.type}:${activePickReveal.team}:${activePickReveal.round}:${idolId}`;
+  return action.revealKey === legacyKey;
 }
 
 function onlineRevealAutoAdvanceDelay(reveal = activePickReveal) {
@@ -2647,7 +2660,7 @@ function onlineStateReflectsAction(action, state) {
 
   const reveal = state.activePickReveal;
   const revealKey = reveal
-    ? `${reveal.type}:${reveal.team}:${reveal.round}:${reveal.idolId || ""}`
+    ? `${state.gameSessionId || ""}:${reveal.type}:${reveal.round}:${reveal.idolId || ""}`
     : "";
   if (action.kind === "envelope") {
     return revealKey !== action.revealKey || (reveal?.selections || []).some(([envelope, selectedTeam]) =>
@@ -2850,8 +2863,11 @@ function applyOnlineGameState(state) {
     const localPendingPickId = gameSessionChanged ? null : pendingDraftPickId;
     const actionAck = onlineUid ? state.actionAcks?.[onlineUid] : null;
     const actionWasAcknowledged = Boolean(onlinePendingAction && actionAck?.key === onlinePendingAction.key);
-    const actionWasAccepted = onlineStateReflectsAction(onlinePendingAction, state) ||
-      (actionWasAcknowledged && Boolean(actionAck.accepted));
+    const actionWasRejected = actionWasAcknowledged && !Boolean(actionAck.accepted);
+    const actionWasAccepted = !actionWasRejected && (
+      onlineStateReflectsAction(onlinePendingAction, state) ||
+      (actionWasAcknowledged && Boolean(actionAck.accepted))
+    );
     teamNames = state.teamNames || [];
     gameStarted = Boolean(state.gameStarted);
     activeMode = "online";
@@ -2898,7 +2914,7 @@ function applyOnlineGameState(state) {
     } else if (actionWasAcknowledged) {
       onlinePendingAction = null;
       onlineActionPending = false;
-      setOnlineStatus("操作が反映されませんでした。順番を確認して、もう一度試してください。");
+      setOnlineStatus(actionAck.reason || "操作が反映されませんでした。順番を確認して、もう一度試してください。");
     } else {
       pendingDraftPickId = localPendingPickId;
       onlineActionPending = Boolean(onlinePendingAction);
@@ -2955,7 +2971,11 @@ function resumeOnlineHostProgress() {
 }
 
 function submitOnlineAction(action) {
-  if (!onlineRoomRef || onlineIsHost || onlineActionPending) return;
+  if (!onlineRoomRef) {
+    setOnlineStatus("ルームへの接続が切れています。再接続してから、もう一度押してください。");
+    return;
+  }
+  if (onlineIsHost || onlineActionPending) return;
   onlineActionPending = true;
   renderDraft();
   renderOnlinePickReveal();
@@ -2975,6 +2995,11 @@ function submitOnlineAction(action) {
     envelope: action.envelope
   };
   actionRef.set(payload)
+    .then(() => {
+      if (onlinePendingAction?.key === actionRef.key && action.kind === "next") {
+        setOnlineStatus("確認を送信しました。ホスト側で反映中です…");
+      }
+    })
     .catch(error => {
       onlinePendingAction = null;
       onlineActionPending = false;
@@ -3006,10 +3031,14 @@ async function processOnlineAction(snapshot) {
   onlineHandledActionIds.add(snapshot.key);
   const action = snapshot.val();
   const ownerTeam = onlineTeamForUid(action?.uid);
-  const revealMatches = Boolean(action?.revealKey && action.revealKey === currentRevealKey());
+  const revealMatches = actionMatchesCurrentReveal(action);
   let actionAccepted = false;
+  let actionRejectionReason = "";
   try {
-    if (!action || !onlinePlayers[action.uid]) return;
+    if (!action || !onlinePlayers[action.uid]) {
+      actionRejectionReason = "参加者情報を確認できませんでした。全員が同じルームに入り直してください。";
+      return;
+    }
     const canAcceptPick = action?.kind === "pick" && ownerTeam && (
       !r1Started ? canSubmitR1Nomination(ownerTeam) : ownerTeam === currentTeamName()
     );
@@ -3037,6 +3066,19 @@ async function processOnlineAction(snapshot) {
       }
     } else if (action?.kind === "next" && revealMatches) {
       actionAccepted = acknowledgeOnlineReveal(action.uid);
+      if (!actionAccepted) {
+        actionRejectionReason = !onlinePlayers[action.uid]
+          ? "参加者情報を確認できませんでした。"
+          : !activePickReveal || pickRevealPhase !== "revealed"
+            ? "発表画面の状態がずれています。全員で画面を更新して、新しいルームでお試しください。"
+            : activePickReveal.type === "lottery" && !activePickReveal.winner
+              ? "抽選結果が確定する前は次へ進めません。"
+              : !onlineRevealParticipantUids().includes(action.uid)
+                ? "この発表の確認対象に含まれていません。"
+                : "確認を処理できませんでした。もう一度押してください。";
+      }
+    } else if (action?.kind === "next") {
+      actionRejectionReason = "端末間で発表データが一致しません。全員で画面を更新して、新しいルームでお試しください。";
     } else if (action?.kind === "skip" && revealMatches && activeMode !== "online") {
       const previousPhase = pickRevealPhase;
       skipCurrentPickReveal();
@@ -3044,7 +3086,12 @@ async function processOnlineAction(snapshot) {
     }
   } finally {
     if (action?.uid) {
-      onlineActionAcks[action.uid] = { key: snapshot.key, accepted: actionAccepted, at: Date.now() };
+      onlineActionAcks[action.uid] = {
+        key: snapshot.key,
+        accepted: actionAccepted,
+        reason: actionAccepted ? "" : actionRejectionReason || "操作を確認できませんでした。発表画面を確認して、もう一度試してください。",
+        at: Date.now()
+      };
     }
     await snapshot.ref.remove().catch(() => {});
     syncOnlineState();
