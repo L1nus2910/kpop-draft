@@ -3467,6 +3467,32 @@ body.final-screenshot-mode .final-snapshot-grid {
   font-weight: 700;
 }
 
+.online-action-status {
+  min-width: 0;
+  min-height: 20px;
+  margin: -3px 0 0;
+  padding: 9px 11px;
+  color: #245d84;
+  background: #edf6fc;
+  border: 1px solid #d5e8f6;
+  border-radius: 10px;
+  font-size: 12px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+.online-action-status.is-error {
+  color: #9b3341;
+  background: #fff1f2;
+  border-color: #f3cdd2;
+}
+
+.online-action-status.is-success {
+  color: #236344;
+  background: #edf9f1;
+  border-color: #ccebd6;
+}
+
 .online-lobby {
   display: grid;
   gap: 11px;

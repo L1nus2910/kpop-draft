@@ -1999,6 +1999,12 @@ function updateModeSetup() {
 
 function setOnlineStatus(message) {
   $("onlineRoomStatus").textContent = message;
+  const actionStatus = $("onlineActionStatus");
+  if (actionStatus) {
+    actionStatus.textContent = message;
+    actionStatus.classList.toggle("is-error", /できません|まだです|見つかりません|満員|終了しました|失敗/.test(message));
+    actionStatus.classList.toggle("is-success", /作りました|参加しました|再接続しました/.test(message));
+  }
 }
 
 function firebaseConfigurationReady() {
