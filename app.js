@@ -889,34 +889,15 @@ const individualPopularityRanks = [
   ["ITZY", "Yuna", 20]
 ];
 
-const groupPopularityRanks = [
-  ["NiziU", 1], ["NMIXX", 2], ["QWER", 3], ["ISEGYE IDOL", 4],
-  ["SECRET NUMBER", 5], ["NewJeans", 6], ["RESCENE", 7], ["Hearts2Hearts", 8],
-  ["IVE", 9], ["aespa", 10], ["Lapillus", 11], ["VIVIZ", 12],
-  ["BABYMONSTER", 13], ["LE SSERAFIM", 14], ["Kep1er", 15], ["izna", 16],
-  ["TUIDE", 17], ["OURBIRTHDAY", 18], ["Billlie", 19], ["KISS OF LIFE", 20],
-  ["TWICE", 1], ["BLACKPINK", 2], ["OH MY GIRL", 3], ["Dreamcatcher", 4],
-  ["Red Velvet", 5], ["Lovelyz", 6], ["ITZY", 7], ["MOMOLAND", 8],
-  ["Apink", 9], ["BBGIRLS", 10], ["GFRIEND", 11], ["Girls' Generation", 12],
-  ["MAMAMOO", 13], ["fromis", 14], ["i-dle", 15]
-];
-
-const rankingGroupAliases = { fromis: "fromis_9" };
 const normalizeRankingName = value => String(value).toLowerCase().replace(/[^a-z0-9]/g, "");
 const memberRankByKey = new Map();
-const groupRankByKey = new Map();
 const memberRankingKey = (group, member) =>
-  `${normalizeRankingName(rankingGroupAliases[group] || group)}:${normalizeRankingName(member)}`;
+  `${normalizeRankingName(group)}:${normalizeRankingName(member)}`;
 
 individualPopularityRanks.forEach(([group, member, rank]) => {
   const key = memberRankingKey(group, member);
   memberRankByKey.set(key, Math.min(memberRankByKey.get(key) || Infinity, rank));
 });
-groupPopularityRanks.forEach(([group, rank]) => {
-  const key = normalizeRankingName(rankingGroupAliases[group] || group);
-  groupRankByKey.set(key, rank);
-});
-
 function starsForMonthlyRank(rank) {
   if (!rank) return 1;
   if (rank <= 5) return 5;
@@ -927,12 +908,9 @@ function starsForMonthlyRank(rank) {
 
 idols.forEach(idol => {
   const memberRank = memberRankByKey.get(memberRankingKey(idol.group, idol.name)) || null;
-  const groupRank = groupRankByKey.get(normalizeRankingName(idol.group)) || null;
-  idol.popularityStars = Math.max(starsForMonthlyRank(memberRank), starsForMonthlyRank(groupRank));
+  idol.popularityStars = starsForMonthlyRank(memberRank);
   idol.individualPopularityRank = memberRank;
-  idol.groupPopularityRank = groupRank;
-  idol.popularitySortScore = (memberRank ? 1000 + (21 - memberRank) : 0) +
-    (groupRank ? 100 + (21 - groupRank) : 0);
+  idol.popularitySortScore = memberRank ? 1000 + (21 - memberRank) : 0;
 });
 
 const $ = id => document.getElementById(id);
@@ -1132,10 +1110,9 @@ function renderCandidates() {
           : gameStarted
             ? "クリックして選択"
             : "クリックして選択";
-    const rankingDetails = [
-      idol.individualPopularityRank ? `個人${idol.individualPopularityRank}位` : "個人未掲載",
-      idol.groupPopularityRank ? `グループ${idol.groupPopularityRank}位` : "グループ未掲載"
-    ].join("・");
+    const rankingDetails = idol.individualPopularityRank
+      ? `個人${idol.individualPopularityRank}位`
+      : "個人ランキング未掲載";
     return `
       <article class="candidate-card ${isSelected ? "is-selected" : ""} ${isExcluded ? "is-excluded" : ""}" data-candidate-id="${idol.id}">
         <button class="candidate-select" type="button" data-action="select" data-id="${idol.id}" aria-pressed="${isSelected}" ${isUnavailable ? "disabled" : ""}>
