@@ -2955,3 +2955,56 @@ footer span:first-child {
     flex-direction: column-reverse;
   }
 }
+
+/* Keep team headers distinct while adding a subtle glossy finish. */
+.draft-results-table .team-column,
+.final-results .draft-results-table .team-column {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.2), transparent 48%),
+    linear-gradient(
+      145deg,
+      color-mix(in srgb, var(--team-color) 82%, #fff),
+      var(--team-color) 54%,
+      color-mix(in srgb, var(--team-color) 76%, #101c2b)
+    );
+  border-bottom-color: rgba(8, 28, 48, 0.18);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.48), inset 0 -2px 0 rgba(5, 22, 39, 0.12);
+}
+
+.draft-lottery-history {
+  display: grid;
+  gap: 5px;
+  margin-bottom: 5px;
+}
+
+.draft-cell-card.draft-lottery-loss {
+  gap: 2px;
+  padding: 6px 7px;
+  border: 1px solid #dbe3eb;
+  border-radius: 8px;
+  background: linear-gradient(145deg, #f3f6f9, #e9eef3);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85);
+}
+
+.draft-cell-card.draft-lottery-loss small {
+  color: #75869a;
+  font-size: 9px;
+}
+
+.draft-cell-card.draft-lottery-loss strong {
+  color: #66768a;
+  font-size: 12px;
+}
+
+.draft-cell-card.draft-lottery-loss span {
+  color: #8794a3;
+  font-size: 9px;
+}
+
+.draft-cell-card.draft-pick-confirmed {
+  padding: 6px 7px;
+  border: 1px solid #c7dced;
+  border-radius: 8px;
+  background: linear-gradient(145deg, #fff, #edf6fc);
+  box-shadow: inset 0 1px 0 #fff;
+}

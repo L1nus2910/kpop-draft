@@ -851,6 +851,12 @@ let turnIndex = 0;
 let lotterySummary = "";
 let pickLimit = 5;
 let orderMode = "snake";
+let firstRoundLotteryLosses = {};
+
+const teamColorPalette = [
+  "#b4233b", "#2457aa", "#08786f", "#a55310", "#6741a5",
+  "#20764a", "#a72f69", "#116d87", "#826012", "#4b5a71"
+];
 
 const aiStrategies = [
   { label: "バランス型", group: 5, generation: 5, nationality: 4, activity: 3 },
@@ -1243,6 +1249,7 @@ function startGame(mode, aiCount = 3) {
   selectedId = null;
   pendingDraftPickId = null;
   picks = Object.fromEntries(teamNames.map(team => [team, []]));
+  firstRoundLotteryLosses = Object.fromEntries(teamNames.map(team => [team, []]));
   round = 1;
   r1Started = false;
   r1NominationOrder = teamNames.slice();
@@ -1459,6 +1466,14 @@ function openLotteryEnvelope(envelope, automatic = false) {
 
     if (won) {
       reveal.winner = team;
+      reveal.teams.forEach(losingTeam => {
+        if (losingTeam === team) return;
+        if (!firstRoundLotteryLosses[losingTeam]) firstRoundLotteryLosses[losingTeam] = [];
+        firstRoundLotteryLosses[losingTeam].push({
+          name: reveal.idol.japaneseName,
+          group: reveal.idol.group
+        });
+      });
       picks[team].push(pickRecord(reveal.idol, 1));
       drafted.add(reveal.idol.id);
       if (pendingR1Resolution) {
@@ -1472,6 +1487,7 @@ function openLotteryEnvelope(envelope, automatic = false) {
       reveal.drawIndex += 1;
     }
     updateLotteryProgress();
+    renderDraft();
     if (!won) scheduleAINextLotteryEnvelope();
   }, openDelay);
 }
@@ -1509,13 +1525,9 @@ function showNextPickReveal() {
     reveal.winner = null;
     reveal.lastTeam = null;
   }
-  const revealColors = [
-    "#b3262e", "#2451b2", "#171b24", "#118247", "#1c4fa3", "#bd2930",
-    "#67409b", "#a7480b", "#087481", "#c02f6f", "#4e5c70"
-  ];
   const teamIndex = Math.max(0, teamNames.indexOf(isLottery ? reveal.drawOrder[0] : reveal.team));
   const card = $("pickRevealCard");
-  card.style.setProperty("--reveal-team-color", revealColors[teamIndex % revealColors.length]);
+  card.style.setProperty("--reveal-team-color", teamColorPalette[teamIndex % teamColorPalette.length]);
   card.classList.toggle("is-lottery", isLottery);
   $("pickRevealRound").textContent = isLottery ? "1巡目 / 重複指名の抽選" : reveal.round + "巡目";
   $("pickRevealLabel").textContent = isLottery
@@ -1830,17 +1842,25 @@ function renderDraft() {
         : `${round}巡目を進行中です。`;
 
   const roundRows = Array.from({ length: pickLimit }, (_, index) => index + 1);
-  const teamColors = [
-    "#b3262e", "#2451b2", "#171b24", "#118247", "#1c4fa3", "#bd2930",
-    "#67409b", "#a7480b", "#087481", "#c02f6f", "#4e5c70"
-  ];
   const cellsFor = (team, pickRound) => {
     const teamPicks = picks[team] || [];
     const pick = teamPicks.find(item => item.round === pickRound);
     const current = gameStarted && !finished && round === pickRound && currentTeam === team;
+    const losses = pickRound === 1 ? (firstRoundLotteryLosses[team] || []) : [];
+    const lossMarkup = losses.length ? `
+      <div class="draft-lottery-history" aria-label="1巡目の抽選で外れた候補">
+        ${losses.map(lost => `
+          <div class="draft-cell-card draft-lottery-loss">
+            <small>抽選落選</small>
+            <strong>${escapeHTML(lost.name)}</strong>
+            <span>${escapeHTML(lost.group)}</span>
+          </div>
+        `).join("")}
+      </div>
+    ` : "";
 
     if (pick) {
-      return `<div class="draft-cell-card">
+      return `${lossMarkup}<div class="draft-cell-card draft-pick-confirmed">
         <strong>${escapeHTML(pick.name)}</strong>
         <span>${escapeHTML(pick.group)}</span>
       </div>`;
@@ -1851,19 +1871,20 @@ function renderDraft() {
       const nominee = nomination && idols.find(item => item.id === nomination.id);
       if (!r1Started && r1NominationOrder.includes(team)) {
         if (nominee) {
-          return `<div class="draft-cell-card draft-nomination">
+          return `${lossMarkup}<div class="draft-cell-card draft-nomination">
             <small>抽選待ち</small>
             <strong>${escapeHTML(nominee.japaneseName)}</strong>
             <span>${escapeHTML(nominee.group)}</span>
           </div>`;
         }
-        return `<div class="draft-cell-card draft-lottery-wait">
+        return `${lossMarkup}<div class="draft-cell-card draft-lottery-wait">
           <small>${team === currentTeam ? "再指名中" : "再指名待ち"}</small>
           <strong>${team === currentTeam ? "候補を選択" : "抽選待ち"}</strong>
         </div>`;
       }
     }
 
+    if (lossMarkup) return lossMarkup;
     return `<span class="empty-pick${current ? " is-current" : ""}">${current ? "指名中" : "—"}</span>`;
   };
 
@@ -1873,7 +1894,7 @@ function renderDraft() {
         <tr>
           <th class="round-column" scope="col">巡目</th>
           ${teamNames.map((team, index) => `
-            <th class="team-column" scope="col" style="--team-color: ${teamColors[index % teamColors.length]}">
+            <th class="team-column" scope="col" style="--team-color: ${teamColorPalette[index % teamColorPalette.length]}">
               <strong>${escapeHTML(displayTeamName(team))}</strong>
               <span>${picks[team].length} / ${pickLimit}人</span>
             </th>
