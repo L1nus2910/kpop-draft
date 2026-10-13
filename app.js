@@ -872,7 +872,7 @@ const idols = groups.flatMap(group =>
   }))
 );
 
-const individualPopularityRanks = [
+const choeaedolIndividualRanks = [
   ["NiziU", "Maya", 1], ["BABYMONSTER", "Ahyeon", 2], ["NiziU", "Mako", 3],
   ["IVE", "Leeseo", 4], ["CLASS:y", "Boeun", 5], ["aespa", "Winter", 6],
   ["NiziU", "Ayaka", 7], ["NiziU", "Rima", 8], ["NiziU", "Riku", 9],
@@ -889,28 +889,94 @@ const individualPopularityRanks = [
   ["ITZY", "Yuna", 20]
 ];
 
+const popularityRankingSources = [
+  {
+    id: "youloy",
+    weight: 50,
+    topN: 30,
+    ranks: [
+      ["RESCENE", "Woni", 1], ["IVE", "Wonyoung", 2], ["BLACKPINK", "Jennie", 3],
+      ["aespa", "Karina", 4], ["RESCENE", "Zena", 5], ["RESCENE", "Minami", 6],
+      ["IVE", "Yujin", 7], ["RESCENE", "Liv", 8], ["BLACKPINK", "Rosé", 9],
+      ["RESCENE", "May", 10], ["ILLIT", "Wonhee", 11], ["aespa", "Winter", 12],
+      ["BLACKPINK", "Lisa", 13], ["Red Velvet", "Joy", 14],
+      ["Girls' Generation", "Taeyeon", 15], ["BLACKPINK", "Jisoo", 16],
+      ["NMIXX", "Sullyoon", 17], ["Red Velvet", "Irene", 18],
+      ["Red Velvet", "Seulgi", 19], ["ITZY", "Lia", 20],
+      ["Red Velvet", "Wendy", 21], ["Girls' Generation", "Yoona", 22],
+      ["TWICE", "Jeongyeon", 23], ["Red Velvet", "Yeri", 24],
+      ["IVE", "Rei", 25], ["ITZY", "Ryujin", 26], ["IVE", "Liz", 27],
+      ["LE SSERAFIM", "Chaewon", 28], ["ITZY", "Chaeryeong", 29],
+      ["Girls' Generation", "Sooyoung", 30]
+    ]
+  },
+  {
+    id: "starnews",
+    weight: 15,
+    topN: 5,
+    ranks: [
+      ["NewJeans", "Minji", 1], ["NewJeans", "Hyein", 2],
+      ["NewJeans", "Hanni", 3], ["NewJeans", "Haerin", 4],
+      ["Red Velvet", "Irene", 5]
+    ]
+  },
+  {
+    id: "fannstar",
+    weight: 10,
+    topN: 16,
+    ranks: [
+      ["Girls' Generation", "Yoona", 3], ["NMIXX", "Haewon", 5],
+      ["i-dle", "Yuqi", 9], ["NMIXX", "Sullyoon", 10],
+      ["aespa", "Winter", 11], ["BABYMONSTER", "Ahyeon", 13],
+      ["ILLIT", "Wonhee", 15], ["i-dle", "Soyeon", 16]
+    ]
+  }
+];
+
 const normalizeRankingName = value => String(value).toLowerCase().replace(/[^a-z0-9]/g, "");
-const memberRankByKey = new Map();
 const memberRankingKey = (group, member) =>
   `${normalizeRankingName(group)}:${normalizeRankingName(member)}`;
 
-individualPopularityRanks.forEach(([group, member, rank]) => {
-  const key = memberRankingKey(group, member);
-  memberRankByKey.set(key, Math.min(memberRankByKey.get(key) || Infinity, rank));
-});
-function starsForMonthlyRank(rank) {
-  if (!rank) return 1;
-  if (rank <= 5) return 5;
-  if (rank <= 10) return 4;
-  if (rank <= 15) return 3;
-  return 2;
+function starsForPopularityScore(score) {
+  if (score >= 70) return 5;
+  if (score >= 50) return 4;
+  if (score >= 30) return 3;
+  if (score >= 15) return 2;
+  return 1;
 }
 
+const popularityRanksByMember = new Map();
+function addPopularityRank(sourceId, group, member, rank) {
+  const key = memberRankingKey(group, member);
+  const sourceRanks = popularityRanksByMember.get(key) || {};
+  sourceRanks[sourceId] = Math.min(sourceRanks[sourceId] || Infinity, rank);
+  popularityRanksByMember.set(key, sourceRanks);
+}
+
+choeaedolIndividualRanks.forEach(([group, member, rank]) =>
+  addPopularityRank("choeaedol", group, member, rank)
+);
+popularityRankingSources.forEach(source => {
+  source.ranks.forEach(([group, member, rank]) =>
+    addPopularityRank(source.id, group, member, rank)
+  );
+});
+
 idols.forEach(idol => {
-  const memberRank = memberRankByKey.get(memberRankingKey(idol.group, idol.name)) || null;
-  idol.popularityStars = starsForMonthlyRank(memberRank);
-  idol.individualPopularityRank = memberRank;
-  idol.popularitySortScore = memberRank ? 1000 + (21 - memberRank) : 0;
+  const sourceRanks = popularityRanksByMember.get(memberRankingKey(idol.group, idol.name)) || {};
+  const choeaedolRank = sourceRanks.choeaedol || null;
+  const compositeScore = popularityRankingSources.reduce((score, source) => {
+    const rank = sourceRanks[source.id];
+    if (!rank) return score;
+    const sourceScore = ((source.topN + 1 - rank) / source.topN) * 100;
+    return score + sourceScore * (source.weight / 100);
+  }, choeaedolRank ? ((21 - choeaedolRank) / 20) * 25 : 0);
+
+  idol.popularityScore = Math.round(compositeScore * 10) / 10;
+  idol.popularityStars = starsForPopularityScore(idol.popularityScore);
+  idol.individualPopularityRank = choeaedolRank;
+  idol.popularitySortScore = idol.popularityScore;
+  idol.popularitySources = sourceRanks;
 });
 
 const $ = id => document.getElementById(id);
@@ -1110,9 +1176,9 @@ function renderCandidates() {
           : gameStarted
             ? "クリックして選択"
             : "クリックして選択";
-    const rankingDetails = idol.individualPopularityRank
-      ? `個人${idol.individualPopularityRank}位`
-      : "個人ランキング未掲載";
+    const rankingDetails = idol.popularityScore > 0
+      ? `人気参考スコア ${Math.round(idol.popularityScore)}点`
+      : "参照した個人ランキングに未掲載";
     return `
       <article class="candidate-card ${isSelected ? "is-selected" : ""} ${isExcluded ? "is-excluded" : ""}" data-candidate-id="${idol.id}">
         <button class="candidate-select" type="button" data-action="select" data-id="${idol.id}" aria-pressed="${isSelected}" ${isUnavailable ? "disabled" : ""}>
@@ -1466,7 +1532,7 @@ function chooseAIIdol(team) {
       strategy.generation / (generationCount + 1) +
       strategy.nationality / (nationalityCount + 1) +
       (idol.activity === "活動中" ? strategy.activity : 0) +
-      (idol.popularityStars - 1) * 2.2;
+      idol.popularityScore / 20;
     return { idol, score };
   }).sort((a, b) => b.score - a.score);
 
