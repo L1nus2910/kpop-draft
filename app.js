@@ -2068,12 +2068,17 @@ function updateLotteryProgress() {
   const drawer = reveal.drawOrder[reveal.drawIndex];
   if (reveal.winner) {
     $("lotteryBoard").classList.add("is-revealed");
-    $("lotteryTurn").textContent = `当選：${displayTeamName(reveal.winner)}`;
-    $("lotteryOutcome").textContent = `${displayTeamName(reveal.winner)}が交渉権を獲得！`;
+    $("lotteryTurn").textContent = `🏆 当選チーム：${displayTeamName(reveal.winner)}`;
+    $("lotteryOutcome").textContent = "このチームが交渉権を獲得しました";
+    const winnerIndex = Math.max(0, teamNames.indexOf(reveal.winner));
+    $("lotteryBoard").style.setProperty("--lottery-winner-color", teamColorPalette[winnerIndex % teamColorPalette.length]);
     $("pickRevealNext").disabled = false;
     $("pickRevealNext").textContent = pickRevealQueue.length
-      ? "次の指名へ"
-      : "ドラフト画面へ";
+      ? "次の発表へ"
+      : "ドラフトに戻る";
+    $("pickRevealActionHint").textContent = pickRevealQueue.length
+      ? "抽選結果を確認したら「次の発表へ」で続けられます。"
+      : "抽選結果を確認したら「ドラフトに戻る」で表に戻れます。";
     $("lotteryTickets").querySelectorAll("[data-lottery-envelope]").forEach(button => {
       button.disabled = true;
     });
@@ -2085,6 +2090,7 @@ function updateLotteryProgress() {
     $("lotteryOutcome").textContent = "選んだ封筒を一斉に開示します…";
     $("pickRevealNext").disabled = true;
     $("pickRevealNext").textContent = "結果を開示中";
+    $("pickRevealActionHint").textContent = "全チームの封筒を同時に開封しています。";
     $("lotteryTickets").querySelectorAll("[data-lottery-envelope]").forEach(button => {
       button.disabled = true;
     });
@@ -2096,7 +2102,8 @@ function updateLotteryProgress() {
   $("lotteryTurn").textContent = `抽選順 ${reveal.drawIndex + 1} / ${total}：${displayTeamName(drawer)}が封筒を選択`;
   $("lotteryOutcome").textContent = `${reveal.selections.size} / ${total}チームが選択済み。全員が選んだ後に一斉開示します。`;
   $("pickRevealNext").disabled = true;
-  $("pickRevealNext").textContent = "全員の選択を待っています";
+  $("pickRevealNext").textContent = "全員の封筒選択を待っています";
+  $("pickRevealActionHint").textContent = `${displayTeamName(drawer)}の番です。封筒を一つ選ぶと、全員の選択後に一斉開示します。`;
   const canChoose = pickRevealPhase === "revealed" && !reveal.opening && !aiTeams.has(drawer);
   $("lotteryTickets").querySelectorAll("[data-lottery-envelope]").forEach(button => {
     const envelope = Number(button.dataset.lotteryEnvelope);
@@ -2169,7 +2176,9 @@ function revealLotteryResults(reveal) {
     if (!button || !team) return;
     const result = button.querySelector(".lottery-envelope-result");
     result.querySelector("strong").textContent = displayTeamName(team);
-    result.querySelector("small").textContent = won ? "交渉権獲得" : "再指名へ";
+    result.querySelector("small").textContent = won ? "当選！交渉権獲得" : "落選・再指名へ";
+    const teamIndex = Math.max(0, teamNames.indexOf(team));
+    button.style.setProperty("--lottery-team-color", teamColorPalette[teamIndex % teamColorPalette.length]);
     button.classList.add("is-opening");
     button.disabled = true;
   });
@@ -2222,7 +2231,7 @@ function revealLotteryResults(reveal) {
 
 function skipCurrentPickReveal() {
   if (activePickReveal?.type === "lottery") return;
-  showNextPickReveal();
+  revealPickCard();
 }
 
 function showNextPickReveal() {
@@ -2289,9 +2298,12 @@ function showNextPickReveal() {
   void card.offsetWidth;
   card.classList.add("is-visible");
   pickRevealPhase = "intro";
-  $("pickRevealNext").textContent = isLottery ? "抽選を開始" : "指名を見る";
+  $("pickRevealNext").textContent = isLottery ? "抽選を開始" : "指名を発表";
   $("pickRevealSkip").textContent = "演出をスキップ";
   $("pickRevealSkip").hidden = isLottery;
+  $("pickRevealActionHint").textContent = isLottery
+    ? "封筒を選ぶ抽選です。結果は全員が選び終わってから同時に開きます。"
+    : "右上は演出だけを省略します。指名を確認した後は下のボタンで次へ進みます。";
   requestAnimationFrame(() => $("pickRevealNext").focus({ preventScroll: true }));
 
   const introDelay = window.matchMedia("(prefers-reduced-motion: reduce)").matches
@@ -2309,6 +2321,7 @@ function revealPickCard() {
 
   pickRevealPhase = "revealed";
   $("pickRevealFlipCard").classList.add("is-flipped");
+  $("pickRevealSkip").hidden = true;
   if (activePickReveal?.type === "lottery") {
     updateLotteryProgress();
     scheduleAINextLotteryEnvelope();
@@ -2317,8 +2330,10 @@ function revealPickCard() {
   $("pickRevealNext").disabled = false;
   $("pickRevealNext").textContent = pickRevealQueue.length
     ? "次の指名へ（あと" + pickRevealQueue.length + "件）"
-    : "ドラフト画面へ";
-  $("pickRevealSkip").textContent = "スキップ";
+    : "ドラフトに戻る";
+  $("pickRevealActionHint").textContent = pickRevealQueue.length
+    ? "指名内容を確認したら「次の指名へ」で次の発表に進みます。"
+    : "指名内容を確認したら「ドラフトに戻る」で結果表に戻れます。";
 
   const revealDelay = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 1300 : 2600;
   pickRevealTimer = window.setTimeout(showNextPickReveal, revealDelay);
