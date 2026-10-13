@@ -1598,6 +1598,8 @@ let onlineHandledActionIds = new Set();
 let onlineJoinQueue = Promise.resolve();
 let onlineShownRevealKey = "";
 let onlineHostRestoring = false;
+let gameSessionId = "";
+let onlineRestartPending = false;
 
 const teamColorPalette = [
   "#a72e45", "#24539d", "#116d68", "#98500f", "#6740a5",
@@ -2207,10 +2209,17 @@ function renderOnlineLobby() {
   $("startOnlineGame").textContent = hostCanStart
     ? `${players.length}人でドラフト開始`
     : `参加者待ち（${players.length} / 10人）`;
-  const finished = onlineGameStatus === "playing" && gameStarted && allTeamsComplete();
+  const finished = onlineGameStatus === "playing" && gameStarted && allTeamsComplete() && !pendingR1Resolution && $("pickReveal").hidden && pickRevealQueue.length === 0;
+  $("restartOnlineGame").hidden = !onlineIsHost || !finished;
+  $("restartOnlineGame").disabled = onlineRestartPending;
+  $("restartOnlineGame").textContent = onlineRestartPending ? "再戦を準備中…" : "同じルームで再戦";
   $("onlineLobbyHint").textContent = onlineGameStatus === "playing"
-    ? finished ? "ドラフトが終了しました。ホストはルームを終了してデータを削除できます。" : "ドラフト進行中です。ホストは必要に応じてルームを終了してデータを削除できます。"
-    : "2〜10人で遊べます。参加者がそろったらホストが開始します。終了時はルームを削除してください。";
+    ? finished
+      ? onlineIsHost
+        ? "結果を確認したら「同じルームで再戦」を押してください。参加者はそのまま次のドラフトに参加できます。"
+        : "ドラフトが終了しました。ホストが再戦を始めると、このルームのまま次のドラフトに進みます。"
+      : "ドラフト進行中です。終了後も同じルームで再戦できます。"
+    : "2〜10人で遊べます。参加者がそろったらホストが開始します。終了後も同じルームで再戦できます。";
   $("closeOnlineRoom").hidden = !onlineIsHost || !onlineRoomRef;
   $("leaveOnlineRoom").hidden = onlineIsHost || !["lobby", "closed"].includes(onlineGameStatus);
   $("closeOnlineRoom").textContent = "ルーム終了・データ削除";
@@ -2519,6 +2528,7 @@ function serializeOnlineGame() {
     orderMode,
     startOrderMode,
     firstRoundLotteryLosses,
+    gameSessionId,
     actionAcks: onlineActionAcks,
     pickRevealQueue: pickRevealQueue.map(serializeOnlineReveal),
     activePickReveal: serializeOnlineReveal(activePickReveal),
@@ -2610,7 +2620,22 @@ function applyOnlineGameState(state) {
   if ((onlineIsHost && !onlineHostRestoring) || !state || onlineStateApplying) return;
   onlineStateApplying = true;
   try {
-    const localPendingPickId = pendingDraftPickId;
+    const incomingGameSessionId = String(state.gameSessionId || "");
+    const gameSessionChanged = Boolean(incomingGameSessionId && incomingGameSessionId !== gameSessionId);
+    if (gameSessionChanged) {
+      onlinePendingAction = null;
+      onlineActionPending = false;
+      pendingDraftPickId = null;
+      selectedId = null;
+      onlineShownRevealKey = "";
+      if (pickRevealTimer !== null) {
+        clearTimeout(pickRevealTimer);
+        pickRevealTimer = null;
+      }
+      finalResultsWasVisible = false;
+      setFinalScreenshotMode(false, false);
+    }
+    const localPendingPickId = gameSessionChanged ? null : pendingDraftPickId;
     const actionAck = onlineUid ? state.actionAcks?.[onlineUid] : null;
     const actionWasAcknowledged = Boolean(onlinePendingAction && actionAck?.key === onlinePendingAction.key);
     const actionWasAccepted = onlineStateReflectsAction(onlinePendingAction, state) ||
@@ -2643,6 +2668,7 @@ function applyOnlineGameState(state) {
     orderMode = state.orderMode === "random" ? "fixed" : (state.orderMode || "snake");
     startOrderMode = state.startOrderMode || "fixed";
     firstRoundLotteryLosses = state.firstRoundLotteryLosses || {};
+    gameSessionId = incomingGameSessionId || gameSessionId;
     onlineActionAcks = state.actionAcks || {};
     pickRevealQueue = (state.pickRevealQueue || []).map(restoreOnlineReveal).filter(Boolean);
     activePickReveal = restoreOnlineReveal(state.activePickReveal);
@@ -2827,11 +2853,67 @@ async function startOnlineGame() {
   }
 }
 
+async function restartOnlineGame() {
+  if (!onlineIsHost || !onlineRoomRef || onlineGameStatus !== "playing" ||
+      !gameStarted || !allTeamsComplete() || pendingR1Resolution || !$("pickReveal").hidden || pickRevealQueue.length || onlineRestartPending) return;
+  const players = onlinePlayersInDraftOrder();
+  if (players.length < 2 || players.length > 10) {
+    setOnlineStatus("再戦には2〜10人の参加者が必要です。ルームの参加者を確認してください。");
+    return;
+  }
+
+  onlineRestartPending = true;
+  renderOnlineLobby();
+  try {
+    if (onlineStateWriteTimer !== null) {
+      clearTimeout(onlineStateWriteTimer);
+      onlineStateWriteTimer = null;
+    }
+    const actionsSnapshot = await onlineRoomRef.child("actions").once("value");
+    const oldActionIds = Object.keys(actionsSnapshot.val() || {});
+    await Promise.all(oldActionIds.map(actionId =>
+      onlineRoomRef.child(`actions/${actionId}`).remove()
+    ));
+    onlineActionAcks = {};
+    onlinePendingAction = null;
+    onlineActionPending = false;
+    onlineHandledActionIds.clear();
+    startGame("online");
+    if (onlineStateWriteTimer !== null) {
+      clearTimeout(onlineStateWriteTimer);
+      onlineStateWriteTimer = null;
+    }
+    await onlineRoomRef.child("state").set(serializeOnlineGame());
+  } catch (error) {
+    setOnlineStatus(error.message || "同じルームで再戦を開始できませんでした。");
+  } finally {
+    onlineRestartPending = false;
+    renderOnlineLobby();
+  }
+}
+
 function startGame(mode, aiCount = 3) {
   if (aiAdvanceTimer !== null) {
     clearTimeout(aiAdvanceTimer);
     aiAdvanceTimer = null;
   }
+  if (pickRevealTimer !== null) {
+    clearTimeout(pickRevealTimer);
+    pickRevealTimer = null;
+  }
+  pickRevealQueue = [];
+  pickRevealPhase = "closed";
+  activePickReveal = null;
+  onlineShownRevealKey = "";
+  gameSessionId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+  finalResultsWasVisible = false;
+  if (mode === "online") {
+    onlinePendingAction = null;
+    onlineActionPending = false;
+    onlineActionAcks = {};
+    if (onlineIsHost) onlineHandledActionIds.clear();
+  }
+  $("pickReveal").hidden = true;
   setFinalScreenshotMode(false, false);
   activeMode = mode;
   pickLimit = Number($("pickLimit").value);
@@ -2907,6 +2989,7 @@ $("copyOnlineInvite").addEventListener("click", copyOnlineInvite);
 $("closeOnlineRoom").addEventListener("click", closeOnlineRoom);
 $("leaveOnlineRoom").addEventListener("click", leaveOnlineRoom);
 $("startOnlineGame").addEventListener("click", startOnlineGame);
+$("restartOnlineGame").addEventListener("click", restartOnlineGame);
 $("startGame").addEventListener("click", () => {
   const mode = $("playMode").value;
   if (mode === "ai") startGame("ai", Number($("aiCount").value));
