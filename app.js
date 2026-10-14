@@ -2729,7 +2729,9 @@ function updateOnlineRevealConfirmation() {
       });
     hint.textContent = `${waitingTeams.join("・")}の確認後に次へ進みます。`;
   } else if (onlineActionPending) {
-    hint.textContent = "確認を送っています。対象チームの確認後に進みます。";
+    hint.textContent = onlinePendingAction?.deliveryState === "sent"
+      ? "Firebaseへの保存は完了しました。ホストの受信確認を待っています。"
+      : "Firebaseへ確認を送信しています…";
   } else if (alreadyConfirmed) {
     hint.textContent = `確認済みです。他の対象チームの確認を待っています（${count} / ${total}）。`;
   } else {
@@ -3150,14 +3152,16 @@ function submitOnlineConfirmation() {
     team: onlineTeamForUid(onlineUid),
     round: round,
     revealKey: payload.revealKey,
-    revealPhase: pickRevealPhase
+    revealPhase: pickRevealPhase,
+    deliveryState: "sending"
   };
 
   confirmationRef.set(payload)
     .then(() => {
       if (onlinePendingAction?.key === confirmationId) {
-        setOnlineStatus("確認をホストへ送信しました。反映を待っています…");
-        $("pickRevealActionHint").textContent = "確認を送信しました。ホストの受信を待っています…";
+        onlinePendingAction.deliveryState = "sent";
+        setOnlineStatus("Firebaseへ確認を保存しました。ホストの受信確認を待っています…");
+        renderOnlinePickReveal();
       }
     })
     .catch(error => {
@@ -3172,13 +3176,18 @@ function submitOnlineConfirmation() {
 
   window.setTimeout(() => {
     if (!onlineActionPending || onlinePendingAction?.key !== confirmationId) return;
+    const writeSucceeded = onlinePendingAction.deliveryState === "sent";
     onlinePendingAction = null;
     onlineActionPending = false;
-    setOnlineStatus("確認の受信応答がありません。ホストとの接続を確認してください。");
+    setOnlineStatus(writeSucceeded
+      ? "Firebaseへの保存は完了しましたが、ホストの受信確認がありません。"
+      : "Firebaseへの送信が12秒以内に完了しませんでした。");
     renderDraft();
     renderOnlinePickReveal();
     renderCandidates();
-    $("pickRevealActionHint").textContent = "送信は完了しましたが、ホストの受信確認が届きません。Firebaseルールまたはホスト接続で止まっています。";
+    $("pickRevealActionHint").textContent = writeSucceeded
+      ? "送信側のFirebase保存は成功しています。ホストの受信・処理・状態返信で止まっています。ホスト画面のエラー表示を確認してください。"
+      : "送信元からFirebaseへの保存が完了していません。送信元の接続状態かFirebase書き込みルールで止まっています。";
   }, 12000);
   return true;
 }
