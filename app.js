@@ -1606,6 +1606,7 @@ let onlineConfirmationQueue = Promise.resolve();
 let onlineQueuedConfirmationIds = new Set();
 let onlineHandledConfirmationIds = new Set();
 let onlineGuestStatePollTimer = null;
+let onlineGuestRebidFallbackTimer = null;
 let onlineListenersAttached = false;
 let onlineHandledActionIds = new Set();
 let onlineQueuedActionIds = new Set();
@@ -2240,6 +2241,10 @@ function setOnlineRoomConnected(code, isHost, initialPlayers = null, deferGameAc
     clearTimeout(onlineGuestStatePollTimer);
     onlineGuestStatePollTimer = null;
   }
+  if (onlineGuestRebidFallbackTimer !== null) {
+    clearTimeout(onlineGuestRebidFallbackTimer);
+    onlineGuestRebidFallbackTimer = null;
+  }
   onlineRoomCode = code;
   onlineRoomRef = firebase.database().ref(`rooms/${code}`);
   onlineIsHost = isHost;
@@ -2667,6 +2672,82 @@ function scheduleRevealAutoAdvance(delay) {
   }, delay);
 }
 
+function clearOnlineGuestRebidFallback() {
+  if (onlineGuestRebidFallbackTimer !== null) {
+    clearTimeout(onlineGuestRebidFallbackTimer);
+    onlineGuestRebidFallbackTimer = null;
+  }
+}
+
+function scheduleOnlineGuestRebidFallback() {
+  clearOnlineGuestRebidFallback();
+  if (onlineIsHost || activeMode !== "online" || !onlineRoomRef || !pendingR1Resolution ||
+      pickRevealPhase !== "revealed" || pickRevealQueue.length > 0 || !activePickReveal) return;
+
+  const reveal = activePickReveal;
+  if (reveal.type === "lottery" && !reveal.winner) return;
+  if (reveal.type !== "lottery" && reveal.type !== "nomination") return;
+
+  const expectedRevealKey = currentRevealKey();
+  const expectedSessionId = gameSessionId;
+  const expectedRevision = onlineAppliedStateRevision;
+  const delay = onlineRevealAutoAdvanceDelay(reveal) + 350;
+  onlineGuestRebidFallbackTimer = window.setTimeout(async () => {
+    onlineGuestRebidFallbackTimer = null;
+    if (onlineIsHost || !onlineRoomRef || expectedSessionId !== gameSessionId ||
+        expectedRevealKey !== currentRevealKey() || !pendingR1Resolution ||
+        pickRevealPhase !== "revealed" || pickRevealQueue.length > 0) return;
+
+    // Fetch once more before recovering locally. Normally the host's transition
+    // has already arrived; this covers a missed final state notification.
+    try {
+      const latestSnapshot = await onlineRoomRef.child("state").once("value");
+      const latestState = latestSnapshot.val();
+      const latestRevision = Number(latestState?.stateRevision);
+      if (latestState && Number.isFinite(latestRevision) && latestRevision > onlineAppliedStateRevision) {
+        applyOnlineGameState(latestState);
+        return;
+      }
+    } catch (error) {
+      console.warn("Could not refresh the final first-round reveal state", error);
+    }
+
+    // If the host's final transition is still missing, derive the same
+    // first-round result from the synchronized reveal and open the losers'
+    // re-nomination phase on this guest. Pick submissions still go to the host.
+    if (expectedRevision !== onlineAppliedStateRevision || !pendingR1Resolution ||
+        expectedRevealKey !== currentRevealKey() || pickRevealQueue.length > 0) return;
+
+    if (reveal.type === "nomination") completeFirstRoundNomination(reveal);
+    if (reveal.type === "lottery" && reveal.winner) {
+      const winnerPicks = picks[reveal.winner] || (picks[reveal.winner] = []);
+      if (!winnerPicks.some(item => item.round === 1)) {
+        winnerPicks.push(pickRecord(reveal.idol, 1));
+      }
+      markPersonDrafted(reveal.idol);
+      pendingR1Resolution.waiting.delete(reveal.winner);
+      reveal.teams.forEach(team => {
+        if (team === reveal.winner) return;
+        const losses = firstRoundLotteryLosses[team] || (firstRoundLotteryLosses[team] = []);
+        if (!losses.some(item => item.name === reveal.idol.japaneseName && item.group === reveal.idol.group)) {
+          losses.push({
+            name: reveal.idol.japaneseName,
+            group: reveal.idol.group,
+            agency: reveal.idol.agency
+          });
+        }
+      });
+    }
+
+    activePickReveal = null;
+    pickRevealPhase = "closed";
+    $("pickReveal").hidden = true;
+    finishFirstRoundResolution();
+    renderOnlinePickReveal();
+    console.warn("Recovered the guest first-round re-nomination phase from the final reveal");
+  }, delay);
+}
+
 function acknowledgeOnlineReveal(uid) {
   if (!onlineIsHost || activeMode !== "online" || !uid || !onlinePlayers[uid] ||
       !activePickReveal || pickRevealPhase !== "revealed" ||
@@ -3049,6 +3130,7 @@ function applyOnlineGameState(state) {
   } finally {
     onlineStateApplying = false;
   }
+  scheduleOnlineGuestRebidFallback();
 }
 
 function resumeOnlineHostProgress() {
@@ -3505,6 +3587,7 @@ async function restartOnlineGame() {
 }
 
 function startGame(mode, aiCount = 3) {
+  clearOnlineGuestRebidFallback();
   if (aiAdvanceTimer !== null) {
     clearTimeout(aiAdvanceTimer);
     aiAdvanceTimer = null;
@@ -4295,9 +4378,11 @@ function finishFirstRoundResolution() {
   renderNominations();
   renderDraft();
   renderCandidates();
-  // Publish the reopened first-round nomination phase explicitly so guests
-  // can select again as soon as the last reveal/lottery is closed.
-  syncOnlineState();
+  // Publish the reopened first-round nomination phase immediately. Re-bids
+  // can start as soon as the last reveal/lottery closes, so don't leave this
+  // transition behind the normal debounced state write.
+  if (activeMode === "online" && onlineIsHost) void flushOnlineState();
+  else syncOnlineState();
 }
 
 function resolveFirstRound() {
