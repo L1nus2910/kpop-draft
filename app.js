@@ -3028,15 +3028,25 @@ function renderOnlinePickReveal() {
 function applyOnlineGameState(state) {
   if ((onlineIsHost && !onlineHostRestoring) || !state || onlineStateApplying) return;
   const incomingRevision = Number(state.stateRevision);
-  if (onlineAppliedStateRevision >= 0 && (!Number.isFinite(incomingRevision) || incomingRevision <= onlineAppliedStateRevision)) return;
+  const incomingGameSessionId = String(state.gameSessionId || "");
+  const gameSessionChanged = Boolean(incomingGameSessionId && incomingGameSessionId !== gameSessionId);
+  const incomingNominationOrder = Array.isArray(state.r1NominationOrder) ? state.r1NominationOrder : [];
+  const incomingIsRebidPhase = !state.r1Started && !state.pendingR1Resolution &&
+    incomingNominationOrder.length > 0 && (state.pickRevealPhase || "closed") === "closed" &&
+    !(state.activePickReveal) && !(state.pickRevealQueue || []).length;
+  const localIsStuckInFirstRoundResolution = !r1Started && Boolean(pendingR1Resolution);
+  const recoversMissedRebidTransition = localIsStuckInFirstRoundResolution && incomingIsRebidPhase &&
+    (!incomingGameSessionId || incomingGameSessionId === gameSessionId);
+  if (onlineAppliedStateRevision >= 0 && !gameSessionChanged && !recoversMissedRebidTransition &&
+      (!Number.isFinite(incomingRevision) || incomingRevision <= onlineAppliedStateRevision)) return;
   if (Number.isFinite(incomingRevision)) {
-    onlineAppliedStateRevision = incomingRevision;
+    onlineAppliedStateRevision = gameSessionChanged || recoversMissedRebidTransition
+      ? incomingRevision
+      : Math.max(onlineAppliedStateRevision, incomingRevision);
     onlineStateRevision = Math.max(onlineStateRevision, incomingRevision);
   }
   onlineStateApplying = true;
   try {
-    const incomingGameSessionId = String(state.gameSessionId || "");
-    const gameSessionChanged = Boolean(incomingGameSessionId && incomingGameSessionId !== gameSessionId);
     if (gameSessionChanged) {
       onlinePendingAction = null;
       onlineActionPending = false;
