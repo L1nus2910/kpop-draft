@@ -2653,8 +2653,9 @@ function actionMatchesCurrentReveal(action) {
 }
 
 function onlineRevealAutoAdvanceDelay(reveal = activePickReveal) {
-  if (activeMode !== "online" || reveal?.type !== "pick" || Number(reveal.round) < 2) return 0;
-  return 4200;
+  if (activeMode !== "online" || !reveal) return 0;
+  if (reveal.type === "lottery") return reveal.winner ? 5000 : 0;
+  return 4000;
 }
 
 function scheduleRevealAutoAdvance(delay) {
@@ -2686,57 +2687,21 @@ function acknowledgeOnlineReveal(uid) {
 
 function updateOnlineRevealConfirmation() {
   if (activeMode !== "online" || !activePickReveal) return false;
-  if (activePickReveal.type === "lottery" && !activePickReveal.winner) return false;
-
   const button = $("pickRevealNext");
   const hint = $("pickRevealActionHint");
-  button.setAttribute("aria-busy", String(onlineActionPending));
-  if (onlineRevealAutoAdvanceDelay() > 0) {
-    button.disabled = true;
-    button.textContent = pickRevealPhase === "revealed" ? "自動で次へ進みます" : "発表演出中…";
-    hint.textContent = pickRevealPhase === "revealed"
-      ? "指名発表のあと、約4秒で次のチームへ進みます。"
-      : "指名のアニメーションを全員の画面に表示しています。";
-    return true;
-  }
+  button.hidden = true;
+  button.disabled = true;
+  button.removeAttribute("aria-busy");
+
+  if (activePickReveal.type === "lottery" && !activePickReveal.winner) return false;
   if (pickRevealPhase !== "revealed") {
-    button.disabled = true;
-    button.textContent = "発表演出中…";
-    hint.textContent = "指名のアニメーションを全員の画面に表示しています。";
+    hint.textContent = "指名のアニメーションを表示しています。演出後、約4秒で自動的に次へ進みます。";
     return true;
   }
-
-  const participantUids = onlineRevealParticipantUids();
-  const total = participantUids.length;
-  const count = participantUids.filter(uid => onlineRevealAcks.has(uid)).length;
-  const alreadyConfirmed = onlineRevealAcks.has(onlineUid);
-  const canConfirm = participantUids.includes(onlineUid);
-  button.disabled = onlineActionPending || alreadyConfirmed || !canConfirm;
-  button.textContent = !canConfirm
-    ? `対象チームの確認待ち（${count} / ${total}）`
-    : onlineActionPending
-      ? "確認を送信中…"
-      : alreadyConfirmed
-        ? `確認済み（${count} / ${total}）`
-        : `確認して次へ（${count} / ${total}）`;
-
-  if (!canConfirm) {
-    const waitingTeams = participantUids
-      .filter(uid => !onlineRevealAcks.has(uid))
-      .map(uid => {
-        const player = onlinePlayers[uid];
-        return displayTeamName(player?.teamName || player?.name || "対象チーム");
-      });
-    hint.textContent = `${waitingTeams.join("・")}の確認後に次へ進みます。`;
-  } else if (onlineActionPending) {
-    hint.textContent = onlinePendingAction?.deliveryState === "sent"
-      ? "Firebaseへの保存は完了しました。ホストの受信確認を待っています。"
-      : "Firebaseへ確認を送信しています…";
-  } else if (alreadyConfirmed) {
-    hint.textContent = `確認済みです。他の対象チームの確認を待っています（${count} / ${total}）。`;
-  } else {
-    hint.textContent = `対象チーム全員の確認後に次の画面へ進みます（${count} / ${total}）。`;
-  }
+  const delaySeconds = Math.round(onlineRevealAutoAdvanceDelay() / 1000);
+  hint.textContent = activePickReveal.type === "lottery"
+    ? `交渉権の抽選結果を表示中です。約${delaySeconds}秒後に自動で次へ進みます。`
+    : `発表内容を表示中です。約${delaySeconds}秒後に自動で次へ進みます。`;
   return true;
 }
 
@@ -2909,9 +2874,11 @@ function renderOnlinePickReveal() {
   const reveal = activePickReveal;
   if (!reveal) {
     onlineShownRevealKey = "";
+    $("pickRevealNext").hidden = false;
     $("pickReveal").hidden = true;
     return;
   }
+  $("pickRevealNext").hidden = activeMode === "online";
   const isLottery = reveal.type === "lottery";
   const revealKey = `${reveal.type}:${reveal.team}:${reveal.round}:${reveal.idol.id}`;
   const isNewReveal = revealKey !== onlineShownRevealKey;
@@ -3095,7 +3062,10 @@ function resumeOnlineHostProgress() {
     return;
   }
   if (activePickReveal.type === "lottery") {
-    if (activePickReveal.winner) return;
+    if (activePickReveal.winner) {
+      scheduleRevealAutoAdvance(onlineRevealAutoAdvanceDelay(activePickReveal));
+      return;
+    }
     if (activePickReveal.revealing || activePickReveal.opening) {
       pickRevealTimer = window.setTimeout(() => revealLotteryResults(activePickReveal), 350);
     } else if (pickRevealPhase === "intro") {
@@ -3836,6 +3806,7 @@ function renderLotteryTickets(reveal) {
 
 function updateLotteryProgress() {
   if (!activePickReveal || activePickReveal.type !== "lottery") return;
+  $("pickRevealNext").hidden = activeMode === "online";
   const reveal = activePickReveal;
   const total = reveal.drawOrder.length;
   const drawer = reveal.drawOrder[reveal.drawIndex];
@@ -4016,6 +3987,10 @@ function revealLotteryResults(reveal) {
     renderCandidates();
     updateLotteryProgress();
     syncOnlineState();
+    if (activeMode === "online") {
+      updateOnlineRevealConfirmation();
+      scheduleRevealAutoAdvance(onlineRevealAutoAdvanceDelay(reveal));
+    }
   }, openingDelay);
 }
 
@@ -4145,7 +4120,7 @@ function revealPickCard() {
   const revealDelay = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 1300 : 2600;
   if (activeMode === "online") {
     updateOnlineRevealConfirmation();
-    scheduleRevealAutoAdvance(onlineRevealAutoAdvanceDelay());
+    scheduleRevealAutoAdvance(onlineRevealAutoAdvanceDelay(activePickReveal));
   } else {
     pickRevealTimer = window.setTimeout(showNextPickReveal, revealDelay);
   }
