@@ -3721,6 +3721,18 @@ body.final-screenshot-mode .final-snapshot-grid {
   justify-content: flex-end;
 }
 
+.online-sync-debug {
+  overflow-wrap: anywhere;
+  margin: 0;
+  padding: 10px;
+  border: 1px solid #b6c9d9;
+  border-radius: 9px;
+  background: #f5f8fb;
+  color: #213449;
+  font: 11px/1.5 ui-monospace, "Cascadia Code", Consolas, monospace;
+  white-space: pre-wrap;
+}
+
 @media (max-width: 650px) {
   .online-controls {
     padding: 10px;

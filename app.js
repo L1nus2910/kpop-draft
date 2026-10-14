@@ -1604,6 +1604,12 @@ let onlineStateWriteTimer = null;
 let onlineStateWriteChain = Promise.resolve();
 let onlineStateRevision = 0;
 let onlineAppliedStateRevision = -1;
+let onlineLastRemoteStateRevision = null;
+let onlineLastRemoteStatePhase = "";
+let onlineLastStateReadAt = "";
+let onlineLastStateWriteAt = "";
+let onlineLastStateReadError = "";
+let onlineLastStateWriteError = "";
 let onlineActionQueue = Promise.resolve();
 let onlineConfirmationQueue = Promise.resolve();
 let onlineQueuedConfirmationIds = new Set();
@@ -2288,6 +2294,12 @@ function setOnlineRoomConnected(code, isHost, initialPlayers = null, deferGameAc
   onlineListenersAttached = false;
   onlineStateRevision = 0;
   onlineAppliedStateRevision = -1;
+  onlineLastRemoteStateRevision = null;
+  onlineLastRemoteStatePhase = "";
+  onlineLastStateReadAt = "";
+  onlineLastStateWriteAt = "";
+  onlineLastStateReadError = "";
+  onlineLastStateWriteError = "";
   onlineActionQueue = Promise.resolve();
   onlineConfirmationQueue = Promise.resolve();
   onlineQueuedConfirmationIds = new Set();
@@ -2305,6 +2317,7 @@ function setOnlineRoomConnected(code, isHost, initialPlayers = null, deferGameAc
   $("joinOnlineRoom").hidden = true;
   $("onlineRoomCode").disabled = true;
   renderOnlineLobby();
+  renderOnlineSyncDebug();
 
   const connectedRoomRef = onlineRoomRef;
   onlineRoomRef.child("players").on("value", snapshot => {
@@ -2404,8 +2417,64 @@ function renderOnlineLobby() {
   $("closeOnlineRoom").textContent = "ルーム終了・データ削除";
   if (onlineGameStatus === "playing") setOnlineStatus(finished ? "ドラフト終了・結果を確認できます" : "ドラフト進行中");
   else if (onlineGameStatus === "lobby") setOnlineStatus(onlineIsHost ? "友達の参加を待っています" : "ルームに参加しました");
+  renderOnlineSyncDebug();
   $("pickLimit").disabled = onlineGameStatus === "playing" || (!onlineIsHost && Boolean(onlineRoomRef));
   $("orderMode").disabled = onlineGameStatus === "playing" || (!onlineIsHost && Boolean(onlineRoomRef));
+}
+
+function onlineStatePhaseSummary(state) {
+  if (!state) return "状態なし";
+  const reveal = state.activePickReveal;
+  const batch = state.pendingR1Resolution;
+  const queueCount = (state.pickRevealQueue || []).length;
+  const bidCount = (state.r1Nominations || []).length;
+  if (batch) {
+    return `1巡目解決中: 公開${(batch.revealedTeams || []).length}/${(batch.nominations || []).length}, 抽選結果${(batch.results || []).length}, reveal=${reveal?.type || "なし"}, queue=${queueCount}`;
+  }
+  if (!state.r1Started && (state.r1NominationOrder || []).length) {
+    return `1巡目再入札: ${bidCount}/${state.r1NominationOrder.length}, order=${state.r1NominationOrder.join(",")}`;
+  }
+  if (reveal) return `${reveal.round || "?"}巡目発表: ${reveal.type || "?"}, queue=${queueCount}`;
+  return state.r1Started ? `${state.round || 2}巡目通常指名` : "1巡目入札";
+}
+
+function recordOnlineRemoteState(state) {
+  if (!state) return;
+  onlineLastRemoteStateRevision = Number.isFinite(Number(state.stateRevision)) ? Number(state.stateRevision) : "なし";
+  onlineLastRemoteStatePhase = onlineStatePhaseSummary(state);
+  onlineLastStateReadAt = new Date().toLocaleTimeString("ja-JP", { hour12: false });
+  onlineLastStateReadError = "";
+  renderOnlineSyncDebug();
+}
+
+function renderOnlineSyncDebug() {
+  const panel = $("onlineSyncDebug");
+  if (!panel) return;
+  const enabled = new URLSearchParams(location.search).get("syncdebug") === "1";
+  panel.hidden = !enabled || !onlineRoomRef;
+  if (panel.hidden) return;
+  const localPhase = onlineIsHost
+    ? onlineStatePhaseSummary(serializeOnlineGame())
+    : onlineStatePhaseSummary({
+        r1Started,
+        round,
+        r1Nominations,
+        r1NominationOrder,
+        pendingR1Resolution: pendingR1Resolution ? {
+          nominations: pendingR1Resolution.nominations || [],
+          revealedTeams: [...pendingR1Resolution.revealedTeams],
+          results: pendingR1Resolution.results || []
+        } : null,
+        activePickReveal: serializeOnlineReveal(activePickReveal),
+        pickRevealQueue: pickRevealQueue.map(serializeOnlineReveal)
+      });
+  panel.textContent = [
+    `room=${onlineRoomCode} role=${onlineIsHost ? "host" : "guest"} uid=${onlineUid.slice(0, 8)}`,
+    `writeRev=${onlineIsHost ? onlineStateRevision : "—"} writeAt=${onlineLastStateWriteAt || "—"}${onlineLastStateWriteError ? ` error=${onlineLastStateWriteError}` : ""}`,
+    `remoteRev=${onlineLastRemoteStateRevision ?? "—"} appliedRev=${onlineAppliedStateRevision} readAt=${onlineLastStateReadAt || "—"}${onlineLastStateReadError ? ` error=${onlineLastStateReadError}` : ""}`,
+    `remote=${onlineLastRemoteStatePhase || "—"}`,
+    `local=${localPhase}`
+  ].join("\n");
 }
 
 async function acceptOnlineJoinRequest(snapshot, sourceRoomRef = onlineRoomRef) {
@@ -2450,9 +2519,15 @@ function scheduleOnlineGuestStatePoll() {
         const snapshot = await roomRef.child("state").once("value");
         if (roomRef !== onlineRoomRef || onlineIsHost) return;
         const state = snapshot.val();
-        if (state) applyOnlineGameState(state);
+        if (state) {
+          recordOnlineRemoteState(state);
+          applyOnlineGameState(state);
+          recoverIdleGuestFirstRoundResolution();
+        }
       } catch (error) {
         if (roomRef === onlineRoomRef) {
+          onlineLastStateReadError = error?.message || "read failed";
+          renderOnlineSyncDebug();
           setOnlineStatus(error.message || "共有状態を再取得できませんでした。接続を確認してください。");
         }
       }
@@ -2469,9 +2544,15 @@ function attachOnlineGuestListeners() {
     roomRef.child("state").on("value", snapshot => {
       if (roomRef !== onlineRoomRef || onlineIsHost) return;
       const state = snapshot.val();
-      if (state) applyOnlineGameState(state);
+      if (state) {
+        recordOnlineRemoteState(state);
+        applyOnlineGameState(state);
+        recoverIdleGuestFirstRoundResolution();
+      }
     }, error => {
       if (roomRef !== onlineRoomRef || onlineIsHost) return;
+      onlineLastStateReadError = error?.message || "listener failed";
+      renderOnlineSyncDebug();
       setOnlineStatus(error.message || "共有状態を受信できません。接続を確認してください。");
     });
   }
@@ -2799,6 +2880,33 @@ function scheduleOnlineGuestRebidFallback() {
   }, delay);
 }
 
+function recoverIdleGuestFirstRoundResolution() {
+  if (onlineIsHost || activeMode !== "online" || !gameStarted || r1Started ||
+      !pendingR1Resolution || pickRevealPhase !== "closed" || activePickReveal || pickRevealQueue.length) return false;
+
+  const batch = pendingR1Resolution;
+  if ((batch.nominations || []).some(item => !batch.revealedTeams.has(item.team))) return false;
+
+  // A conflict is resolved only after its lottery result has been recorded.
+  // If a guest missed the host's final transition snapshot, it is safe to
+  // reopen nominations only when every conflict represented in the batch has
+  // a corresponding result and there is no reveal left to display.
+  const conflicts = new Map();
+  (batch.nominations || []).forEach(item => {
+    const idol = idols.find(candidate => candidate.id === item.idolId);
+    if (!idol) return;
+    const personKey = idol.personKey || idol.id;
+    conflicts.set(personKey, (conflicts.get(personKey) || 0) + 1);
+  });
+  const conflictCount = [...conflicts.values()].filter(count => count > 1).length;
+  if ((batch.results || []).length < conflictCount) return false;
+
+  finishFirstRoundResolution();
+  renderOnlinePickReveal();
+  console.warn("Recovered an idle first-round resolution from the synchronized results");
+  return true;
+}
+
 function acknowledgeOnlineReveal(uid) {
   if (!onlineIsHost || activeMode !== "online" || !uid || !onlinePlayers[uid] ||
       !activePickReveal || pickRevealPhase !== "revealed" ||
@@ -2976,9 +3084,16 @@ function queueOnlineStateWrite() {
       const state = makeFirebaseSafe(serializeOnlineGame());
       state.stateRevision = ++onlineStateRevision;
       await roomRef.child("state").set(state);
+      onlineLastStateWriteAt = new Date().toLocaleTimeString("ja-JP", { hour12: false });
+      onlineLastStateWriteError = "";
+      onlineLastRemoteStateRevision = state.stateRevision;
+      onlineLastRemoteStatePhase = onlineStatePhaseSummary(state);
+      renderOnlineSyncDebug();
       return true;
     })
     .catch(error => {
+      onlineLastStateWriteError = error?.message || "write failed";
+      renderOnlineSyncDebug();
       setOnlineStatus(error.message || "ゲーム状態を共有できませんでした。");
       return false;
     });
@@ -3191,7 +3306,9 @@ function applyOnlineGameState(state) {
   } finally {
     onlineStateApplying = false;
   }
+  renderOnlineSyncDebug();
   scheduleOnlineGuestRebidFallback();
+  recoverIdleGuestFirstRoundResolution();
 }
 
 function resumeOnlineHostProgress() {
