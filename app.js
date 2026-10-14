@@ -2586,12 +2586,33 @@ function currentRevealKey() {
 function actionMatchesCurrentReveal(action) {
   if (!action?.revealKey || !activePickReveal) return false;
   if (action.revealKey === currentRevealKey()) return true;
-  // Accept the pre-session-key format for an already-open reveal. This lets a
-  // device with a cached app finish its confirmation while the host is current.
   if (action.kind !== "next") return false;
-  const idolId = activePickReveal.idol?.id || activePickReveal.idolId || "";
-  const legacyKey = `${activePickReveal.type}:${activePickReveal.team}:${activePickReveal.round}:${idolId}`;
-  return action.revealKey === legacyKey;
+
+  const reveal = activePickReveal;
+  const idol = reveal.idol || {};
+  const idolId = idol.id || reveal.idolId || "";
+  const legacyKey = `${reveal.type}:${reveal.team}:${reveal.round}:${idolId}`;
+  if (action.revealKey === legacyKey) return true;
+
+  // Different cached catalog versions can resolve the same person to different
+  // local IDs. Confirm the reveal using stable person data as well as the key.
+  const sameRevealContext = action.revealType === reveal.type &&
+    Number(action.revealRound) === Number(reveal.round);
+  const samePerson = Boolean(
+    (action.revealIdolId && action.revealIdolId === idolId) ||
+    (action.revealPersonKey && idol.personKey && action.revealPersonKey === idol.personKey) ||
+    (action.revealName && action.revealGroup &&
+      action.revealName === idol.japaneseName && action.revealGroup === idol.group)
+  );
+  if (sameRevealContext && samePerson) return true;
+
+  // A session token can differ across a stale tab, while the rest of the
+  // reveal identity still matches the host's currently open card.
+  const keyParts = String(action.revealKey).split(":");
+  return keyParts.length === 4 &&
+    keyParts[1] === reveal.type &&
+    Number(keyParts[2]) === Number(reveal.round) &&
+    keyParts[3] === idolId;
 }
 
 function onlineRevealAutoAdvanceDelay(reveal = activePickReveal) {
@@ -3082,7 +3103,17 @@ function submitOnlineAction(action) {
     payload.revealKey = currentRevealKey();
     payload.revealPhase = pickRevealPhase;
   }
-  if (action.kind === "next") payload.id = actionKey;
+  if (action.kind === "next" && activePickReveal) {
+    const revealIdol = activePickReveal.idol || {};
+    payload.revealType = activePickReveal.type;
+    payload.revealRound = Number(activePickReveal.round);
+    payload.revealIdolId = revealIdol.id || activePickReveal.idolId || "";
+    payload.revealPersonKey = revealIdol.personKey || "";
+    payload.revealName = revealIdol.japaneseName || "";
+    payload.revealGroup = revealIdol.group || "";
+    payload.revealPhase = pickRevealPhase;
+    payload.id = actionKey;
+  }
   onlinePendingAction = {
     key: actionKey,
     kind: action.kind,
