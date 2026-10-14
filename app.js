@@ -1591,6 +1591,9 @@ let onlinePlayers = {};
 let onlineActionPending = false;
 let onlineActionsListenerRef = null;
 let onlineConfirmationsListenerRef = null;
+let onlineActionsListenerCallback = null;
+let onlineConfirmationsAddedListenerCallback = null;
+let onlineConfirmationsChangedListenerCallback = null;
 let onlineActionsPollTimer = null;
 let onlineActionsPollRoomRef = null;
 let onlinePendingAction = null;
@@ -2140,13 +2143,16 @@ function normalizeOnlineName(value, fallback = "プレイヤー") {
 
 function detachOnlineActionsListener() {
   if (onlineActionsListenerRef) {
-    onlineActionsListenerRef.off("child_added", enqueueOnlineAction);
+    onlineActionsListenerRef.off("child_added", onlineActionsListenerCallback || enqueueOnlineAction);
     onlineActionsListenerRef = null;
+    onlineActionsListenerCallback = null;
   }
   if (onlineConfirmationsListenerRef) {
-    onlineConfirmationsListenerRef.off("child_added", enqueueOnlineConfirmation);
-    onlineConfirmationsListenerRef.off("child_changed", enqueueOnlineConfirmation);
+    onlineConfirmationsListenerRef.off("child_added", onlineConfirmationsAddedListenerCallback || enqueueOnlineConfirmation);
+    onlineConfirmationsListenerRef.off("child_changed", onlineConfirmationsChangedListenerCallback || enqueueOnlineConfirmation);
     onlineConfirmationsListenerRef = null;
+    onlineConfirmationsAddedListenerCallback = null;
+    onlineConfirmationsChangedListenerCallback = null;
   }
   if (onlineActionsPollTimer !== null) {
     clearTimeout(onlineActionsPollTimer);
@@ -2157,10 +2163,16 @@ function detachOnlineActionsListener() {
 
 function attachOnlineActionsListener() {
   if (!onlineIsHost || !onlineRoomRef) return;
-  const actionsRef = onlineRoomRef.child("actions");
+  const roomRef = onlineRoomRef;
+  const actionsRef = roomRef.child("actions");
   if (onlineActionsListenerRef?.toString() !== actionsRef.toString()) {
     detachOnlineActionsListener();
-    actionsRef.on("child_added", enqueueOnlineAction, error => {
+    onlineActionsListenerCallback = snapshot => {
+      if (roomRef !== onlineRoomRef || !onlineIsHost) return;
+      enqueueOnlineAction(snapshot, roomRef);
+    };
+    actionsRef.on("child_added", onlineActionsListenerCallback, error => {
+      if (roomRef !== onlineRoomRef || !onlineIsHost) return;
       const message = error?.code === "PERMISSION_DENIED"
         ? "オンライン操作を受信できません。Firebaseルールの actions 読み取り設定を確認してください。"
         : `オンライン操作を受信できません：${error?.message || "Firebaseの接続を確認してください。"}`;
@@ -2170,10 +2182,20 @@ function attachOnlineActionsListener() {
     });
     onlineActionsListenerRef = actionsRef;
   }
-  const confirmationsRef = onlineRoomRef.child("confirmations");
+  const confirmationsRef = roomRef.child("confirmations");
   if (onlineConfirmationsListenerRef?.toString() === confirmationsRef.toString()) return;
-  confirmationsRef.on("child_added", enqueueOnlineConfirmation, reportOnlineConfirmationsReadError);
-  confirmationsRef.on("child_changed", enqueueOnlineConfirmation, reportOnlineConfirmationsReadError);
+  onlineConfirmationsAddedListenerCallback = snapshot => {
+    if (roomRef === onlineRoomRef && onlineIsHost) enqueueOnlineConfirmation(snapshot);
+  };
+  onlineConfirmationsChangedListenerCallback = snapshot => {
+    if (roomRef === onlineRoomRef && onlineIsHost) enqueueOnlineConfirmation(snapshot);
+  };
+  confirmationsRef.on("child_added", onlineConfirmationsAddedListenerCallback, error => {
+    if (roomRef === onlineRoomRef && onlineIsHost) reportOnlineConfirmationsReadError(error);
+  });
+  confirmationsRef.on("child_changed", onlineConfirmationsChangedListenerCallback, error => {
+    if (roomRef === onlineRoomRef && onlineIsHost) reportOnlineConfirmationsReadError(error);
+  });
   onlineConfirmationsListenerRef = confirmationsRef;
 }
 
@@ -2213,6 +2235,7 @@ function startOnlineActionsPolling() {
         actionsRef.once("value"),
         confirmationsRef.once("value")
       ]);
+      if (roomRef !== onlineRoomRef || !onlineIsHost || onlineGameStatus !== "playing") return;
       if (actionsResult.status === "fulfilled") {
         actionsResult.value.forEach(actionSnapshot => enqueueOnlineAction(actionSnapshot));
       } else {
@@ -2236,7 +2259,19 @@ function startOnlineActionsPolling() {
 }
 
 function setOnlineRoomConnected(code, isHost, initialPlayers = null, deferGameActions = false) {
+  const previousRoomRef = onlineRoomRef;
   detachOnlineActionsListener();
+  if (previousRoomRef) {
+    previousRoomRef.child("players").off();
+    previousRoomRef.child("status").off();
+    previousRoomRef.child("settings").off();
+    previousRoomRef.child("state").off();
+    previousRoomRef.child("joinRequests").off();
+    if (onlineUid) {
+      previousRoomRef.child(`players/${onlineUid}`).off();
+      previousRoomRef.child(`joinRequests/${onlineUid}`).off();
+    }
+  }
   if (onlineGuestStatePollTimer !== null) {
     clearTimeout(onlineGuestStatePollTimer);
     onlineGuestStatePollTimer = null;
@@ -2271,7 +2306,9 @@ function setOnlineRoomConnected(code, isHost, initialPlayers = null, deferGameAc
   $("onlineRoomCode").disabled = true;
   renderOnlineLobby();
 
+  const connectedRoomRef = onlineRoomRef;
   onlineRoomRef.child("players").on("value", snapshot => {
+    if (connectedRoomRef !== onlineRoomRef) return;
     onlinePlayers = snapshot.val() || {};
     renderOnlineLobby();
     // The playing state can arrive before the player roster on a guest device.
@@ -2283,6 +2320,7 @@ function setOnlineRoomConnected(code, isHost, initialPlayers = null, deferGameAc
     }
   });
   onlineRoomRef.child("status").on("value", snapshot => {
+    if (connectedRoomRef !== onlineRoomRef) return;
     onlineGameStatus = snapshot.val() || "closed";
     renderOnlineLobby();
     if (onlineGameStatus === "playing" && onlineIsHost) startOnlineActionsPolling();
@@ -2297,11 +2335,13 @@ function setOnlineRoomConnected(code, isHost, initialPlayers = null, deferGameAc
 
   if (isHost) {
     onlineRoomRef.child("joinRequests").on("child_added", snapshot => {
-      onlineJoinQueue = onlineJoinQueue.then(() => acceptOnlineJoinRequest(snapshot));
+      if (connectedRoomRef !== onlineRoomRef) return;
+      onlineJoinQueue = onlineJoinQueue.then(() => acceptOnlineJoinRequest(snapshot, connectedRoomRef));
     });
     if (!deferGameActions) attachOnlineActionsListener();
   } else {
     onlineRoomRef.child(`players/${onlineUid}`).on("value", snapshot => {
+      if (connectedRoomRef !== onlineRoomRef) return;
       if (snapshot.exists()) {
         attachOnlineGuestListeners();
       } else {
@@ -2309,6 +2349,7 @@ function setOnlineRoomConnected(code, isHost, initialPlayers = null, deferGameAc
       }
     });
     onlineRoomRef.child(`joinRequests/${onlineUid}`).on("value", snapshot => {
+      if (connectedRoomRef !== onlineRoomRef) return;
       const request = snapshot.val();
       if (request?.status === "full") setOnlineStatus("このルームは満員です。別のルームを作ってください。");
       if (request?.status === "closed") setOnlineStatus("このルームはすでに開始されています。");
@@ -2316,6 +2357,7 @@ function setOnlineRoomConnected(code, isHost, initialPlayers = null, deferGameAc
   }
 
   onlineRoomRef.child("settings").on("value", snapshot => {
+    if (connectedRoomRef !== onlineRoomRef) return;
     if (onlineIsHost) return;
     const settings = snapshot.val();
     if (!settings) return;
@@ -2366,8 +2408,8 @@ function renderOnlineLobby() {
   $("orderMode").disabled = onlineGameStatus === "playing" || (!onlineIsHost && Boolean(onlineRoomRef));
 }
 
-async function acceptOnlineJoinRequest(snapshot) {
-  if (!onlineIsHost || onlineGameStatus !== "lobby") return;
+async function acceptOnlineJoinRequest(snapshot, sourceRoomRef = onlineRoomRef) {
+  if (!onlineIsHost || onlineGameStatus !== "lobby" || sourceRoomRef !== onlineRoomRef) return;
   const uid = snapshot.key;
   const request = snapshot.val();
   if (!uid || !request) return;
@@ -2385,12 +2427,13 @@ async function acceptOnlineJoinRequest(snapshot) {
   let suffix = 2;
   while (occupied.has(teamName)) teamName = `${baseName} ${suffix++}`;
   const order = Math.max(-1, ...Object.values(onlinePlayers).map(player => Number(player.order || 0))) + 1;
-  await onlineRoomRef.child(`players/${uid}`).set({
+  await sourceRoomRef.child(`players/${uid}`).set({
     name: baseName,
     teamName,
     order,
     host: false
   });
+  if (sourceRoomRef !== onlineRoomRef || !onlineIsHost) return;
   onlinePlayers[uid] = { name: baseName, teamName, order, host: false };
   renderOnlineLobby();
   await snapshot.ref.remove();
@@ -2405,10 +2448,13 @@ function scheduleOnlineGuestStatePoll() {
     if (onlineGameStatus === "playing") {
       try {
         const snapshot = await roomRef.child("state").once("value");
+        if (roomRef !== onlineRoomRef || onlineIsHost) return;
         const state = snapshot.val();
         if (state) applyOnlineGameState(state);
       } catch (error) {
-        setOnlineStatus(error.message || "共有状態を再取得できませんでした。接続を確認してください。");
+        if (roomRef === onlineRoomRef) {
+          setOnlineStatus(error.message || "共有状態を再取得できませんでした。接続を確認してください。");
+        }
       }
     }
     scheduleOnlineGuestStatePoll();
@@ -2417,12 +2463,15 @@ function scheduleOnlineGuestStatePoll() {
 
 function attachOnlineGuestListeners() {
   if (onlineIsHost || !onlineRoomRef) return;
+  const roomRef = onlineRoomRef;
   if (!onlineListenersAttached) {
     onlineListenersAttached = true;
-    onlineRoomRef.child("state").on("value", snapshot => {
+    roomRef.child("state").on("value", snapshot => {
+      if (roomRef !== onlineRoomRef || onlineIsHost) return;
       const state = snapshot.val();
       if (state) applyOnlineGameState(state);
     }, error => {
+      if (roomRef !== onlineRoomRef || onlineIsHost) return;
       setOnlineStatus(error.message || "共有状態を受信できません。接続を確認してください。");
     });
   }
@@ -2691,17 +2740,19 @@ function scheduleOnlineGuestRebidFallback() {
   const expectedRevealKey = currentRevealKey();
   const expectedSessionId = gameSessionId;
   const expectedRevision = onlineAppliedStateRevision;
+  const expectedRoomRef = onlineRoomRef;
   const delay = onlineRevealAutoAdvanceDelay(reveal) + 350;
   onlineGuestRebidFallbackTimer = window.setTimeout(async () => {
     onlineGuestRebidFallbackTimer = null;
-    if (onlineIsHost || !onlineRoomRef || expectedSessionId !== gameSessionId ||
+    if (onlineIsHost || !expectedRoomRef || expectedRoomRef !== onlineRoomRef || expectedSessionId !== gameSessionId ||
         expectedRevealKey !== currentRevealKey() || !pendingR1Resolution ||
         pickRevealPhase !== "revealed" || pickRevealQueue.length > 0) return;
 
     // Fetch once more before recovering locally. Normally the host's transition
     // has already arrived; this covers a missed final state notification.
     try {
-      const latestSnapshot = await onlineRoomRef.child("state").once("value");
+      const latestSnapshot = await expectedRoomRef.child("state").once("value");
+      if (expectedRoomRef !== onlineRoomRef) return;
       const latestState = latestSnapshot.val();
       const latestRevision = Number(latestState?.stateRevision);
       if (latestState && Number.isFinite(latestRevision) && latestRevision > onlineAppliedStateRevision) {
@@ -2715,7 +2766,7 @@ function scheduleOnlineGuestRebidFallback() {
     // If the host's final transition is still missing, derive the same
     // first-round result from the synchronized reveal and open the losers'
     // re-nomination phase on this guest. Pick submissions still go to the host.
-    if (expectedRevision !== onlineAppliedStateRevision || !pendingR1Resolution ||
+    if (expectedRoomRef !== onlineRoomRef || expectedRevision !== onlineAppliedStateRevision || !pendingR1Resolution ||
         expectedRevealKey !== currentRevealKey() || pickRevealQueue.length > 0) return;
 
     if (reveal.type === "nomination") completeFirstRoundNomination(reveal);
@@ -3418,13 +3469,14 @@ async function processOnlineConfirmation(roomRef, ref, uid, confirmation, confir
   }
 }
 
-function enqueueOnlineAction(snapshot) {
+function enqueueOnlineAction(snapshot, sourceRoomRef = onlineRoomRef) {
+  if (!sourceRoomRef || sourceRoomRef !== onlineRoomRef || !onlineIsHost) return onlineActionQueue;
   if (!snapshot?.key || onlineHandledActionIds.has(snapshot.key) || onlineQueuedActionIds.has(snapshot.key)) {
     return onlineActionQueue;
   }
   onlineQueuedActionIds.add(snapshot.key);
   onlineActionQueue = onlineActionQueue
-    .then(() => processOnlineAction(snapshot))
+    .then(() => processOnlineAction(snapshot, sourceRoomRef))
     .catch(error => setOnlineStatus(error.message || "操作を処理できませんでした。"))
     .finally(() => onlineQueuedActionIds.delete(snapshot.key));
   return onlineActionQueue;
@@ -3434,8 +3486,8 @@ async function removeProcessedOnlineAction(snapshot) {
   await snapshot.ref.remove().catch(() => {});
 }
 
-async function processOnlineAction(snapshot) {
-  if (!onlineIsHost || !onlineRoomRef) return;
+async function processOnlineAction(snapshot, processingRoomRef = onlineRoomRef) {
+  if (!onlineIsHost || !onlineRoomRef || processingRoomRef !== onlineRoomRef) return;
   if (onlineProcessedActionIds.has(snapshot.key)) {
     const stateSaved = await flushOnlineState();
     if (stateSaved) {
@@ -3452,7 +3504,6 @@ async function processOnlineAction(snapshot) {
     return;
   }
   if (onlineHandledActionIds.has(snapshot.key)) return;
-  const processingRoomRef = onlineRoomRef;
   onlineHandledActionIds.add(snapshot.key);
   const ownerTeam = onlineTeamForUid(action?.uid);
   const revealMatches = actionMatchesCurrentReveal(action);
