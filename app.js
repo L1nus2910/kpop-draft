@@ -1565,6 +1565,7 @@ function markPersonDrafted(idol) {
   drafted.add(idol.personKey || idol.id);
 }
 let pendingDraftPickId = null;
+let lastCandidateInteraction = '未操作';
 let picks = Object.fromEntries(teamNames.map(team => [team, []]));
 let round = 1;
 let r1Started = false;
@@ -1874,25 +1875,37 @@ function renderCandidates() {
 
 function selectMember(id) {
   const idol = idols.find(item => item.id === id);
-  if (!idol || excluded.has(id) || personHasBeenDrafted(idol)) return;
+  if (!idol || excluded.has(id) || personHasBeenDrafted(idol)) {
+    lastCandidateInteraction = `選択拒否:候補無効 ${id}`;
+    return;
+  }
 
   if (!gameStarted) {
     selectedId = id;
+    lastCandidateInteraction = `選択:${id}`;
     $("selectedMember").textContent = `${idol.japaneseName}（${idol.group}）を選択中。ドラフト開始後に指名できるよ。`;
     renderCandidates();
     return;
   }
 
-  if (!$("pickReveal").hidden || onlineActionPending) return;
+  if (!$('pickReveal').hidden || onlineActionPending) {
+    lastCandidateInteraction = `選択拒否:発表/送信中 ${id}`;
+    return;
+  }
   const team = currentTeamName();
-  if (!candidateSelectionGate(team).canPickNow) return;
+  const gate = candidateSelectionGate(team);
+  if (!gate.canPickNow) {
+    lastCandidateInteraction = `選択拒否:順番外 team=${team || 'なし'} ${id}`;
+    return;
+  }
 
   pendingDraftPickId = idol.id;
+  lastCandidateInteraction = `選択済み:${id}`;
   $("randomResult").hidden = true;
   renderDraft();
   renderCandidates();
+  renderOnlineSyncDebug();
 }
-
 function cancelDraftPick() {
   pendingDraftPickId = null;
   renderDraft();
@@ -1946,11 +1959,17 @@ $("cancelPick").addEventListener("click", cancelDraftPick);
 
 $("candidateList").addEventListener("click", event => {
   const button = event.target.closest("button[data-action]");
-  if (!button) return;
+  if (!button) {
+    lastCandidateInteraction = `タップ受信:候補ボタン外 ${event.target?.tagName || "unknown"}`;
+    renderOnlineSyncDebug();
+    return;
+  }
 
   const id = button.dataset.id;
   if (button.dataset.action === "select") {
+    lastCandidateInteraction = `タップ受信:${id} disabled=${button.disabled}`;
     selectMember(id);
+    renderOnlineSyncDebug();
   } else if (button.dataset.action === "exclude") {
     if (excluded.has(id)) excluded.delete(id);
     else excluded.add(id);
@@ -2516,7 +2535,8 @@ function renderOnlineSyncDebug() {
     `local=${localPhase}`,
     `ownTeam=${ownTeam || "なし"} turn=${currentTeam || "なし"} submitted=${submittedTeams.join(",") || "なし"}`,
     `pickGate control=${currentTeam ? canControlTeam(currentTeam) : false} pending=${onlineActionPending} revealHidden=${$("pickReveal").hidden} resolution=${Boolean(pendingR1Resolution)}`,
-    `candidateUI=${candidateList?.dataset.gateSignature === desiredCandidateGate ? "fresh" : "stale"} selectable=${candidateGate.canPickNow} disabled=${candidateList?.querySelectorAll(".candidate-select:disabled").length ?? 0}`
+    `candidateUI=${candidateList?.dataset.gateSignature === desiredCandidateGate ? "fresh" : "stale"} selectable=${candidateGate.canPickNow} disabled=${candidateList?.querySelectorAll(".candidate-select:disabled").length ?? 0}`,
+    `candidateTap=${lastCandidateInteraction} pendingPick=${pendingDraftPickId || "なし"} confirmVisible=${!$("pickConfirmation").hidden}`
   ].join("\n");
 }
 
@@ -4719,11 +4739,8 @@ function renderDraft() {
   );
   const pendingIdol = idols.find(item => item.id === pendingDraftPickId);
   const canConfirm = Boolean(
-    gameStarted && currentTeam && pendingIdol &&
-    canControlTeam(currentTeam) &&
-    $("pickReveal").hidden &&
-    !onlineActionPending &&
-    !pendingR1Resolution
+    gameStarted && pendingIdol &&
+    candidateSelectionGate(currentTeam).canPickNow
   );
 
   $("pickConfirmation").hidden = !canConfirm;
