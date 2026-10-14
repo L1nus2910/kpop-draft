@@ -1605,6 +1605,8 @@ let onlineStateWriteTimer = null;
 let onlineStateWriteChain = Promise.resolve();
 let onlineStateRevision = 0;
 let onlineAppliedStateRevision = -1;
+let onlineRenderedStateRevision = -1;
+let onlineLastRenderError = "";
 let onlineLastRemoteStateRevision = null;
 let onlineLastRemoteStatePhase = "";
 let onlineLastStateReadAt = "";
@@ -1958,9 +1960,21 @@ $("confirmPick").addEventListener("click", () => confirmDraftPick());
 $("cancelPick").addEventListener("click", cancelDraftPick);
 
 $("candidateList").addEventListener("click", event => {
-  const button = event.target.closest("button[data-action]");
+  const target = event.target instanceof Element ? event.target : event.target?.parentElement;
+  const button = target?.closest("button[data-action]");
   if (!button) {
-    lastCandidateInteraction = `タップ受信:候補ボタン外 ${event.target?.tagName || "unknown"}`;
+    const candidateButton = target?.closest("button.candidate-select");
+    const candidateCard = candidateButton?.closest(".candidate-card");
+    if (candidateButton && candidateCard && !target?.closest("#pickConfirmation")) {
+      const id = candidateButton.dataset.id || candidateCard.dataset.candidateId;
+      lastCandidateInteraction = `候補タップ補正:${id} disabled=${candidateButton.disabled}`;
+      if (!candidateButton.disabled && id) selectMember(id);
+      renderOnlineSyncDebug();
+      return;
+    }
+    const className = typeof target?.className === "string" ? target.className : "";
+    const cardId = target?.closest(".candidate-card")?.dataset.candidateId || "なし";
+    lastCandidateInteraction = `タップ未分類:${target?.tagName || "unknown"}#${target?.id || ""}.${className} card=${cardId}`;
     renderOnlineSyncDebug();
     return;
   }
@@ -2346,6 +2360,8 @@ function setOnlineRoomConnected(code, isHost, initialPlayers = null, deferGameAc
   onlineListenersAttached = false;
   onlineStateRevision = 0;
   onlineAppliedStateRevision = -1;
+  onlineRenderedStateRevision = -1;
+  onlineLastRenderError = "";
   onlineLastRemoteStateRevision = null;
   onlineLastRemoteStatePhase = "";
   onlineLastStateReadAt = "";
@@ -2530,13 +2546,15 @@ function renderOnlineSyncDebug() {
   panel.textContent = [
     `room=${onlineRoomCode} role=${onlineIsHost ? "host" : "guest"} uid=${onlineUid.slice(0, 8)}`,
     `writeRev=${onlineIsHost ? onlineStateRevision : "—"} writeAt=${onlineLastStateWriteAt || "—"}${onlineLastStateWriteError ? ` error=${onlineLastStateWriteError}` : ""}`,
-    `remoteRev=${onlineLastRemoteStateRevision ?? "—"} appliedRev=${onlineAppliedStateRevision} readAt=${onlineLastStateReadAt || "—"}${onlineLastStateReadError ? ` error=${onlineLastStateReadError}` : ""}`,
+    `remoteRev=${onlineLastRemoteStateRevision ?? "—"} appliedRev=${onlineAppliedStateRevision} renderedRev=${onlineRenderedStateRevision} readAt=${onlineLastStateReadAt || "—"}${onlineLastStateReadError ? ` readError=${onlineLastStateReadError}` : ""}${onlineLastRenderError ? ` renderError=${onlineLastRenderError}` : ""}`,
     `remote=${onlineLastRemoteStatePhase || "—"}`,
     `local=${localPhase}`,
     `ownTeam=${ownTeam || "なし"} turn=${currentTeam || "なし"} submitted=${submittedTeams.join(",") || "なし"}`,
     `pickGate control=${currentTeam ? canControlTeam(currentTeam) : false} pending=${onlineActionPending} revealHidden=${$("pickReveal").hidden} resolution=${Boolean(pendingR1Resolution)}`,
     `candidateUI=${candidateList?.dataset.gateSignature === desiredCandidateGate ? "fresh" : "stale"} selectable=${candidateGate.canPickNow} disabled=${candidateList?.querySelectorAll(".candidate-select:disabled").length ?? 0}`,
-    `candidateTap=${lastCandidateInteraction} pendingPick=${pendingDraftPickId || "なし"} confirmVisible=${!$("pickConfirmation").hidden}`
+    `candidateTap=${lastCandidateInteraction} pendingPick=${pendingDraftPickId || "なし"} confirmVisible=${!$("pickConfirmation").hidden}`,
+    `r1Picks=${teamNames.map(team => `${displayTeamName(team)}:${(picks[team] || []).filter(item => item.round === 1).map(item => item.name).join("+") || "—"}`).join(",")}`,
+    `boardR1=${[...$("draftBoard").querySelectorAll("tbody tr:first-child td")].map(cell => cell.innerText.replace(/\s+/g, " ").trim() || "—").join("|") || "—"}`
   ].join("\n");
 }
 
@@ -3266,8 +3284,10 @@ function applyOnlineGameState(state) {
   const localIsStuckInFirstRoundResolution = !r1Started && Boolean(pendingR1Resolution);
   const recoversMissedRebidTransition = localIsStuckInFirstRoundResolution && incomingIsRebidPhase &&
     (!incomingGameSessionId || incomingGameSessionId === gameSessionId);
+  const revisionNeedsRender = Number.isFinite(incomingRevision) &&
+    incomingRevision > onlineRenderedStateRevision && incomingRevision >= onlineAppliedStateRevision;
   if (onlineAppliedStateRevision >= 0 && !gameSessionChanged && !recoversMissedRebidTransition &&
-      (!Number.isFinite(incomingRevision) || incomingRevision <= onlineAppliedStateRevision)) return;
+      (!Number.isFinite(incomingRevision) || incomingRevision <= onlineAppliedStateRevision) && !revisionNeedsRender) return;
   if (Number.isFinite(incomingRevision)) {
     onlineAppliedStateRevision = gameSessionChanged || recoversMissedRebidTransition
       ? incomingRevision
@@ -3275,6 +3295,7 @@ function applyOnlineGameState(state) {
     onlineStateRevision = Math.max(onlineStateRevision, incomingRevision);
   }
   onlineStateApplying = true;
+  let renderSucceeded = false;
   try {
     if (gameSessionChanged) {
       onlinePendingAction = null;
@@ -3367,13 +3388,24 @@ function applyOnlineGameState(state) {
     renderOnlinePickReveal();
     renderDraft();
     renderCandidates();
+    renderSucceeded = true;
+    onlineLastRenderError = "";
+    if (Number.isFinite(incomingRevision)) {
+      onlineRenderedStateRevision = gameSessionChanged
+        ? incomingRevision
+        : Math.max(onlineRenderedStateRevision, incomingRevision);
+    }
     if (actionWasAcknowledged && actionWasRejected && pendingActionKind === "next" && activePickReveal) {
       $("pickRevealActionHint").textContent = actionAck.reason || "確認を受け付けられませんでした。もう一度押してください。";
     }
+  } catch (error) {
+    onlineLastRenderError = error?.message || "state render failed";
+    console.error("Could not render the latest shared draft state; it will be retried", error);
   } finally {
     onlineStateApplying = false;
   }
   renderOnlineSyncDebug();
+  if (!renderSucceeded) return;
   scheduleOnlineGuestRebidFallback();
   recoverIdleGuestFirstRoundResolution();
 }
