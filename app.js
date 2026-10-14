@@ -1747,6 +1747,38 @@ function updateDependentFilters() {
   }
 }
 
+function isOnlineR1RebidTurn(team) {
+  return activeMode === "online" && gameStarted && !r1Started &&
+    canSubmitR1Nomination(team) && pickRevealPhase === "closed" &&
+    !activePickReveal && pickRevealQueue.length === 0 && $("pickReveal").hidden;
+}
+
+function candidateSelectionGate(team = currentTeamName()) {
+  if (!gameStarted) return { canPickNow: true, onlineRebidTurn: false };
+  const onlineRebidTurn = Boolean(team && isOnlineR1RebidTurn(team));
+  const canPickNow = Boolean(
+    team && canControlTeam(team) && !onlineActionPending && $("pickReveal").hidden &&
+    (!pendingR1Resolution || onlineRebidTurn) &&
+    (r1Started || canSubmitR1Nomination(team))
+  );
+  return { canPickNow, onlineRebidTurn };
+}
+
+function candidateGateSignature(team, canPickNow) {
+  return JSON.stringify({
+    team: team || "",
+    ownTeam: activeMode === "online" ? onlineTeamForUid(onlineUid) : "",
+    canPickNow,
+    actionPending: onlineActionPending,
+    revealHidden: $("pickReveal").hidden,
+    resolution: Boolean(pendingR1Resolution),
+    phase: pickRevealPhase,
+    r1Started,
+    attempt: r1NominationAttempt,
+    submitted: r1Nominations.map(item => item.team)
+  });
+}
+
 function renderCandidates() {
   const confirmationPanel = $("pickConfirmation");
   $("pickConfirmationMount").append(confirmationPanel);
@@ -1760,9 +1792,13 @@ function renderCandidates() {
   $("rosterTotal").textContent = idols.length;
   $("groupTotal").textContent = groups.length;
 
+  const currentTeam = gameStarted ? currentTeamName() : "";
+  const canPickNow = candidateSelectionGate(currentTeam).canPickNow;
+  const gateSignature = candidateGateSignature(currentTeam, canPickNow);
   if (list.length === 0) {
     $("candidateList").innerHTML =
       '<div class="empty-state">条件に合うメンバーはいません。</div>';
+    $("candidateList").dataset.gateSignature = gateSignature;
     return;
   }
 
@@ -1771,12 +1807,8 @@ function renderCandidates() {
     : new Set(r1Nominations.filter(item =>
       !pendingR1Resolution || pendingR1Resolution.revealedTeams.has(item.team)
     ).map(item => idols.find(idol => idol.id === item.id)?.personKey).filter(Boolean));
-  const currentTeam = gameStarted ? currentTeamName() : "";
   const ownOnlineTeam = activeMode === "online" ? onlineTeamForUid(onlineUid) : "";
   const ownOnlineBidSubmitted = Boolean(ownOnlineTeam && r1Nominations.some(item => item.team === ownOnlineTeam));
-  const canPickNow = !gameStarted || Boolean(
-    currentTeam && canControlTeam(currentTeam) && !onlineActionPending && $("pickReveal").hidden && !pendingR1Resolution
-  );
   $("candidateList").innerHTML = list.map(idol => {
     const isExcluded = excluded.has(idol.id);
     const isNominated = !r1Started && nominatedPersonKeys.has(idol.personKey);
@@ -1830,6 +1862,7 @@ function renderCandidates() {
       </article>
     `;
   }).join("");
+  $("candidateList").dataset.gateSignature = gateSignature;
 
   if (pendingIdol) {
     const selectedCard = [...$("candidateList").querySelectorAll(".candidate-card")]
@@ -1850,10 +1883,9 @@ function selectMember(id) {
     return;
   }
 
-  if (!$("pickReveal").hidden || pendingR1Resolution || onlineActionPending) return;
+  if (!$("pickReveal").hidden || onlineActionPending) return;
   const team = currentTeamName();
-  if (!team || !canControlTeam(team)) return;
-  if (!r1Started && !canSubmitR1Nomination(team)) return;
+  if (!candidateSelectionGate(team).canPickNow) return;
 
   pendingDraftPickId = idol.id;
   $("randomResult").hidden = true;
@@ -1868,7 +1900,7 @@ function cancelDraftPick() {
 }
 
 function confirmDraftPick(submittingUid = "") {
-  if (!$("pickReveal").hidden || pendingR1Resolution) return;
+  if (!$("pickReveal").hidden) return;
   const idol = idols.find(item => item.id === pendingDraftPickId);
   if (!idol || excluded.has(idol.id) || personHasBeenDrafted(idol)) {
     cancelDraftPick();
@@ -1876,6 +1908,7 @@ function confirmDraftPick(submittingUid = "") {
   }
   const team = submittingUid ? onlineTeamForUid(submittingUid) : currentTeamName();
   if (!team || !canControlTeam(team, submittingUid || onlineUid)) return;
+  if (pendingR1Resolution && !isOnlineR1RebidTurn(team)) return;
   if (!r1Started && !canSubmitR1Nomination(team)) {
     if (activeMode === "online") setOnlineStatus("入札状態が更新されました。画面を確認して、もう一度選んでください。");
     pendingDraftPickId = null;
@@ -2455,6 +2488,10 @@ function renderOnlineSyncDebug() {
   if (panel.hidden) return;
   const ownTeam = onlineTeamForUid(onlineUid);
   const currentTeam = currentTeamName();
+  const candidateList = $("candidateList");
+  const candidateGate = candidateSelectionGate(currentTeam);
+  const desiredCandidateGate = candidateGateSignature(currentTeam, candidateGate.canPickNow);
+  if (candidateList?.dataset.gateSignature !== desiredCandidateGate) renderCandidates();
   const submittedTeams = r1Nominations.map(item => item.team);
   const localPhase = onlineIsHost
     ? onlineStatePhaseSummary(serializeOnlineGame())
@@ -2478,7 +2515,8 @@ function renderOnlineSyncDebug() {
     `remote=${onlineLastRemoteStatePhase || "—"}`,
     `local=${localPhase}`,
     `ownTeam=${ownTeam || "なし"} turn=${currentTeam || "なし"} submitted=${submittedTeams.join(",") || "なし"}`,
-    `pickGate control=${currentTeam ? canControlTeam(currentTeam) : false} pending=${onlineActionPending} revealHidden=${$("pickReveal").hidden} resolution=${Boolean(pendingR1Resolution)}`
+    `pickGate control=${currentTeam ? canControlTeam(currentTeam) : false} pending=${onlineActionPending} revealHidden=${$("pickReveal").hidden} resolution=${Boolean(pendingR1Resolution)}`,
+    `candidateUI=${candidateList?.dataset.gateSignature === desiredCandidateGate ? "fresh" : "stale"} selectable=${candidateGate.canPickNow} disabled=${candidateList?.querySelectorAll(".candidate-select:disabled").length ?? 0}`
   ].join("\n");
 }
 
