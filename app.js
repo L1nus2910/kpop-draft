@@ -1607,6 +1607,7 @@ let onlineStateRevision = 0;
 let onlineAppliedStateRevision = -1;
 let onlineRenderedStateRevision = -1;
 let onlineLastRenderError = "";
+let onlineLastMissingPickLists = "なし";
 let onlineLastRemoteStateRevision = null;
 let onlineLastRemoteStatePhase = "";
 let onlineLastStateReadAt = "";
@@ -2362,6 +2363,7 @@ function setOnlineRoomConnected(code, isHost, initialPlayers = null, deferGameAc
   onlineAppliedStateRevision = -1;
   onlineRenderedStateRevision = -1;
   onlineLastRenderError = "";
+  onlineLastMissingPickLists = "なし";
   onlineLastRemoteStateRevision = null;
   onlineLastRemoteStatePhase = "";
   onlineLastStateReadAt = "";
@@ -2510,6 +2512,9 @@ function recordOnlineRemoteState(state) {
   if (!state) return;
   onlineLastRemoteStateRevision = Number.isFinite(Number(state.stateRevision)) ? Number(state.stateRevision) : "なし";
   onlineLastRemoteStatePhase = onlineStatePhaseSummary(state);
+  const remotePicks = state.picks && typeof state.picks === "object" ? state.picks : {};
+  const remoteTeams = Array.isArray(state.teamNames) ? state.teamNames : [];
+  onlineLastMissingPickLists = remoteTeams.filter(team => remotePicks[team] == null).join(",") || "なし";
   onlineLastStateReadAt = new Date().toLocaleTimeString("ja-JP", { hour12: false });
   onlineLastStateReadError = "";
   renderOnlineSyncDebug();
@@ -2547,6 +2552,7 @@ function renderOnlineSyncDebug() {
     `room=${onlineRoomCode} role=${onlineIsHost ? "host" : "guest"} uid=${onlineUid.slice(0, 8)}`,
     `writeRev=${onlineIsHost ? onlineStateRevision : "—"} writeAt=${onlineLastStateWriteAt || "—"}${onlineLastStateWriteError ? ` error=${onlineLastStateWriteError}` : ""}`,
     `remoteRev=${onlineLastRemoteStateRevision ?? "—"} appliedRev=${onlineAppliedStateRevision} renderedRev=${onlineRenderedStateRevision} readAt=${onlineLastStateReadAt || "—"}${onlineLastStateReadError ? ` readError=${onlineLastStateReadError}` : ""}${onlineLastRenderError ? ` renderError=${onlineLastRenderError}` : ""}`,
+    `missingPickLists=${onlineLastMissingPickLists}`,
     `remote=${onlineLastRemoteStatePhase || "—"}`,
     `local=${localPhase}`,
     `ownTeam=${ownTeam || "なし"} turn=${currentTeam || "なし"} submitted=${submittedTeams.join(",") || "なし"}`,
@@ -3328,7 +3334,16 @@ function applyOnlineGameState(state) {
     gameStarted = Boolean(state.gameStarted);
     activeMode = "online";
     aiTeams = new Set();
-    picks = state.picks || Object.fromEntries(teamNames.map(team => [team, []]));
+    const remotePicks = state.picks && typeof state.picks === "object" ? state.picks : {};
+    picks = Object.fromEntries(teamNames.map(team => {
+      const teamPicks = remotePicks[team];
+      if (Array.isArray(teamPicks)) return [team, teamPicks];
+      if (teamPicks && typeof teamPicks === "object") {
+        const indexes = Object.keys(teamPicks).filter(key => /^\d+$/.test(key)).sort((a, b) => Number(a) - Number(b));
+        return [team, indexes.map(index => teamPicks[index])];
+      }
+      return [team, []];
+    }));
     drafted = new Set(state.drafted || []);
     round = Number(state.round || 1);
     r1Started = Boolean(state.r1Started);
