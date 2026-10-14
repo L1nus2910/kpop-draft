@@ -1590,6 +1590,7 @@ let onlineIsHost = false;
 let onlinePlayers = {};
 let onlineActionPending = false;
 let onlineActionsListenerRef = null;
+let onlineConfirmationsListenerRef = null;
 let onlineActionsPollTimer = null;
 let onlineActionsPollRoomRef = null;
 let onlinePendingAction = null;
@@ -1601,6 +1602,9 @@ let onlineStateWriteChain = Promise.resolve();
 let onlineStateRevision = 0;
 let onlineAppliedStateRevision = -1;
 let onlineActionQueue = Promise.resolve();
+let onlineConfirmationQueue = Promise.resolve();
+let onlineQueuedConfirmationIds = new Set();
+let onlineHandledConfirmationIds = new Set();
 let onlineGuestStatePollTimer = null;
 let onlineListenersAttached = false;
 let onlineHandledActionIds = new Set();
@@ -2138,6 +2142,11 @@ function detachOnlineActionsListener() {
     onlineActionsListenerRef.off("child_added", enqueueOnlineAction);
     onlineActionsListenerRef = null;
   }
+  if (onlineConfirmationsListenerRef) {
+    onlineConfirmationsListenerRef.off("child_added", enqueueOnlineConfirmation);
+    onlineConfirmationsListenerRef.off("child_changed", enqueueOnlineConfirmation);
+    onlineConfirmationsListenerRef = null;
+  }
   if (onlineActionsPollTimer !== null) {
     clearTimeout(onlineActionsPollTimer);
     onlineActionsPollTimer = null;
@@ -2148,17 +2157,32 @@ function detachOnlineActionsListener() {
 function attachOnlineActionsListener() {
   if (!onlineIsHost || !onlineRoomRef) return;
   const actionsRef = onlineRoomRef.child("actions");
-  if (onlineActionsListenerRef?.toString() === actionsRef.toString()) return;
-  detachOnlineActionsListener();
-  actionsRef.on("child_added", enqueueOnlineAction, error => {
-    const message = error?.code === "PERMISSION_DENIED"
-      ? "確認を受信できません。FirebaseのRealtime Databaseルールで、このルームの actions の読み取りをホストに許可して公開してください。"
-      : `オンライン操作を受信できません：${error?.message || "Firebaseの接続を確認してください。"}`;
-    console.error("Online actions listener was cancelled", error);
-    setOnlineStatus(message);
-    if (!$("pickReveal").hidden) $("pickRevealActionHint").textContent = message;
-  });
-  onlineActionsListenerRef = actionsRef;
+  if (onlineActionsListenerRef?.toString() !== actionsRef.toString()) {
+    detachOnlineActionsListener();
+    actionsRef.on("child_added", enqueueOnlineAction, error => {
+      const message = error?.code === "PERMISSION_DENIED"
+        ? "オンライン操作を受信できません。Firebaseルールの actions 読み取り設定を確認してください。"
+        : `オンライン操作を受信できません：${error?.message || "Firebaseの接続を確認してください。"}`;
+      console.error("Online actions listener was cancelled", error);
+      setOnlineStatus(message);
+      if (!$("pickReveal").hidden) $("pickRevealActionHint").textContent = message;
+    });
+    onlineActionsListenerRef = actionsRef;
+  }
+  const confirmationsRef = onlineRoomRef.child("confirmations");
+  if (onlineConfirmationsListenerRef?.toString() === confirmationsRef.toString()) return;
+  confirmationsRef.on("child_added", enqueueOnlineConfirmation, reportOnlineConfirmationsReadError);
+  confirmationsRef.on("child_changed", enqueueOnlineConfirmation, reportOnlineConfirmationsReadError);
+  onlineConfirmationsListenerRef = confirmationsRef;
+}
+
+function reportOnlineConfirmationsReadError(error) {
+  const message = error?.code === "PERMISSION_DENIED"
+    ? "確認を受信できません。FirebaseのRealtime Databaseルールで confirmations の読み取りをホストに許可してください。"
+    : `確認を受信できません：${error?.message || "Firebaseの接続を確認してください。"}`;
+  console.error("Online confirmations listener was cancelled", error);
+  setOnlineStatus(message);
+  if (!$("pickReveal").hidden) $("pickRevealActionHint").textContent = message;
 }
 
 function reportOnlineActionsReadError(error) {
@@ -2175,6 +2199,7 @@ function startOnlineActionsPolling() {
       onlineActionsPollRoomRef === onlineRoomRef) return;
   const roomRef = onlineRoomRef;
   const actionsRef = roomRef.child("actions");
+  const confirmationsRef = roomRef.child("confirmations");
   onlineActionsPollRoomRef = roomRef;
   const poll = async () => {
     if (roomRef !== onlineRoomRef || !onlineIsHost || onlineGameStatus !== "playing") {
@@ -2183,12 +2208,21 @@ function startOnlineActionsPolling() {
     }
     let nextDelay = gameStarted && activeMode === "online" ? 900 : 1200;
     if (gameStarted && activeMode === "online") {
-      try {
-        const actionsSnapshot = await actionsRef.once("value");
-        actionsSnapshot.forEach(actionSnapshot => enqueueOnlineAction(actionSnapshot));
-      } catch (error) {
-        reportOnlineActionsReadError(error);
-        nextDelay = error?.code === "PERMISSION_DENIED" ? 5000 : 1800;
+      const [actionsResult, confirmationsResult] = await Promise.allSettled([
+        actionsRef.once("value"),
+        confirmationsRef.once("value")
+      ]);
+      if (actionsResult.status === "fulfilled") {
+        actionsResult.value.forEach(actionSnapshot => enqueueOnlineAction(actionSnapshot));
+      } else {
+        reportOnlineActionsReadError(actionsResult.reason);
+        nextDelay = actionsResult.reason?.code === "PERMISSION_DENIED" ? 5000 : 1800;
+      }
+      if (confirmationsResult.status === "fulfilled") {
+        confirmationsResult.value.forEach(enqueueOnlineConfirmation);
+      } else {
+        reportOnlineConfirmationsReadError(confirmationsResult.reason);
+        nextDelay = confirmationsResult.reason?.code === "PERMISSION_DENIED" ? 5000 : 1800;
       }
     }
     if (roomRef === onlineRoomRef && onlineIsHost && onlineGameStatus === "playing") {
@@ -2215,6 +2249,9 @@ function setOnlineRoomConnected(code, isHost, initialPlayers = null, deferGameAc
   onlineStateRevision = 0;
   onlineAppliedStateRevision = -1;
   onlineActionQueue = Promise.resolve();
+  onlineConfirmationQueue = Promise.resolve();
+  onlineQueuedConfirmationIds = new Set();
+  onlineHandledConfirmationIds = new Set();
   onlineActionPending = false;
   onlinePendingAction = null;
   onlineActionAcks = {};
@@ -3078,7 +3115,76 @@ function resumeOnlineHostProgress() {
   }
 }
 
+function submitOnlineConfirmation() {
+  if (!onlineRoomRef || !onlineUid || !activePickReveal || pickRevealPhase !== "revealed") {
+    $("pickRevealActionHint").textContent = "確認を送れません。ルーム接続と発表画面を確認してください。";
+    return false;
+  }
+  if (onlineIsHost || onlineActionPending) return false;
+
+  onlineActionPending = true;
+  renderDraft();
+  renderOnlinePickReveal();
+  renderCandidates();
+
+  const confirmationRef = onlineRoomRef.child(`confirmations/${onlineUid}`);
+  const confirmationId = confirmationRef.push().key;
+  const idol = activePickReveal.idol || {};
+  const payload = {
+    uid: onlineUid,
+    kind: "next",
+    id: confirmationId,
+    revealKey: currentRevealKey(),
+    revealPhase: pickRevealPhase,
+    revealType: activePickReveal.type,
+    revealRound: Number(activePickReveal.round),
+    revealIdolId: idol.id || activePickReveal.idolId || "",
+    revealPersonKey: idol.personKey || "",
+    revealName: idol.japaneseName || "",
+    revealGroup: idol.group || "",
+    createdAt: Date.now()
+  };
+  onlinePendingAction = {
+    key: confirmationId,
+    kind: "next",
+    team: onlineTeamForUid(onlineUid),
+    round: round,
+    revealKey: payload.revealKey,
+    revealPhase: pickRevealPhase
+  };
+
+  confirmationRef.set(payload)
+    .then(() => {
+      if (onlinePendingAction?.key === confirmationId) {
+        setOnlineStatus("確認をホストへ送信しました。反映を待っています…");
+        $("pickRevealActionHint").textContent = "確認を送信しました。ホストの受信を待っています…";
+      }
+    })
+    .catch(error => {
+      onlinePendingAction = null;
+      onlineActionPending = false;
+      setOnlineStatus(error.message || "確認を送れませんでした。接続とFirebaseルールを確認してください。");
+      renderDraft();
+      renderOnlinePickReveal();
+      renderCandidates();
+      $("pickRevealActionHint").textContent = `確認を送れませんでした：${error.message || "接続とFirebaseルールを確認してください。"}`;
+    });
+
+  window.setTimeout(() => {
+    if (!onlineActionPending || onlinePendingAction?.key !== confirmationId) return;
+    onlinePendingAction = null;
+    onlineActionPending = false;
+    setOnlineStatus("確認の受信応答がありません。ホストとの接続を確認してください。");
+    renderDraft();
+    renderOnlinePickReveal();
+    renderCandidates();
+    $("pickRevealActionHint").textContent = "送信は完了しましたが、ホストの受信確認が届きません。Firebaseルールまたはホスト接続で止まっています。";
+  }, 12000);
+  return true;
+}
+
 function submitOnlineAction(action) {
+  if (action.kind === "next") return submitOnlineConfirmation();
   if (!onlineRoomRef) {
     setOnlineStatus("ルームへの接続が切れています。再接続してから、もう一度押してください。");
     if (action.kind === "next") {
@@ -3156,6 +3262,89 @@ function submitOnlineAction(action) {
     }
   }, 12000);
   return true;
+}
+
+function enqueueOnlineConfirmation(snapshot) {
+  if (!onlineIsHost || !snapshot?.key) return onlineConfirmationQueue;
+  const confirmation = snapshot.val();
+  if (!confirmation || confirmation.kind !== "next" ||
+      confirmation.uid !== snapshot.key || !confirmation.id) return onlineConfirmationQueue;
+  const confirmationId = String(confirmation.id);
+  if (onlineHandledConfirmationIds.has(confirmationId) ||
+      onlineQueuedConfirmationIds.has(confirmationId)) return onlineConfirmationQueue;
+
+  const roomRef = onlineRoomRef;
+  onlineQueuedConfirmationIds.add(confirmationId);
+  onlineConfirmationQueue = onlineConfirmationQueue
+    .catch(() => {})
+    .then(() => processOnlineConfirmation(roomRef, snapshot.ref, snapshot.key, confirmation, confirmationId))
+    .catch(error => {
+      console.error("Online confirmation processing failed", error);
+      reportOnlineConfirmationsReadError(error);
+    })
+    .finally(() => onlineQueuedConfirmationIds.delete(confirmationId));
+  return onlineConfirmationQueue;
+}
+
+async function removeOnlineConfirmationIfCurrent(ref, confirmationId) {
+  try {
+    const current = await ref.once("value");
+    if (String(current.val()?.id || "") === confirmationId) await ref.remove();
+  } catch (error) {
+    console.error("Processed online confirmation could not be cleared", error);
+  }
+}
+
+async function processOnlineConfirmation(roomRef, ref, uid, confirmation, confirmationId) {
+  if (!onlineIsHost || !roomRef || roomRef !== onlineRoomRef) return;
+  if (onlineHandledConfirmationIds.has(confirmationId)) return;
+  onlineHandledConfirmationIds.add(confirmationId);
+
+  if (onlineActionAcks[uid]?.key === confirmationId) {
+    const stateSaved = await flushOnlineState();
+    if (stateSaved) await removeOnlineConfirmationIfCurrent(ref, confirmationId);
+    else onlineHandledConfirmationIds.delete(confirmationId);
+    return;
+  }
+
+  let accepted = false;
+  let reason = "";
+  try {
+    if (!onlinePlayers[uid]) {
+      reason = "参加者情報を確認できませんでした。全員が同じルームに入り直してください。";
+    } else if (!actionMatchesCurrentReveal(confirmation)) {
+      reason = "発表データが一致しません。全員で新しいルームに入り直してください。";
+    } else {
+      accepted = acknowledgeOnlineReveal(uid);
+      if (!accepted) {
+        reason = !activePickReveal || pickRevealPhase !== "revealed"
+          ? "発表画面の状態がずれています。全員で新しいルームに入り直してください。"
+          : !onlineRevealParticipantUids().includes(uid)
+            ? "この発表の確認対象に含まれていません。"
+            : "確認を処理できませんでした。もう一度押してください。";
+      }
+    }
+  } catch (error) {
+    reason = error?.message || "確認を処理できませんでした。もう一度押してください。";
+    console.error("Online confirmation could not be applied", error);
+  }
+
+  if (roomRef !== onlineRoomRef || !onlineIsHost) {
+    onlineHandledConfirmationIds.delete(confirmationId);
+    return;
+  }
+  onlineActionAcks[uid] = {
+    key: confirmationId,
+    accepted,
+    reason: accepted ? "" : reason || "確認を受け付けられませんでした。発表画面を確認して、もう一度試してください。",
+    at: Date.now()
+  };
+  const stateSaved = await flushOnlineState();
+  if (stateSaved) {
+    await removeOnlineConfirmationIfCurrent(ref, confirmationId);
+  } else {
+    onlineHandledConfirmationIds.delete(confirmationId);
+  }
 }
 
 function enqueueOnlineAction(snapshot) {
