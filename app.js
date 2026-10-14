@@ -1590,6 +1590,8 @@ let onlineIsHost = false;
 let onlinePlayers = {};
 let onlineActionPending = false;
 let onlineActionsListenerRef = null;
+let onlineActionsPollTimer = null;
+let onlineActionsPollRoomRef = null;
 let onlinePendingAction = null;
 let lastPickRevealPointerActionAt = 0;
 let onlineActionAcks = {};
@@ -1602,6 +1604,7 @@ let onlineActionQueue = Promise.resolve();
 let onlineGuestStatePollTimer = null;
 let onlineListenersAttached = false;
 let onlineHandledActionIds = new Set();
+let onlineQueuedActionIds = new Set();
 let onlineJoinQueue = Promise.resolve();
 let onlineShownRevealKey = "";
 let onlineRevealAcks = new Set();
@@ -2130,9 +2133,15 @@ function normalizeOnlineName(value, fallback = "プレイヤー") {
 }
 
 function detachOnlineActionsListener() {
-  if (!onlineActionsListenerRef) return;
-  onlineActionsListenerRef.off("child_added", enqueueOnlineAction);
-  onlineActionsListenerRef = null;
+  if (onlineActionsListenerRef) {
+    onlineActionsListenerRef.off("child_added", enqueueOnlineAction);
+    onlineActionsListenerRef = null;
+  }
+  if (onlineActionsPollTimer !== null) {
+    clearTimeout(onlineActionsPollTimer);
+    onlineActionsPollTimer = null;
+  }
+  onlineActionsPollRoomRef = null;
 }
 
 function attachOnlineActionsListener() {
@@ -2149,6 +2158,45 @@ function attachOnlineActionsListener() {
     if (!$("pickReveal").hidden) $("pickRevealActionHint").textContent = message;
   });
   onlineActionsListenerRef = actionsRef;
+}
+
+function reportOnlineActionsReadError(error) {
+  const message = error?.code === "PERMISSION_DENIED"
+    ? "確認を受信できません。FirebaseのRealtime Databaseルールで、このルームの actions の読み取りをホストに許可して公開してください。"
+    : "オンライン操作を受信できません：" + (error?.message || "Firebaseの接続を確認してください。");
+  console.error("Online actions could not be read", error);
+  setOnlineStatus(message);
+  if (!$("pickReveal").hidden) $("pickRevealActionHint").textContent = message;
+}
+
+function startOnlineActionsPolling() {
+  if (!onlineIsHost || !onlineRoomRef || onlineGameStatus !== "playing" ||
+      onlineActionsPollRoomRef === onlineRoomRef) return;
+  const roomRef = onlineRoomRef;
+  const actionsRef = roomRef.child("actions");
+  onlineActionsPollRoomRef = roomRef;
+  const poll = async () => {
+    if (roomRef !== onlineRoomRef || !onlineIsHost || onlineGameStatus !== "playing") {
+      if (onlineActionsPollRoomRef === roomRef) detachOnlineActionsListener();
+      return;
+    }
+    let nextDelay = gameStarted && activeMode === "online" ? 900 : 1200;
+    if (gameStarted && activeMode === "online") {
+      try {
+        const snapshot = await actionsRef.once("value");
+        snapshot.forEach(actionSnapshot => enqueueOnlineAction(actionSnapshot));
+      } catch (error) {
+        reportOnlineActionsReadError(error);
+        nextDelay = error?.code === "PERMISSION_DENIED" ? 5000 : 1800;
+      }
+    }
+    if (roomRef === onlineRoomRef && onlineIsHost && onlineGameStatus === "playing") {
+      onlineActionsPollTimer = window.setTimeout(poll, nextDelay);
+    } else if (onlineActionsPollRoomRef === roomRef) {
+      detachOnlineActionsListener();
+    }
+  };
+  void poll();
 }
 
 function setOnlineRoomConnected(code, isHost, initialPlayers = null, deferGameActions = false) {
@@ -2170,6 +2218,7 @@ function setOnlineRoomConnected(code, isHost, initialPlayers = null, deferGameAc
   onlinePendingAction = null;
   onlineActionAcks = {};
   onlineHandledActionIds = new Set();
+  onlineQueuedActionIds = new Set();
   $("onlineRoomCode").value = code;
   $("onlineRoomCodeLabel").textContent = code;
   $("onlineLobby").hidden = false;
@@ -2192,6 +2241,10 @@ function setOnlineRoomConnected(code, isHost, initialPlayers = null, deferGameAc
   onlineRoomRef.child("status").on("value", snapshot => {
     onlineGameStatus = snapshot.val() || "closed";
     renderOnlineLobby();
+    if (onlineGameStatus === "playing" && onlineIsHost) startOnlineActionsPolling();
+    if (onlineGameStatus !== "playing" && onlineActionsPollRoomRef === onlineRoomRef) {
+      detachOnlineActionsListener();
+    }
     if (onlineGameStatus === "playing" && !onlineIsHost) {
       attachOnlineGuestListeners();
     }
@@ -3068,9 +3121,14 @@ function submitOnlineAction(action) {
 }
 
 function enqueueOnlineAction(snapshot) {
+  if (!snapshot?.key || onlineHandledActionIds.has(snapshot.key) || onlineQueuedActionIds.has(snapshot.key)) {
+    return onlineActionQueue;
+  }
+  onlineQueuedActionIds.add(snapshot.key);
   onlineActionQueue = onlineActionQueue
     .then(() => processOnlineAction(snapshot))
-    .catch(error => setOnlineStatus(error.message || "操作を処理できませんでした。"));
+    .catch(error => setOnlineStatus(error.message || "操作を処理できませんでした。"))
+    .finally(() => onlineQueuedActionIds.delete(snapshot.key));
   return onlineActionQueue;
 }
 
