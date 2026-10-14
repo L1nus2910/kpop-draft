@@ -1589,6 +1589,7 @@ let onlineUid = "";
 let onlineIsHost = false;
 let onlinePlayers = {};
 let onlineActionPending = false;
+let onlineActionsListenerRef = null;
 let onlinePendingAction = null;
 let lastPickRevealPointerActionAt = 0;
 let onlineActionAcks = {};
@@ -2128,7 +2129,30 @@ function normalizeOnlineName(value, fallback = "プレイヤー") {
   return cleaned || fallback;
 }
 
+function detachOnlineActionsListener() {
+  if (!onlineActionsListenerRef) return;
+  onlineActionsListenerRef.off("child_added", enqueueOnlineAction);
+  onlineActionsListenerRef = null;
+}
+
+function attachOnlineActionsListener() {
+  if (!onlineIsHost || !onlineRoomRef) return;
+  const actionsRef = onlineRoomRef.child("actions");
+  if (onlineActionsListenerRef?.toString() === actionsRef.toString()) return;
+  detachOnlineActionsListener();
+  actionsRef.on("child_added", enqueueOnlineAction, error => {
+    const message = error?.code === "PERMISSION_DENIED"
+      ? "確認を受信できません。FirebaseのRealtime Databaseルールで、このルームの actions の読み取りをホストに許可して公開してください。"
+      : `オンライン操作を受信できません：${error?.message || "Firebaseの接続を確認してください。"}`;
+    console.error("Online actions listener was cancelled", error);
+    setOnlineStatus(message);
+    if (!$("pickReveal").hidden) $("pickRevealActionHint").textContent = message;
+  });
+  onlineActionsListenerRef = actionsRef;
+}
+
 function setOnlineRoomConnected(code, isHost, initialPlayers = null, deferGameActions = false) {
+  detachOnlineActionsListener();
   if (onlineGuestStatePollTimer !== null) {
     clearTimeout(onlineGuestStatePollTimer);
     onlineGuestStatePollTimer = null;
@@ -2178,7 +2202,7 @@ function setOnlineRoomConnected(code, isHost, initialPlayers = null, deferGameAc
     onlineRoomRef.child("joinRequests").on("child_added", snapshot => {
       onlineJoinQueue = onlineJoinQueue.then(() => acceptOnlineJoinRequest(snapshot));
     });
-    if (!deferGameActions) onlineRoomRef.child("actions").on("child_added", enqueueOnlineAction);
+    if (!deferGameActions) attachOnlineActionsListener();
   } else {
     onlineRoomRef.child(`players/${onlineUid}`).on("value", snapshot => {
       if (snapshot.exists()) {
@@ -2358,7 +2382,7 @@ async function joinOnlineRoom() {
             onlineHostRestoring = false;
           }
         }
-        onlineRoomRef.child("actions").on("child_added", enqueueOnlineAction);
+        attachOnlineActionsListener();
         resumeOnlineHostProgress();
         setOnlineStatus("進行中のルームにホストとして再接続しました。");
       } else if (!isHost && isPlaying) {
