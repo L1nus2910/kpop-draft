@@ -2453,6 +2453,9 @@ function renderOnlineSyncDebug() {
   const enabled = new URLSearchParams(location.search).get("syncdebug") === "1";
   panel.hidden = !enabled || !onlineRoomRef;
   if (panel.hidden) return;
+  const ownTeam = onlineTeamForUid(onlineUid);
+  const currentTeam = currentTeamName();
+  const submittedTeams = r1Nominations.map(item => item.team);
   const localPhase = onlineIsHost
     ? onlineStatePhaseSummary(serializeOnlineGame())
     : onlineStatePhaseSummary({
@@ -2473,7 +2476,9 @@ function renderOnlineSyncDebug() {
     `writeRev=${onlineIsHost ? onlineStateRevision : "—"} writeAt=${onlineLastStateWriteAt || "—"}${onlineLastStateWriteError ? ` error=${onlineLastStateWriteError}` : ""}`,
     `remoteRev=${onlineLastRemoteStateRevision ?? "—"} appliedRev=${onlineAppliedStateRevision} readAt=${onlineLastStateReadAt || "—"}${onlineLastStateReadError ? ` error=${onlineLastStateReadError}` : ""}`,
     `remote=${onlineLastRemoteStatePhase || "—"}`,
-    `local=${localPhase}`
+    `local=${localPhase}`,
+    `ownTeam=${ownTeam || "なし"} turn=${currentTeam || "なし"} submitted=${submittedTeams.join(",") || "なし"}`,
+    `pickGate control=${currentTeam ? canControlTeam(currentTeam) : false} pending=${onlineActionPending} revealHidden=${$("pickReveal").hidden} resolution=${Boolean(pendingR1Resolution)}`
   ].join("\n");
 }
 
@@ -2744,7 +2749,7 @@ function onlineTeamForUid(uid) {
 }
 
 function canControlTeam(team, actorUid = onlineUid) {
-  if (activeMode === "online") return Boolean(actorUid && teamOwnerUid(team) === actorUid);
+  if (activeMode === "online") return Boolean(actorUid && onlineTeamForUid(actorUid) === team);
   return !aiTeams.has(team);
 }
 
@@ -3232,7 +3237,11 @@ function applyOnlineGameState(state) {
     const pendingActionKind = onlinePendingAction?.kind || "";
     const actionWasAcknowledged = Boolean(onlinePendingAction && actionAck?.key === onlinePendingAction.key);
     const actionWasRejected = actionWasAcknowledged && !Boolean(actionAck.accepted);
+    const pendingPickSupersededByNextAttempt = onlinePendingAction?.kind === "pick" &&
+      Number.isFinite(Number(onlinePendingAction.r1NominationAttempt)) &&
+      Number(state.r1NominationAttempt || 1) > Number(onlinePendingAction.r1NominationAttempt);
     const actionWasAccepted = !actionWasRejected && (
+      pendingPickSupersededByNextAttempt ||
       onlineStateReflectsAction(onlinePendingAction, state) ||
       (actionWasAcknowledged && Boolean(actionAck.accepted))
     );
@@ -3464,6 +3473,7 @@ function submitOnlineAction(action) {
     kind: action.kind,
     idolId: action.idolId || "",
     team: onlineTeamForUid(onlineUid),
+    r1NominationAttempt,
     round: round,
     pickCount: (picks[onlineTeamForUid(onlineUid)] || []).length,
     revealKey: payload.revealKey || "",
