@@ -32,6 +32,13 @@
             ".write": "auth != null && ((auth.uid == $uid && ((!data.exists() && newData.exists()) || (data.exists() && !newData.exists()))) || root.child('rooms').child($roomId).child('hostUid').val() == auth.uid)"
           }
         },
+        "confirmations": {
+          ".read": "auth != null && root.child('rooms').child($roomId).child('hostUid').val() == auth.uid",
+          "$uid": {
+            ".write": "auth != null && ((auth.uid == $uid && root.child('rooms').child($roomId).child('players').child($uid).exists() && root.child('rooms').child($roomId).child('status').val() == 'playing') || root.child('rooms').child($roomId).child('hostUid').val() == auth.uid)",
+            ".validate": "!newData.exists() || (newData.hasChildren(['uid', 'kind', 'id', 'revealKey', 'revealPhase']) && newData.child('uid').val() == $uid && newData.child('kind').val() == 'next')"
+          }
+        },
         "actions": {
           ".read": "auth != null && root.child('rooms').child($roomId).child('hostUid').val() == auth.uid",
           "$actionId": {
