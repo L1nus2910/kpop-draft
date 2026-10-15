@@ -18,12 +18,12 @@
   <meta property="og:description" content="推しでつくる、夢のドラフト。非公式ファン制作のK-POPドラフトゲーム。">
   <meta property="og:url" content="https://l1nus2910.github.io/kpop-draft/">
   <meta name="twitter:card" content="summary">
-  <link rel="stylesheet" href="style.css?v=20261015-live-board-1">
+  <link rel="stylesheet" href="style.css?v=20261015-final-results-1">
   <script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-database-compat.js"></script>
   <script src="firebase-config.js" defer></script>
-  <script src="app.js?v=20261015-live-board-1" defer></script>
+  <script src="app.js?v=20261015-final-results-1" defer></script>
 </head>
 <body>
   <header class="topbar">
@@ -240,8 +240,8 @@
           <div class="pick-confirmation" id="pickConfirmation" hidden>
             <div class="pick-confirmation-copy">
               <span>指名内容の確認</span>
-              <strong id="pickConfirmName"></strong>
-              <small id="pickConfirmDetails"></small>
+              <strong id="pickConfirmName" hidden></strong>
+              <small id="pickConfirmDetails" hidden></small>
             </div>
             <div class="pick-confirmation-actions">
               <button class="button button-secondary" id="cancelPick" type="button">選び直す</button>

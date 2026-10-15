@@ -1583,6 +1583,7 @@ let excluded = new Set(readSaved("stagePickExcluded", []));
 let savedPresets = readSaved("stagePickPresets", {});
 let selectedId = null;
 let candidateSortMode = "recommended";
+let candidateSearchRenderTimer = null;
 let gameStarted = false;
 let finalResultsWasVisible = false;
 let drafted = new Set();
@@ -1905,7 +1906,7 @@ function renderCandidates() {
       ? `<span class="candidate-stars" aria-label="同世代内人気参考ランク ${idol.popularityStars}つ星">${"★".repeat(idol.popularityStars)}${"☆".repeat(5 - idol.popularityStars)}</span>`
       : '<span class="candidate-stars" aria-label="ランキング未掲載のため星1つ" title="ランキング未掲載">★☆☆☆☆</span>';
     return `
-      <article class="candidate-card ${isSelected ? "is-selected" : ""} ${isExcluded ? "is-excluded" : ""}" data-candidate-id="${idol.id}">
+      <article class="candidate-card ${isSelected ? "is-selected" : ""} ${isExcluded ? "is-excluded" : ""} ${pendingDraftPickId === idol.id ? "has-pick-confirmation" : ""}" data-candidate-id="${idol.id}">
         <button class="candidate-select" type="button" data-action="select" data-id="${idol.id}" aria-pressed="${isSelected}" ${isUnavailable || !canPickNow ? "disabled" : ""}>
           <span class="candidate-title-row">
             <span class="candidate-name">${escapeHTML(idol.japaneseName)}</span>
@@ -2000,6 +2001,7 @@ function refreshCandidateCardSelection(id) {
   const nominated = candidateIsAlreadyNominated(id);
   const selected = pendingDraftPickId === id || selectedId === id || nominated;
   card.classList.toggle("is-selected", selected);
+  card.classList.toggle("has-pick-confirmation", pendingDraftPickId === id);
   button.setAttribute("aria-pressed", String(selected));
   hint.textContent = pendingDraftPickId === id
     ? "✓ 選択中・確認して提出"
@@ -2030,7 +2032,7 @@ function updatePendingPickFeedback(previousId = "") {
   const selectedCard = findCandidateCard(pendingDraftPickId);
   const cardActions = selectedCard?.querySelector(".card-actions");
   if (selectedCard && cardActions) selectedCard.insertBefore(panel, cardActions);
-  $("selectedMember").textContent = `${pendingIdol.japaneseName}を選択中です。確認ボタンを押すと指名が提出されます。`;
+  $("selectedMember").textContent = "候補を選択しました。確認ボタンから提出できます。";
 }
 
 function cancelDraftPick() {
@@ -2118,7 +2120,13 @@ $("candidateList").addEventListener("click", event => {
   }
 });
 
-$("searchInput").addEventListener("input", renderCandidates);
+$("searchInput").addEventListener("input", () => {
+  if (candidateSearchRenderTimer !== null) clearTimeout(candidateSearchRenderTimer);
+  candidateSearchRenderTimer = window.setTimeout(() => {
+    candidateSearchRenderTimer = null;
+    renderCandidates();
+  }, 90);
+});
 document.querySelectorAll("[data-sort-candidates]").forEach(button => {
   button.addEventListener("click", () => {
     candidateSortMode = button.dataset.sortCandidates || "recommended";
@@ -2127,6 +2135,8 @@ document.querySelectorAll("[data-sort-candidates]").forEach(button => {
 });
 
 $("resetFilters").addEventListener("click", () => {
+  if (candidateSearchRenderTimer !== null) clearTimeout(candidateSearchRenderTimer);
+  candidateSearchRenderTimer = null;
   $("searchInput").value = "";
   ["generationFilter", "nationalityFilter", "agencyFilter", "groupFilter"].forEach(id => {
     $(id).value = "";
@@ -5064,7 +5074,7 @@ function renderDraft() {
           : `${displayTeamName(currentTeam)}の${currentStage}です。相手が指名しています。`
         : "次の指名チームを準備しています。";
     $("selectedMember").textContent = pendingIdol
-      ? `${pendingIdol.japaneseName}を選択中です。確認ボタンを押すと指名が提出されます。`
+      ? "候補を選択しました。確認ボタンから提出できます。"
       : activeMode === "online"
         ? ownOnlineSubmitted
           ? "提出済み。ほかのチームの提出を待っています。"
@@ -5083,7 +5093,7 @@ function renderDraft() {
           : `2巡目以降は${orderMode === "snake" ? "前巡の逆順" : "チーム順固定"}。${displayTeamName(currentTeam)}は候補を選び、確認後に提出してね。`
         : `${displayTeamName(currentTeam)}が指名中です。自分のチームの順番を待っています。`);
     $("selectedMember").textContent = pendingIdol
-      ? `${pendingIdol.japaneseName}を選択中です。確認ボタンを押すと指名が提出されます。`
+      ? "候補を選択しました。確認ボタンから提出できます。"
       : "候補カードを押すと、指名内容の確認画面が表示されます。";
   }
 
