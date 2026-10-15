@@ -1681,19 +1681,27 @@ const teamColorPalette = [
 ];
 
 const aiStrategies = [
-  { label: "バランス型", style: "balanced" },
-  { label: "国籍ミックス型", style: "nationalityMix" },
-  { label: "同事務所ドリーム型", style: "agencyFocus" },
-  { label: "事務所ミックス型", style: "agencyMix" },
-  { label: "同世代ユニット型", style: "generationFocus" },
+  { label: "同世代型", style: "generationFocus" },
   { label: "世代ミックス型", style: "generationMix" },
-  { label: "現役中心型", style: "active" },
-  { label: "完全ランダム型", style: "random" }
+  { label: "同事務所型", style: "agencyFocus" },
+  { label: "事務所ミックス型", style: "agencyMix" },
+  { label: "同国籍型", style: "nationalityFocus" },
+  { label: "国籍ミックス型", style: "nationalityMix" },
+  { label: "ランダム型", style: "random" }
 ];
+let aiStrategyByTeam = new Map();
+
+function assignAIStrategies(teams) {
+  aiStrategyByTeam = new Map(teams.map((team, index) => [
+    team,
+    index < aiStrategies.length
+      ? aiStrategies[index]
+      : aiStrategies[Math.floor(Math.random() * aiStrategies.length)]
+  ]));
+}
 
 function aiStrategyFor(team) {
-  const index = Number(String(team).match(/\d+/)?.[0] || 1) - 1;
-  return aiStrategies[index % aiStrategies.length];
+  return aiStrategyByTeam.get(team) || aiStrategies[0];
 }
 
 function displayTeamName(team) {
@@ -4127,6 +4135,7 @@ function startGame(mode, aiCount = 3) {
         localTeamNameValues[index].trim() || defaultName
       );
   aiTeams = new Set(mode === "ai" ? teamNames.slice(1) : []);
+  assignAIStrategies([...aiTeams]);
   if (startOrderMode === "random") teamNames = shuffle(teamNames);
   gameStarted = true;
   drafted = new Set();
@@ -4285,14 +4294,15 @@ function chooseAIIdol(team) {
   }
 
   const teamPicks = picks[team] || [];
-  const firstKnownAgency = teamPicks.find(pick => pick.agency && pick.agency !== "未確認")?.agency;
+  const firstKnownPick = teamPicks.find(pick => pick.agency && pick.agency !== "未確認");
+  const firstKnownAgency = firstKnownPick ? agencyFilterName(firstKnownPick.agency) : "";
   const ranked = available.map(idol => {
     const groupCount = teamPicks.filter(pick => pick.group === idol.group).length;
     const generationCount = teamPicks.filter(pick => pick.generation === idol.generation).length;
     const nationalityCount = teamPicks.filter(pick => pick.nationality === idol.nationality).length;
-    const agency = idol.agency !== "未確認" ? idol.agency : "";
+    const agency = idol.agency !== "未確認" ? agencyFilterName(idol.agency) : "";
     const agencyCount = agency
-      ? teamPicks.filter(pick => pick.agency === agency).length
+      ? teamPicks.filter(pick => agencyFilterName(pick.agency) === agency).length
       : 0;
     const popularity = idol.popularityStars > 1
       ? (idol.popularityStars - 1) * 1.4 + idol.popularitySortScore / 20
@@ -4327,16 +4337,12 @@ function chooseAIIdol(team) {
         compositionScore += nationalityCount === 0 ? 2 : 0;
         compositionScore += popularity * 0.35;
         break;
-      case "active":
-        compositionScore += idol.activity === "活動中" ? 8 : 0;
-        compositionScore += popularity * 0.25;
+      case "nationalityFocus":
+        compositionScore += nationalityCount > 0 ? 9 * nationalityCount : 0;
+        compositionScore += popularity * 0.3;
         break;
       default:
-        compositionScore += groupCount === 0 ? 5 : -2 * groupCount;
-        compositionScore += 5 / (generationCount + 1);
-        compositionScore += 4 / (nationalityCount + 1);
-        compositionScore += (agency && agencyCount === 0 ? 2 : 0);
-        compositionScore += popularity * 0.55;
+        compositionScore += popularity * 0.35;
         break;
     }
     const score = Math.random() * 4 + compositionScore;
