@@ -3,22 +3,22 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>STAGE PICK — K-POP Draft</title>
-  <meta name="description" content="STAGE PICKは、K-POPアイドルを選んで楽しむ非公式ファン制作のドラフトゲームです。">
-  <meta name="theme-color" content="#1264a4">
+  <title>KDraft — K-POP Draft</title>
+  <meta name="description" content="KDraftは、K-POPアイドルを選んで楽しむ非公式ファン制作のドラフトゲームです。">
+  <meta name="theme-color" content="#6950df">
   <meta name="application-name" content="KDraft">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="KDraft">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <link rel="manifest" href="manifest.webmanifest?v=20261015-kdraft-3">
+  <link rel="manifest" href="manifest.webmanifest?v=20261015-kdraft-prism-1">
   <link rel="icon" href="assets/kdraft-512-v3.png?v=20261015-kdraft-3" type="image/png" sizes="512x512">
   <link rel="apple-touch-icon" sizes="180x180" href="assets/kdraft-apple-touch-icon-v3.png?v=20261015-kdraft-3">
   <meta property="og:type" content="website">
-  <meta property="og:title" content="STAGE PICK — K-POP Draft">
+  <meta property="og:title" content="KDraft — K-POP Draft">
   <meta property="og:description" content="推しでつくる、夢のドラフト。非公式ファン制作のK-POPドラフトゲーム。">
   <meta property="og:url" content="https://l1nus2910.github.io/kpop-draft/">
   <meta name="twitter:card" content="summary">
-  <link rel="stylesheet" href="style.css?v=20261015-mobile-draft-2">
+  <link rel="stylesheet" href="style.css?v=20261015-kdraft-prism-1">
   <script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-database-compat.js"></script>
@@ -28,8 +28,8 @@
 <body>
   <header class="topbar">
     <a class="brand" href="#">
-      <span class="brand-mark">✦</span>
-      <span>STAGE PICK<small>K-POP GIRL GROUP DRAFT</small></span>
+      <img class="brand-mark" src="assets/kdraft-192-v3.png" alt="">
+      <span>KDraft<small>K-POP GIRL GROUP DRAFT</small></span>
     </a>
     <nav>
       <a href="#draft">ドラフトルーム</a>
@@ -345,7 +345,7 @@
 
     <footer class="site-footer" id="siteFooter">
       <div class="site-footer-heading">
-        <span>STAGE PICK</span>
+        <span>KDraft</span>
         <p>非公式ファン制作のドラフトゲームです。各グループ・事務所・情報元とは関係ありません。</p>
       </div>
       <div class="site-notices">
@@ -373,7 +373,7 @@
   <dialog class="site-info-dialog" id="siteInfoDialog" aria-labelledby="siteInfoTitle">
     <div class="site-info-dialog-inner">
       <button class="site-info-close" id="siteInfoClose" type="button" aria-label="閉じる">×</button>
-      <p class="eyebrow">STAGE PICK</p>
+      <p class="eyebrow">KDraft</p>
       <h2 id="siteInfoTitle">サイト情報</h2>
       <div class="site-info-highlights">
         <p><strong>非公式のファン制作ゲームです。</strong><br>芸能事務所、グループ、メンバー、ランキング運営元とは関係ありません。</p>
@@ -398,12 +398,12 @@
       <div class="pick-flip-card" id="pickRevealFlipCard">
         <div class="pick-flip-inner">
           <div class="pick-flip-face pick-flip-back">
-            <span>STAGE PICK</span>
+            <span>KDraft</span>
             <strong>指名発表</strong>
             <b>✦</b>
           </div>
           <div class="pick-flip-face pick-flip-front">
-            <span class="pick-reveal-profile-kicker" aria-hidden="true">STAGE PICK <i>·</i> MEMBER</span>
+            <span class="pick-reveal-profile-kicker" aria-hidden="true">KDRAFT <i>·</i> MEMBER</span>
             <span class="pick-reveal-name" id="pickRevealName"></span>
             <div class="pick-reveal-affiliation">
               <span class="pick-reveal-agency" id="pickRevealAgency"></span>
