@@ -947,6 +947,9 @@ const agencyShortLabels = {
   "JYP Entertainment": "JYP",
   "YG Entertainment": "YG",
   "STARSHIP Entertainment": "STARSHIP",
+  "HYBE": "HYBE",
+  "CJ ENM": "CJ ENM",
+  "RBW": "RBW",
   "SOURCE MUSIC": "SOURCE",
   "OFF THE RECORD（プロジェクト）": "OTR",
   "CJ ENM（プロジェクト）": "CJ ENM",
@@ -961,9 +964,33 @@ const agencyShortLabels = {
   "Dream T Entertainment": "Dream T"
 };
 
+// Keep the original label on each idol for draft logic, while showing the
+// better-known parent company in affiliation labels and the agency filter.
+const agencyParentDisplayNames = {
+  "BELIFT LAB": "HYBE",
+  "SOURCE MUSIC": "HYBE",
+  ADOR: "HYBE",
+  "PLEDIS Entertainment": "HYBE",
+  "ABD（HYBE傘下）": "HYBE",
+  WAKEONE: "CJ ENM",
+  "CJ ENM（プロジェクト）": "CJ ENM",
+  "OFF THE RECORD（プロジェクト）": "CJ ENM",
+  "LAPONE GIRLS": "CJ ENM",
+  "WM Entertainment": "RBW",
+  "DSP Media": "RBW",
+  "Mystic Story": "SM Entertainment",
+  "The Black Label": "YG Entertainment"
+};
+
+function agencyFilterName(agency) {
+  const value = String(agency || "").trim();
+  return agencyParentDisplayNames[value] || value;
+}
+
 function fullAgencyName(group, agency = "") {
   const value = String(agency || "").trim();
-  return value && value !== "未確認" ? value : (agencyByGroup[group] || value);
+  const fullName = value && value !== "未確認" ? value : (agencyByGroup[group] || value);
+  return agencyFilterName(fullName);
 }
 
 function shortAgencyName(agency) {
@@ -1677,7 +1704,7 @@ function fillFilter(id, values) {
 
 fillFilter("generationFilter", idols.map(idol => idol.generation));
 fillFilter("nationalityFilter", idols.map(idol => idol.nationality));
-fillFilter("agencyFilter", idols.map(idol => idol.agency));
+fillFilter("agencyFilter", idols.map(idol => agencyFilterName(idol.agency)));
 fillFilter("groupFilter", idols.map(idol => idol.group));
 
 const dependentFilters = [
@@ -1708,14 +1735,15 @@ function getCandidates(ignoreFilter = "", dedupePeople = true) {
   const hideDrafted = $("hideDrafted").checked;
 
   const candidates = idols.filter(idol => {
+    const displayedAgency = agencyFilterName(idol.agency);
     const matchesText = !query ||
-      [idol.name, idol.japaneseName, idol.japaneseSearchName, idol.koreanName, idol.group, idol.nationality, idol.agency]
+      [idol.name, idol.japaneseName, idol.japaneseSearchName, idol.koreanName, idol.group, idol.nationality, idol.agency, displayedAgency]
         .some(value => normalizeSearchText(value).includes(query));
 
     return matchesText &&
       (!generation || idol.generation === generation) &&
       (!nationality || idol.nationality === nationality) &&
-      (!agency || idol.agency === agency) &&
+      (!agency || displayedAgency === agency) &&
       (!group || idol.group === group) &&
       (!hideDrafted || !personHasBeenDrafted(idol)) &&
       ($("showExcluded").checked || !excluded.has(idol.id));
@@ -1733,7 +1761,9 @@ function updateDependentFilters() {
     dependentFilters.forEach(filter => {
       const select = $(filter.id);
       const current = select.value;
-      const values = [...new Set(getCandidates(filter.id, false).map(idol => idol[filter.field]))]
+      const values = [...new Set(getCandidates(filter.id, false).map(idol =>
+        filter.id === "agencyFilter" ? agencyFilterName(idol.agency) : idol[filter.field]
+      ))]
         .sort((a, b) => a.localeCompare(b));
 
       select.innerHTML = '<option value="">すべて</option>' + values.map(value =>
@@ -2063,12 +2093,12 @@ $("presetSelect").addEventListener("change", () => {
 
   fillFilter("generationFilter", idols.map(idol => idol.generation));
   fillFilter("nationalityFilter", idols.map(idol => idol.nationality));
-  fillFilter("agencyFilter", idols.map(idol => idol.agency));
+  fillFilter("agencyFilter", idols.map(idol => agencyFilterName(idol.agency)));
   fillFilter("groupFilter", idols.map(idol => idol.group));
   $("searchInput").value = preset.query || "";
   $("generationFilter").value = preset.generation || "";
   $("nationalityFilter").value = preset.nationality || "";
-  $("agencyFilter").value = preset.agency || "";
+  $("agencyFilter").value = agencyFilterName(preset.agency || "");
   $("groupFilter").value = preset.group || "";
   $("hideDrafted").checked = preset.hideDrafted !== false;
   renderCandidates();
@@ -4793,7 +4823,7 @@ function renderDraft() {
   $("pickConfirmation").hidden = !canConfirm;
   if (canConfirm) {
     $("pickConfirmName").textContent = pendingIdol.japaneseName;
-    $("pickConfirmDetails").textContent = `${pendingIdol.group}・${pendingIdol.agency || "事務所未登録"}`;
+    $("pickConfirmDetails").textContent = `${pendingIdol.group}・${fullAgencyName(pendingIdol.group, pendingIdol.agency) || "事務所未登録"}`;
   }
 
   $("currentTeam").textContent = !gameStarted
