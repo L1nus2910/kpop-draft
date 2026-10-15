@@ -8702,3 +8702,115 @@ body::before {
   .draft-results-table .team-column span { font-size: 9px; }
   .draft-results-table .pick-cell { height: 56px; padding: 6px; }
 }
+
+/* Let players open the live board as a full, touch-scrollable view at any time. */
+.draft-board-expand-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 40px;
+  padding: 8px 12px;
+  border: 1px solid rgba(183, 164, 227, .75);
+  border-radius: 999px;
+  color: #6846c2;
+  background: linear-gradient(135deg, #fff, #f1edff 58%, #eaf7ff);
+  box-shadow: inset 0 1px #fff, 0 5px 14px rgba(105, 76, 174, .12);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 900;
+  white-space: nowrap;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.draft-board-expand-button > span:first-child { font-size: 17px; line-height: 1; }
+.draft-board-expand-button:active { transform: scale(.97); }
+.draft-board-expand-button:focus-visible { outline: 3px solid #8bcdf1; outline-offset: 2px; }
+
+body.draft-board-expanded-mode { overflow: hidden; }
+
+body.draft-board-expanded-mode::before {
+  position: fixed;
+  z-index: 999;
+  inset: 0;
+  background: rgba(24, 20, 48, .58);
+  backdrop-filter: blur(7px);
+  content: "";
+}
+
+.draft-board.is-expanded {
+  position: fixed;
+  z-index: 1000;
+  inset: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+  display: flex;
+  flex-direction: column;
+  width: auto;
+  min-width: 0;
+  max-height: none;
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid rgba(226, 219, 250, .95);
+  border-radius: 23px;
+  background:
+    radial-gradient(ellipse at 0% 0%, rgba(226, 194, 255, .3), transparent 35%),
+    radial-gradient(ellipse at 100% 100%, rgba(182, 221, 255, .3), transparent 39%),
+    linear-gradient(125deg, #fff 0%, #faf8ff 53%, #f2f8ff 100%);
+  box-shadow: 0 25px 90px rgba(15, 12, 38, .38), inset 0 1px #fff;
+}
+
+.draft-board.is-expanded .draft-board-heading {
+  flex: 0 0 auto;
+  margin: -1px -1px 12px;
+  padding: 12px 14px;
+  border-bottom: 1px solid rgba(186, 171, 224, .3);
+  border-radius: 19px 19px 0 0;
+  background: rgba(255, 255, 255, .66);
+  backdrop-filter: blur(16px);
+}
+
+.draft-board.is-expanded .draft-table-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+  overflow: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-x pan-y;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+
+.draft-board.is-expanded .draft-results-table .team-column { min-width: clamp(132px, 15vw, 205px); }
+
+/* On touchscreens, remove sticky hover animation and give an immediate pressed state. */
+.candidate-select {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+@media (hover: none) {
+  .candidate-card:hover {
+    transform: none;
+    border-color: rgba(203, 195, 232, .82);
+    box-shadow: 0 8px 20px rgba(76, 64, 132, .055), inset 0 1px #fff;
+  }
+
+  .candidate-select:active {
+    border-radius: 12px;
+    background: rgba(133, 83, 219, .075);
+  }
+}
+
+@media (max-width: 650px) {
+  .draft-board-expand-button { min-height: 36px; padding: 7px 9px; font-size: 10px; }
+  .draft-board.is-expanded { inset: max(7px, env(safe-area-inset-top)) max(7px, env(safe-area-inset-right)) max(7px, env(safe-area-inset-bottom)) max(7px, env(safe-area-inset-left)); padding: 10px; border-radius: 18px; }
+  .draft-board.is-expanded .draft-board-heading { align-items: flex-start; flex-direction: column; gap: 8px; padding: 8px 5px 10px; }
+  .draft-board.is-expanded .draft-board-heading > div:first-child { flex-direction: row; align-items: center; gap: 8px; }
+  .draft-board.is-expanded .draft-board-heading p { display: none; }
+  .draft-board.is-expanded .draft-board-tools { width: 100%; flex-wrap: nowrap; justify-content: space-between; gap: 7px; }
+  .draft-board.is-expanded .draft-board-inline-hint { order: 2; flex: 1 1 auto; min-width: 0; text-align: left; }
+  .draft-board.is-expanded .draft-board-count { order: 1; }
+  .draft-board.is-expanded .draft-board-scroll-controls { order: 3; }
+  .draft-board.is-expanded .draft-results-table .team-column { min-width: 132px; height: 70px; }
+}

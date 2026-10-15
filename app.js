@@ -1946,10 +1946,12 @@ function selectMember(id) {
   }
 
   if (!gameStarted) {
+    const previousId = selectedId;
     selectedId = id;
     lastCandidateInteraction = `選択:${id}`;
     $("selectedMember").textContent = `${idol.japaneseName}（${idol.group}）を選択中。ドラフト開始後に指名できるよ。`;
-    renderCandidates();
+    refreshCandidateCardSelection(previousId);
+    refreshCandidateCardSelection(id);
     return;
   }
 
@@ -1964,17 +1966,78 @@ function selectMember(id) {
     return;
   }
 
+  const previousId = pendingDraftPickId;
   pendingDraftPickId = idol.id;
   lastCandidateInteraction = `選択済み:${id}`;
   $("randomResult").hidden = true;
-  renderDraft();
-  renderCandidates();
+  updatePendingPickFeedback(previousId);
   renderOnlineSyncDebug();
 }
+
+function findCandidateCard(id) {
+  for (const card of $("candidateList").querySelectorAll(".candidate-card")) {
+    if (card.dataset.candidateId === String(id)) return card;
+  }
+  return null;
+}
+
+function candidateIsAlreadyNominated(id) {
+  const idol = idols.find(item => item.id === id);
+  if (!idol || r1Started || areR1BidsSealed() || r1RevealPending) return false;
+  return r1Nominations.some(item => {
+    if (pendingR1Resolution && !pendingR1Resolution.revealedTeams.has(item.team)) return false;
+    const nominated = idols.find(candidate => candidate.id === item.id);
+    return nominated?.personKey && nominated.personKey === idol.personKey;
+  });
+}
+
+function refreshCandidateCardSelection(id) {
+  if (!id) return;
+  const card = findCandidateCard(id);
+  const button = card?.querySelector(".candidate-select");
+  const hint = card?.querySelector(".candidate-select-hint");
+  if (!card || !button || !hint) return;
+  const nominated = candidateIsAlreadyNominated(id);
+  const selected = pendingDraftPickId === id || selectedId === id || nominated;
+  card.classList.toggle("is-selected", selected);
+  button.setAttribute("aria-pressed", String(selected));
+  hint.textContent = pendingDraftPickId === id
+    ? "✓ 選択中・確認して提出"
+    : nominated
+      ? "✓ 1巡目候補に設定済み"
+      : selectedId === id && !gameStarted
+        ? "✓ 選択中"
+        : "クリックして選択";
+}
+
+function updatePendingPickFeedback(previousId = "") {
+  const panel = $("pickConfirmation");
+  const mount = $("pickConfirmationMount");
+  const pendingIdol = idols.find(item => item.id === pendingDraftPickId);
+  if (!pendingIdol) {
+    mount.append(panel);
+    panel.hidden = true;
+    refreshCandidateCardSelection(previousId);
+    $("selectedMember").textContent = "候補カードを押すと、指名内容の確認画面が表示されます。";
+    return;
+  }
+
+  if (previousId && previousId !== pendingDraftPickId) refreshCandidateCardSelection(previousId);
+  refreshCandidateCardSelection(pendingDraftPickId);
+  $("pickConfirmName").textContent = pendingIdol.japaneseName;
+  $("pickConfirmDetails").textContent = `${pendingIdol.group}・${fullAgencyName(pendingIdol.group, pendingIdol.agency) || "事務所未登録"}`;
+  panel.hidden = false;
+  const selectedCard = findCandidateCard(pendingDraftPickId);
+  const cardActions = selectedCard?.querySelector(".card-actions");
+  if (selectedCard && cardActions) selectedCard.insertBefore(panel, cardActions);
+  $("selectedMember").textContent = `${pendingIdol.japaneseName}を選択中です。確認ボタンを押すと指名が提出されます。`;
+}
+
 function cancelDraftPick() {
+  const previousId = pendingDraftPickId;
   pendingDraftPickId = null;
-  renderDraft();
-  renderCandidates();
+  updatePendingPickFeedback(previousId);
+  renderOnlineSyncDebug();
 }
 
 function confirmDraftPick(submittingUid = "") {
@@ -5162,6 +5225,7 @@ function renderDraft() {
 
   const finalResults = $("finalResults");
   const compactBoard = $("draftBoard").closest(".draft-board");
+  if (finished && compactBoard.classList.contains("is-expanded")) setDraftBoardExpanded(false, false);
   finalResults.hidden = !finished;
   compactBoard.hidden = finished;
   if (finished) {
@@ -5187,6 +5251,42 @@ function updateDraftBoardScrollControls() {
   $("draftBoardScrollPrev").disabled = maxScroll < 2 || board.scrollLeft < 2;
   $("draftBoardScrollNext").disabled = maxScroll < 2 || board.scrollLeft >= maxScroll - 2;
 }
+
+function setDraftBoardExpanded(expanded, restoreFocus = true) {
+  const board = $("draftBoard").closest(".draft-board");
+  const toggle = $("draftBoardExpand");
+  if (!board || !toggle) return;
+  board.classList.toggle("is-expanded", expanded);
+  document.body.classList.toggle("draft-board-expanded-mode", expanded);
+  toggle.setAttribute("aria-expanded", String(expanded));
+  toggle.querySelector(".draft-board-expand-label").textContent = expanded ? "元の表示に戻る" : "表を広げて見る";
+  toggle.setAttribute("aria-label", expanded ? "指名結果表を閉じる" : "指名結果表を広げて見る");
+  if (expanded) {
+    board.setAttribute("role", "dialog");
+    board.setAttribute("aria-modal", "true");
+    board.setAttribute("aria-label", "拡大した指名経過・結果");
+    board.setAttribute("tabindex", "-1");
+    board.focus({ preventScroll: true });
+  } else {
+    board.setAttribute("role", "region");
+    board.removeAttribute("aria-modal");
+    board.removeAttribute("aria-label");
+    board.removeAttribute("tabindex");
+    if (restoreFocus) toggle.focus({ preventScroll: true });
+  }
+  requestAnimationFrame(updateDraftBoardScrollControls);
+}
+
+$("draftBoardExpand").addEventListener("click", () => {
+  const expanded = $("draftBoard").closest(".draft-board").classList.contains("is-expanded");
+  setDraftBoardExpanded(!expanded);
+});
+
+window.addEventListener("keydown", event => {
+  if (event.key === "Escape" && document.body.classList.contains("draft-board-expanded-mode")) {
+    setDraftBoardExpanded(false);
+  }
+});
 
 function scrollDraftBoard(direction) {
   const board = $("draftBoard");
