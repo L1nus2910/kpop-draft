@@ -5114,6 +5114,7 @@ function renderDraft() {
       </tbody>
     </table>
   `;
+  requestAnimationFrame(updateDraftBoardScrollControls);
 
   const finalResults = $("finalResults");
   const compactBoard = $("draftBoard").closest(".draft-board");
@@ -5135,6 +5136,27 @@ function renderDraft() {
   if (activeMode === "online" && onlineRoomRef) renderOnlineLobby();
   syncOnlineState();
 }
+
+function updateDraftBoardScrollControls() {
+  const board = $("draftBoard");
+  const maxScroll = Math.max(0, board.scrollWidth - board.clientWidth);
+  $("draftBoardScrollPrev").disabled = maxScroll < 2 || board.scrollLeft < 2;
+  $("draftBoardScrollNext").disabled = maxScroll < 2 || board.scrollLeft >= maxScroll - 2;
+}
+
+function scrollDraftBoard(direction) {
+  const board = $("draftBoard");
+  const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+  board.scrollBy({
+    left: direction * Math.max(220, board.clientWidth * 0.78),
+    behavior: reducedMotion ? "auto" : "smooth"
+  });
+}
+
+$("draftBoardScrollPrev").addEventListener("click", () => scrollDraftBoard(-1));
+$("draftBoardScrollNext").addEventListener("click", () => scrollDraftBoard(1));
+$("draftBoard").addEventListener("scroll", updateDraftBoardScrollControls, { passive: true });
+window.addEventListener("resize", updateDraftBoardScrollControls);
 
 renderNominations();
 refreshPresets();
