@@ -1614,6 +1614,7 @@ let orderMode = "snake";
 let startOrderMode = "fixed";
 let firstRoundLotteryLosses = {};
 let onlineRoomRef = null;
+let firebaseSdkLoadPromise = null;
 let onlineRoomCode = "";
 let onlineGameStatus = "";
 let onlineUid = "";
@@ -2255,6 +2256,13 @@ function renderNominations() {
   }).join("");
 }
 
+function isDraftFinished() {
+  return Boolean(
+    gameStarted && allTeamsComplete() && !pendingR1Resolution &&
+    $("pickReveal").hidden && pickRevealQueue.length === 0
+  );
+}
+
 function updateModeSetup() {
   const mode = $("playMode").value;
   const aiMode = mode === "ai";
@@ -2267,8 +2275,9 @@ function updateModeSetup() {
   $("teamNameSettings").hidden = onlineMode;
   $("startGame").hidden = onlineMode;
   $("startGame").textContent = aiMode
-    ? "AI対戦を始める"
+    ? "AIドラフトを始める"
     : `${$("localTeamCount").value}チームで始める`;
+  $("restartOfflineDraft").hidden = !isDraftFinished() || !["ai", "local"].includes(activeMode) || mode !== activeMode;
 
   if (aiMode) {
     $("teamNameHelp").textContent = "AIチーム名は自動で設定されます。";
@@ -2321,7 +2330,7 @@ function setOnlineStatus(message) {
   const actionStatus = $("onlineActionStatus");
   if (actionStatus) {
     actionStatus.textContent = message;
-    actionStatus.classList.toggle("is-error", /できません|まだです|見つかりません|満員|終了しました|失敗/.test(message));
+    actionStatus.classList.toggle("is-error", /できません|読み込めません|まだです|見つかりません|満員|終了しました|失敗/.test(message));
     actionStatus.classList.toggle("is-success", /作りました|参加しました|再接続しました/.test(message));
   }
 }
@@ -2332,12 +2341,39 @@ function firebaseConfigurationReady() {
     !JSON.stringify(config).includes("YOUR_"));
 }
 
+function loadFirebaseSdk() {
+  if (window.firebase?.auth && window.firebase?.database) return Promise.resolve();
+  if (firebaseSdkLoadPromise) return firebaseSdkLoadPromise;
+
+  const sources = [];
+  if (!window.firebase?.initializeApp) sources.push("https://www.gstatic.com/firebasejs/12.19.0/firebase-app-compat.js");
+  if (!window.firebase?.auth) sources.push("https://www.gstatic.com/firebasejs/12.19.0/firebase-auth-compat.js");
+  if (!window.firebase?.database) sources.push("https://www.gstatic.com/firebasejs/12.19.0/firebase-database-compat.js");
+
+  firebaseSdkLoadPromise = sources.reduce((chain, source) => chain.then(() => new Promise((resolve, reject) => {
+    const script = document.createElement("script");
+    script.src = source;
+    script.async = true;
+    script.onload = resolve;
+    script.onerror = () => reject(new Error("Firebase SDKを読み込めませんでした。ネット接続を確認してください。"));
+    document.head.append(script);
+  })), Promise.resolve()).catch(error => {
+    firebaseSdkLoadPromise = null;
+    throw error;
+  });
+  return firebaseSdkLoadPromise;
+}
+
 async function ensureOnlineIdentity() {
-  if (!firebaseConfigurationReady() || !window.firebase?.auth || !window.firebase?.database) {
+  if (!firebaseConfigurationReady()) {
     throw new Error("Firebaseの無料プロジェクト設定がまだです。firebase-config.jsに設定を入れてください。");
   }
-  if (!firebase.apps.length) firebase.initializeApp(window.STAGE_PICK_FIREBASE_CONFIG);
-  const auth = firebase.auth();
+  await loadFirebaseSdk();
+  if (!window.firebase?.auth || !window.firebase?.database) {
+    throw new Error("Firebase SDKを読み込めませんでした。ネット接続を確認してください。");
+  }
+  if (!window.firebase.apps.length) window.firebase.initializeApp(window.STAGE_PICK_FIREBASE_CONFIG);
+  const auth = window.firebase.auth();
   if (!auth.currentUser) await auth.signInAnonymously();
   onlineUid = auth.currentUser.uid;
   return onlineUid;
@@ -2615,14 +2651,14 @@ function renderOnlineLobby() {
   const finished = onlineGameStatus === "playing" && gameStarted && allTeamsComplete() && !pendingR1Resolution && $("pickReveal").hidden && pickRevealQueue.length === 0;
   $("restartOnlineGame").hidden = !onlineIsHost || !finished;
   $("restartOnlineGame").disabled = onlineRestartPending;
-  $("restartOnlineGame").textContent = onlineRestartPending ? "再戦を準備中…" : "同じルームで再戦";
+  $("restartOnlineGame").textContent = onlineRestartPending ? "再ドラフトを準備中…" : "同じルームで再ドラフト";
   $("onlineLobbyHint").textContent = onlineGameStatus === "playing"
     ? finished
       ? onlineIsHost
-        ? "結果を確認したら「同じルームで再戦」を押してください。参加者はそのまま次のドラフトに参加できます。"
-        : "ドラフトが終了しました。ホストが再戦を始めると、このルームのまま次のドラフトに進みます。"
-      : "ドラフト進行中です。終了後も同じルームで再戦できます。"
-    : "2〜10人で遊べます。参加者がそろったらホストが開始します。終了後も同じルームで再戦できます。";
+        ? "結果を確認したら「同じルームで再ドラフト」を押してください。参加者はそのまま次のドラフトに参加できます。"
+        : "ドラフトが終了しました。ホストが再ドラフトを始めると、このルームのまま次のドラフトに進みます。"
+      : "ドラフト進行中です。終了後も同じルームで再ドラフトできます。"
+    : "2〜10人で遊べます。参加者がそろったらホストが開始します。終了後も同じルームで再ドラフトできます。";
   $("closeOnlineRoom").hidden = !onlineIsHost || !onlineRoomRef;
   $("leaveOnlineRoom").hidden = onlineIsHost || !["lobby", "closed"].includes(onlineGameStatus);
   $("closeOnlineRoom").textContent = "ルーム終了・データ削除";
@@ -3983,7 +4019,7 @@ async function startOnlineGame() {
   if (!onlineIsHost || onlineGameStatus !== "lobby") return;
   const players = onlinePlayersInDraftOrder();
   if (players.length < 2 || players.length > 10) {
-    setOnlineStatus("オンライン対戦は2〜10人で開始できます。参加者の人数を確認してください。");
+    setOnlineStatus("オンラインドラフトは2〜10人で開始できます。参加者の人数を確認してください。");
     return;
   }
   try {
@@ -4005,7 +4041,7 @@ async function restartOnlineGame() {
       !gameStarted || !allTeamsComplete() || pendingR1Resolution || !$("pickReveal").hidden || pickRevealQueue.length || onlineRestartPending) return;
   const players = onlinePlayersInDraftOrder();
   if (players.length < 2 || players.length > 10) {
-    setOnlineStatus("再戦には2〜10人の参加者が必要です。ルームの参加者を確認してください。");
+    setOnlineStatus("再ドラフトには2〜10人の参加者が必要です。ルームの参加者を確認してください。");
     return;
   }
 
@@ -4029,11 +4065,17 @@ async function restartOnlineGame() {
     startGame("online");
     await flushOnlineState();
   } catch (error) {
-    setOnlineStatus(error.message || "同じルームで再戦を開始できませんでした。");
+    setOnlineStatus(error.message || "同じルームで再ドラフトを開始できませんでした。");
   } finally {
     onlineRestartPending = false;
     renderOnlineLobby();
   }
+}
+
+function restartLocalOrAiDraft() {
+  const mode = $("playMode").value;
+  if (!isDraftFinished() || mode !== activeMode || !["ai", "local"].includes(mode)) return;
+  startGame(mode, mode === "ai" ? Number($("aiCount").value) : 3);
 }
 
 function startGame(mode, aiCount = 3) {
@@ -4137,6 +4179,7 @@ $("closeOnlineRoom").addEventListener("click", closeOnlineRoom);
 $("leaveOnlineRoom").addEventListener("click", leaveOnlineRoom);
 $("startOnlineGame").addEventListener("click", startOnlineGame);
 $("restartOnlineGame").addEventListener("click", restartOnlineGame);
+$("restartOfflineDraft").addEventListener("click", restartLocalOrAiDraft);
 $("confirmFirstRoundReveal").addEventListener("click", confirmFirstRoundReveal);
 $("startGame").addEventListener("click", () => {
   const mode = $("playMode").value;
@@ -5011,10 +5054,7 @@ function renderDraft() {
   const ownOnlineTeam = activeMode === "online" ? onlineTeamForUid(onlineUid) : "";
   const ownOnlineSubmitted = Boolean(ownOnlineTeam && r1Nominations.some(item => item.team === ownOnlineTeam));
   const ownOnlineFirstPick = Boolean(ownOnlineTeam && (picks[ownOnlineTeam] || []).some(item => item.round === 1));
-  const finished = Boolean(
-    gameStarted && allTeamsComplete() && !pendingR1Resolution &&
-    $("pickReveal").hidden && pickRevealQueue.length === 0
-  );
+  const finished = isDraftFinished();
   const pendingIdol = idols.find(item => item.id === pendingDraftPickId);
   const canConfirm = Boolean(
     gameStarted && pendingIdol &&
@@ -5028,6 +5068,7 @@ function renderDraft() {
     : "ホストが開示を確認すると、各端末で指名メンバーの発表が始まります。";
 
   $("pickConfirmation").hidden = !canConfirm;
+  $("restartOfflineDraft").hidden = !finished || !["ai", "local"].includes(activeMode) || $("playMode").value !== activeMode;
   if (canConfirm) {
     $("pickConfirmName").textContent = pendingIdol.japaneseName;
     $("pickConfirmDetails").textContent = `${pendingIdol.group}・${fullAgencyName(pendingIdol.group, pendingIdol.agency) || "事務所未登録"}`;
@@ -5106,9 +5147,9 @@ function renderDraft() {
   });
   $("startGame").disabled = locked;
   $("startGame").textContent = !gameStarted
-    ? ($("playMode").value === "ai" ? "AI対戦を始める" : `${$("localTeamCount").value}チームで始める`)
+    ? ($("playMode").value === "ai" ? "AIドラフトを始める" : `${$("localTeamCount").value}チームで始める`)
     : finished
-      ? "もう一度遊ぶ"
+      ? "再ドラフト"
       : "ドラフト進行中";
 
   const totalPicks = teamNames.reduce((sum, team) => sum + picks[team].length, 0);
