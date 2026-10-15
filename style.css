@@ -5201,12 +5201,12 @@ body::before {
 }
 
 .pick-reveal-group {
-  padding: 5px 14px 6px;
-  color: #1c6795;
-  background: rgba(226, 242, 251, 0.9);
-  border: 1px solid rgba(78, 153, 190, 0.2);
-  border-radius: 999px;
-  letter-spacing: 0.1em;
+  padding: 0;
+  color: #466d88;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  letter-spacing: 0.12em;
 }
 
 .pick-reveal-agency {
@@ -5248,6 +5248,6 @@ body::before {
   }
 
   .pick-reveal-group {
-    padding: 4px 11px 5px;
+    padding: 0;
   }
 }

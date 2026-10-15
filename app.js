@@ -3089,6 +3089,7 @@ function serializeOnlineReveal(reveal) {
     opened: reveal.opened ? [...reveal.opened] : [],
     opening: Boolean(reveal.opening),
     revealing: Boolean(reveal.revealing),
+    hostOpenConfirmed: Boolean(reveal.hostOpenConfirmed),
     winner: reveal.winner || null
   };
 }
@@ -3106,6 +3107,7 @@ function restoreOnlineReveal(source) {
   return {
     ...source,
     idol,
+    hostOpenConfirmed: Boolean(source.hostOpenConfirmed),
     selections: new Map(source.selections || []),
     opened: new Set(source.opened || [])
   };
@@ -3402,6 +3404,14 @@ function applyOnlineGameState(state) {
     const serializedRevealQueue = state.pickRevealQueue || [];
     pickRevealQueue = serializedRevealQueue.map(restoreOnlineReveal).filter(Boolean);
     activePickReveal = restoreOnlineReveal(state.activePickReveal);
+    if (activePickReveal?.type === "lottery" && !activePickReveal.hostOpenConfirmed &&
+        activePickReveal.revealing && !activePickReveal.opening && !activePickReveal.winner) {
+      // Older room snapshots used `revealing` as an automatic timer. Treat them
+      // as waiting for host approval instead of as an approved opening.
+      activePickReveal.revealing = false;
+    } else if (activePickReveal?.type === "lottery" && activePickReveal.opening && !activePickReveal.winner) {
+      activePickReveal.hostOpenConfirmed = true;
+    }
     if ((state.activePickReveal && !activePickReveal) || pickRevealQueue.length !== serializedRevealQueue.length) {
       setOnlineStatus("発表データを読み込めませんでした。全端末を再読み込みして、新しいルームで開始してください。");
     }
@@ -4212,10 +4222,16 @@ function renderLotteryTickets(reveal) {
 
 function updateLotteryProgress() {
   if (!activePickReveal || activePickReveal.type !== "lottery") return;
-  $("pickRevealNext").hidden = activeMode === "online";
   const reveal = activePickReveal;
   const total = reveal.drawOrder.length;
   const drawer = reveal.drawOrder[reveal.drawIndex];
+  const allEnvelopesSelected = reveal.selections.size === total;
+  const hostCanOpen = activeMode === "online" && onlineIsHost && allEnvelopesSelected &&
+    !reveal.winner && !reveal.revealing && !reveal.opening;
+  $("pickRevealNext").hidden = activeMode === "online" && !hostCanOpen;
+  $("lotteryBoardTitle").textContent = activeMode === "online"
+    ? "全員が封筒を選び終わったら、ホストが開封を開始します"
+    : "順番に封筒を選び、全員が選び終わったら一斉に開封します";
   if (reveal.winner) {
     $("lotteryBoard").classList.add("is-revealed");
     $("lotteryTurn").textContent = `交渉権獲得チーム：${displayTeamName(reveal.winner)}`;
@@ -4237,11 +4253,36 @@ function updateLotteryProgress() {
   }
 
   if (reveal.revealing) {
-    $("lotteryTurn").textContent = `全${total}チームの封筒がそろいました`;
-    $("lotteryOutcome").textContent = "選んだ封筒を一斉に開示します…";
+    const waitingForOpeningCue = !reveal.opening;
+    $("lotteryTurn").textContent = waitingForOpeningCue
+      ? "開封の準備が整いました"
+      : `全${total}チームの封筒を一斉に開封！`;
+    $("lotteryOutcome").textContent = waitingForOpeningCue ? "交渉権獲得チームは…" : "せーの…！";
     $("pickRevealNext").disabled = true;
     $("pickRevealNext").textContent = "結果を開示中";
-    $("pickRevealActionHint").textContent = "全チームの封筒を同時に開封しています。";
+    $("pickRevealActionHint").textContent = waitingForOpeningCue
+      ? activeMode === "online"
+        ? "ホストが開示を開始しました。結果を発表します。"
+        : "全員の封筒がそろいました。まもなく開封します。"
+      : "全チームの封筒を同時に開封しています。";
+    $("lotteryTickets").querySelectorAll("[data-lottery-envelope]").forEach(button => {
+      button.disabled = true;
+    });
+    return;
+  }
+
+  if (allEnvelopesSelected) {
+    $("lotteryTurn").textContent = "全員の封筒がそろいました";
+    $("lotteryOutcome").textContent = activeMode === "online"
+      ? "ホストが開封を始めるまで、抽選結果は伏せられています。"
+      : "選んだ封筒を一斉に開封します…";
+    $("pickRevealNext").disabled = !hostCanOpen;
+    $("pickRevealNext").textContent = "抽選結果を開示";
+    $("pickRevealActionHint").textContent = hostCanOpen
+      ? "準備ができました。確認したら「抽選結果を開示」を押してください。"
+      : activeMode === "online"
+        ? "全員が封筒を選びました。ホストの開示操作を待っています。"
+        : "全員の封筒がそろいました。開封します。";
     $("lotteryTickets").querySelectorAll("[data-lottery-envelope]").forEach(button => {
       button.disabled = true;
     });
@@ -4312,9 +4353,11 @@ function selectLotteryEnvelope(envelope, automatic = false, actorUid = onlineUid
   button.setAttribute("aria-label", `封筒 ${envelopeId + 1}は選択済み。開示まで結果は伏せられます`);
 
   if (reveal.drawIndex >= reveal.drawOrder.length) {
-    reveal.revealing = true;
+    reveal.revealing = activeMode !== "online";
+    reveal.hostOpenConfirmed = false;
     updateLotteryProgress();
     syncOnlineState();
+    if (activeMode === "online") return;
     const revealDelay = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 850;
     pickRevealTimer = window.setTimeout(() => revealLotteryResults(reveal), revealDelay);
     return;
@@ -4326,7 +4369,8 @@ function selectLotteryEnvelope(envelope, automatic = false, actorUid = onlineUid
 }
 
 function revealLotteryResults(reveal) {
-  if (activePickReveal !== reveal || reveal.winner || reveal.selections.size !== reveal.drawOrder.length) return;
+  if (activePickReveal !== reveal || reveal.winner || reveal.opening || reveal.selections.size !== reveal.drawOrder.length) return;
+  if (activeMode === "online" && (!onlineIsHost || !reveal.hostOpenConfirmed)) return;
   pickRevealTimer = null;
   reveal.opening = true;
   $("lotteryTurn").textContent = "全員の封筒を一斉に開封！";
@@ -4356,6 +4400,7 @@ function revealLotteryResults(reveal) {
     if (!winner) return;
 
     reveal.opening = false;
+    reveal.revealing = false;
     reveal.opened = new Set(reveal.envelopes);
     reveal.winner = winner;
     reveal.envelopes.forEach(envelope => {
@@ -4443,6 +4488,7 @@ function showNextPickReveal() {
     reveal.selections = new Map();
     reveal.opening = false;
     reveal.revealing = false;
+    reveal.hostOpenConfirmed = false;
     reveal.envelopes = reveal.teams.map((_, index) => index);
     reveal.winningEnvelope = Math.floor(Math.random() * reveal.envelopes.length);
     reveal.drawIndex = 0;
@@ -4487,7 +4533,9 @@ function showNextPickReveal() {
   $("pickRevealSkip").textContent = "演出をスキップ";
   $("pickRevealSkip").hidden = activeMode === "online" || isLottery;
   $("pickRevealActionHint").textContent = isLottery
-    ? "封筒を選ぶ抽選です。結果は全員が選び終わってから同時に開きます。"
+    ? activeMode === "online"
+      ? "全員が封筒を選び終わると、ホストが開示を始めます。"
+      : "封筒を選ぶ抽選です。結果は全員が選び終わってから同時に開きます。"
     : "右上は演出だけを省略します。指名を確認した後は下のボタンで次へ進みます。";
   requestAnimationFrame(() => $("pickRevealNext").focus({ preventScroll: true }));
 
@@ -4543,12 +4591,22 @@ function advancePickReveal() {
       $("pickRevealActionHint").textContent = "発表演出が終わってから確認できます。";
       return false;
     }
+    if (activePickReveal?.type === "lottery" && !activePickReveal.winner) {
+      const reveal = activePickReveal;
+      if (!onlineIsHost || reveal.selections.size !== reveal.drawOrder.length || reveal.revealing || reveal.opening) {
+        $("pickRevealActionHint").textContent = "全員が封筒を選んだ後、ホストが開示を開始します。";
+        return false;
+      }
+      reveal.hostOpenConfirmed = true;
+      reveal.revealing = true;
+      updateLotteryProgress();
+      syncOnlineState();
+      const suspenseDelay = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 1100;
+      pickRevealTimer = window.setTimeout(() => revealLotteryResults(reveal), suspenseDelay);
+      return true;
+    }
     if (onlineRevealAutoAdvanceDelay() > 0) {
       $("pickRevealActionHint").textContent = "この発表は数秒後に自動で次へ進みます。";
-      return false;
-    }
-    if (activePickReveal?.type === "lottery" && !activePickReveal.winner) {
-      $("pickRevealActionHint").textContent = "抽選結果が開示されてから次へ進めます。";
       return false;
     }
     if (!onlineIsHost) return submitOnlineAction({ kind: "next" });

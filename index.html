@@ -11,12 +11,12 @@
   <meta property="og:description" content="推しでつくる、夢のドラフト。非公式ファン制作のK-POPドラフトゲーム。">
   <meta property="og:url" content="https://l1nus2910.github.io/kpop-draft/">
   <meta name="twitter:card" content="summary">
-  <link rel="stylesheet" href="style.css?v=20261015-draft-reveal-polish-1">
+  <link rel="stylesheet" href="style.css?v=20261015-host-lottery-open-1">
   <script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-database-compat.js"></script>
   <script src="firebase-config.js" defer></script>
-  <script src="app.js?v=20261015-draft-result-wording-1" defer></script>
+  <script src="app.js?v=20261015-host-lottery-open-1" defer></script>
 </head>
 <body>
   <header class="topbar">
@@ -395,7 +395,7 @@
         </div>
       </div>
       <section class="lottery-board" id="lotteryBoard" hidden aria-live="polite">
-        <p class="lottery-board-title">順番に封筒を選び、全員が選び終わったら一斉に開封します</p>
+        <p class="lottery-board-title" id="lotteryBoardTitle">順番に封筒を選び、全員が選び終わったら開封を始めます</p>
         <p class="lottery-turn" id="lotteryTurn"></p>
         <div class="lottery-ticket-grid" id="lotteryTickets"></div>
         <p class="lottery-outcome" id="lotteryOutcome">全員が封筒を選ぶまで、結果は伏せられます。</p>
