@@ -5128,12 +5128,20 @@ function renderDraft() {
       <thead>
         <tr>
           <th class="round-column" scope="col">巡目</th>
-          ${teamNames.map((team, index) => `
-            <th class="team-column" scope="col" style="--team-color: ${teamColorPalette[index % teamColorPalette.length]}">
-              <strong>${escapeHTML(displayTeamName(team))}</strong>
-              <span>${picks[team].length} / ${pickLimit}人</span>
-            </th>
-          `).join("")}
+          ${teamNames.map((team, index) => {
+            const teamSubtitle = aiTeams.has(team)
+              ? aiStrategyFor(team).label
+              : activeMode === "online"
+                ? (team === onlineTeamForUid(onlineUid) ? "あなたのチーム" : "参加チーム")
+                : (activeMode === "ai" && index === 0 ? "あなたのチーム" : `チーム ${String(index + 1).padStart(2, "0")}`);
+            return `
+              <th class="team-column" scope="col" style="--team-color: ${teamColorPalette[index % teamColorPalette.length]}">
+                <small class="team-column-subtitle">${escapeHTML(teamSubtitle)}</small>
+                <strong>${escapeHTML(team)}</strong>
+                <span>${picks[team].length} / ${pickLimit}人</span>
+              </th>
+            `;
+          }).join("")}
         </tr>
       </thead>
       <tbody>
