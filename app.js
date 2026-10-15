@@ -3286,7 +3286,7 @@ function renderOnlinePickReveal() {
         const won = Number(envelope) === Number(reveal.winningEnvelope);
         const result = button.querySelector(".lottery-envelope-result");
         result.querySelector("strong").textContent = displayTeamName(team);
-        result.querySelector("small").textContent = won ? "当選！交渉権獲得" : "落選・再指名へ";
+        result.querySelector("small").textContent = won ? "交渉権獲得" : "再指名へ";
         button.style.setProperty("--lottery-team-color", teamColorPalette[Math.max(0, teamNames.indexOf(team)) % teamColorPalette.length]);
         button.classList.add(reveal.opening ? "is-opening" : "is-open");
         if (reveal.winner) button.classList.add(won ? "is-winner" : "is-loser");
@@ -4218,7 +4218,7 @@ function updateLotteryProgress() {
   const drawer = reveal.drawOrder[reveal.drawIndex];
   if (reveal.winner) {
     $("lotteryBoard").classList.add("is-revealed");
-    $("lotteryTurn").textContent = `🏆 当選チーム：${displayTeamName(reveal.winner)}`;
+    $("lotteryTurn").textContent = `交渉権獲得チーム：${displayTeamName(reveal.winner)}`;
     $("lotteryOutcome").textContent = "このチームが交渉権を獲得しました";
     const winnerIndex = Math.max(0, teamNames.indexOf(reveal.winner));
     $("lotteryBoard").style.setProperty("--lottery-winner-color", teamColorPalette[winnerIndex % teamColorPalette.length]);
@@ -4340,7 +4340,7 @@ function revealLotteryResults(reveal) {
     if (!button || !team) return;
     const result = button.querySelector(".lottery-envelope-result");
     result.querySelector("strong").textContent = displayTeamName(team);
-    result.querySelector("small").textContent = won ? "当選！交渉権獲得" : "落選・再指名へ";
+    result.querySelector("small").textContent = won ? "交渉権獲得" : "再指名へ";
     const teamIndex = Math.max(0, teamNames.indexOf(team));
     button.style.setProperty("--lottery-team-color", teamColorPalette[teamIndex % teamColorPalette.length]);
     button.classList.add("is-opening");
@@ -4369,8 +4369,8 @@ function revealLotteryResults(reveal) {
       const result = button.querySelector(".lottery-envelope-result");
       result.classList.add(won ? "is-winner" : "is-loser");
       button.setAttribute("aria-label", won
-        ? `${displayTeamName(team)}が当選。交渉権を獲得`
-        : `${displayTeamName(team)}は落選。再指名へ`);
+        ? `${displayTeamName(team)}が交渉権を獲得`
+        : `${displayTeamName(team)}は再指名へ`);
     });
 
     reveal.teams.forEach(losingTeam => {
@@ -4386,7 +4386,7 @@ function revealLotteryResults(reveal) {
     markPersonDrafted(reveal.idol);
     if (pendingR1Resolution) {
       pendingR1Resolution.waiting.delete(winner);
-      pendingR1Resolution.results.push(`${reveal.idol.japaneseName}：${displayTeamName(winner)}が当選`);
+      pendingR1Resolution.results.push(`${reveal.idol.japaneseName}：${displayTeamName(winner)}が交渉権を獲得`);
     }
     renderNominations();
     renderDraft();

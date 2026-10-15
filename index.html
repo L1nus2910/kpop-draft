@@ -11,12 +11,12 @@
   <meta property="og:description" content="推しでつくる、夢のドラフト。非公式ファン制作のK-POPドラフトゲーム。">
   <meta property="og:url" content="https://l1nus2910.github.io/kpop-draft/">
   <meta name="twitter:card" content="summary">
-  <link rel="stylesheet" href="style.css?v=20261015-modern-blue-dashboard-1">
+  <link rel="stylesheet" href="style.css?v=20261015-draft-reveal-polish-1">
   <script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-database-compat.js"></script>
   <script src="firebase-config.js" defer></script>
-  <script src="app.js?v=20261015-parent-agency-display-1" defer></script>
+  <script src="app.js?v=20261015-draft-result-wording-1" defer></script>
 </head>
 <body>
   <header class="topbar">
@@ -367,7 +367,7 @@
   </dialog>
   </main>
 
-  <div class="pick-reveal" id="pickReveal" hidden role="dialog" aria-modal="true" aria-labelledby="pickRevealName" aria-describedby="pickRevealAgency pickRevealGroup">
+  <div class="pick-reveal" id="pickReveal" hidden role="dialog" aria-modal="true" aria-labelledby="pickRevealName" aria-describedby="pickRevealGroup pickRevealAgency">
     <button class="pick-reveal-skip" id="pickRevealSkip" type="button" aria-label="アニメーションを省略して指名結果を表示">演出をスキップ</button>
     <div class="pick-reveal-card" id="pickRevealCard">
       <p class="pick-reveal-round" id="pickRevealRound">1巡目</p>
@@ -385,10 +385,11 @@
             <b>✦</b>
           </div>
           <div class="pick-flip-face pick-flip-front">
+            <span class="pick-reveal-profile-kicker" aria-hidden="true">STAGE PICK <i>·</i> MEMBER</span>
             <span class="pick-reveal-name" id="pickRevealName"></span>
             <div class="pick-reveal-affiliation">
-              <span class="pick-reveal-agency" id="pickRevealAgency"></span>
               <span class="pick-reveal-group" id="pickRevealGroup"></span>
+              <span class="pick-reveal-agency" id="pickRevealAgency"></span>
             </div>
           </div>
         </div>
