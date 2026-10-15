@@ -5251,3 +5251,325 @@ body::before {
     padding: 0;
   }
 }
+
+/* Phone-first spacing for portrait screens and compact landscape viewports. */
+@media (max-width: 700px) {
+  html,
+  body {
+    width: 100%;
+    min-width: 0;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+
+  body {
+    min-height: 100svh;
+    overflow-x: clip;
+  }
+
+  .topbar {
+    padding-top: max(8px, env(safe-area-inset-top));
+    padding-right: max(10px, env(safe-area-inset-right));
+    padding-bottom: 8px;
+    padding-left: max(10px, env(safe-area-inset-left));
+    gap: 8px;
+  }
+
+  .topbar nav {
+    width: 100%;
+    min-width: 0;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 4px;
+    margin-left: 0;
+  }
+
+  .topbar nav a,
+  .topbar nav .site-info-button {
+    min-width: 0;
+    min-height: 42px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 7px 4px;
+    font-size: clamp(10px, 2.8vw, 12px);
+    line-height: 1.25;
+    text-align: center;
+    white-space: nowrap;
+  }
+
+  .page {
+    width: 100%;
+    max-width: 680px;
+    margin: 10px auto 24px;
+    padding-right: max(10px, env(safe-area-inset-right));
+    padding-bottom: max(22px, env(safe-area-inset-bottom));
+    padding-left: max(10px, env(safe-area-inset-left));
+  }
+
+  .hero {
+    min-height: clamp(150px, 22svh, 184px);
+    gap: 10px;
+    padding: clamp(15px, 4vw, 22px);
+    border-radius: 18px;
+  }
+
+  .hero > div:first-child {
+    min-width: 0;
+  }
+
+  .hero h1 {
+    font-size: clamp(25px, 7.5vw, 36px);
+    overflow-wrap: anywhere;
+  }
+
+  .hero-copy {
+    max-width: 30ch;
+    margin-top: 10px;
+    font-size: clamp(11px, 3.2vw, 13px);
+    line-height: 1.55;
+  }
+
+  .hero-stamp {
+    flex: 0 0 clamp(68px, 19vw, 88px);
+    width: clamp(68px, 19vw, 88px);
+    height: clamp(68px, 19vw, 88px);
+    margin-right: 0;
+  }
+
+  .mode-panel.panel {
+    gap: 12px;
+    margin-top: 12px;
+    padding: clamp(13px, 3.8vw, 18px);
+  }
+
+  .mode-controls {
+    width: 100%;
+    min-width: 0;
+    gap: 9px;
+  }
+
+  .mode-controls label {
+    min-width: 0;
+    line-height: 1.4;
+  }
+
+  .mode-controls select,
+  .team-name-field input,
+  .filter-grid input,
+  .filter-grid select,
+  .filter-options select,
+  .online-name-field input,
+  .online-room-actions input {
+    min-height: 44px;
+    font-size: 16px;
+  }
+
+  .workspace {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+  }
+
+  .workspace > *,
+  .panel,
+  .candidate-card,
+  .online-controls,
+  .online-lobby {
+    min-width: 0;
+  }
+
+  .panel {
+    padding: clamp(12px, 3.5vw, 16px);
+    border-radius: 17px;
+  }
+
+  .stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    margin: 12px 0;
+  }
+
+  .stat-card {
+    min-width: 0;
+    min-height: 70px;
+    padding: 10px;
+  }
+
+  .stat-card span {
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+  }
+
+  .stat-card strong {
+    font-size: clamp(18px, 5vw, 22px);
+  }
+
+  .candidate-list {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+  }
+
+  .candidate-card {
+    padding: 13px;
+  }
+
+  .filter-options {
+    gap: 6px 10px;
+    padding: 9px;
+  }
+
+  .filter-options label,
+  .filter-options .text-button {
+    min-height: 42px;
+  }
+
+  .draft-board-heading {
+    align-items: flex-start;
+  }
+
+  .draft-table-scroll,
+  .final-results-scroll {
+    max-width: 100%;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .pick-reveal:not([hidden]) {
+    min-height: 100svh;
+    min-height: 100dvh;
+    padding-top: max(12px, env(safe-area-inset-top));
+    padding-right: max(10px, env(safe-area-inset-right));
+    padding-bottom: max(12px, env(safe-area-inset-bottom));
+    padding-left: max(10px, env(safe-area-inset-left));
+    align-items: safe center;
+  }
+}
+
+@media (max-width: 390px) and (orientation: portrait) {
+  .hero {
+    min-height: 146px;
+    padding: 14px 12px;
+  }
+
+  .hero h1 {
+    font-size: clamp(23px, 7.2vw, 29px);
+  }
+
+  .hero-stamp {
+    flex-basis: 64px;
+    width: 64px;
+    height: 64px;
+  }
+
+  .hero-stamp strong {
+    font-size: 7px;
+  }
+
+  .mode-controls {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .mode-controls > label,
+  .mode-controls > .button,
+  .team-name-settings,
+  .online-controls,
+  .online-room-actions {
+    grid-column: 1 / -1;
+  }
+
+  .filter-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .filter-grid .search-field {
+    grid-column: 1;
+  }
+
+  .section-heading h2 {
+    font-size: 18px;
+  }
+}
+
+@media (max-width: 900px) and (orientation: landscape) and (max-height: 540px) {
+  .topbar {
+    min-height: 48px;
+    flex-wrap: nowrap;
+    gap: 8px;
+    padding-top: max(4px, env(safe-area-inset-top));
+    padding-bottom: 4px;
+  }
+
+  .brand-mark {
+    width: 32px;
+    height: 32px;
+  }
+
+  .brand small,
+  .live-badge {
+    display: none;
+  }
+
+  .topbar nav {
+    order: 0;
+    width: auto;
+    margin-left: auto;
+    padding: 0;
+    border: 0;
+  }
+
+  .topbar nav a,
+  .topbar nav .site-info-button {
+    min-height: 36px;
+    padding: 6px 7px;
+    font-size: 11px;
+  }
+
+  .page {
+    margin-top: 8px;
+    margin-bottom: 16px;
+  }
+
+  .hero {
+    min-height: 116px;
+    padding: 12px 16px;
+  }
+
+  .hero h1 {
+    font-size: clamp(24px, 5vw, 34px);
+  }
+
+  .hero-copy {
+    margin-top: 6px;
+  }
+
+  .hero-stamp {
+    flex-basis: 68px;
+    width: 68px;
+    height: 68px;
+  }
+
+  .mode-panel.panel {
+    margin-top: 8px;
+    padding: 11px 14px;
+  }
+
+  .stats {
+    margin: 8px 0;
+  }
+
+  .stat-card {
+    min-height: 58px;
+    padding: 7px 10px;
+  }
+
+  .pick-reveal:not([hidden]) {
+    padding-top: max(8px, env(safe-area-inset-top));
+    padding-bottom: max(8px, env(safe-area-inset-bottom));
+  }
+
+  .pick-reveal-card {
+    padding-top: 18px;
+    padding-bottom: 18px;
+  }
+}
