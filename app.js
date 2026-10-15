@@ -794,7 +794,13 @@ function toKoreanMemberName(name) {
 }
 
 function normalizeSearchText(value) {
-  return String(value).normalize("NFKC").toLocaleLowerCase().replace(/[\s·._-]/g, "");
+  return String(value)
+    .normalize("NFKC")
+    .toLocaleLowerCase()
+    .replace(/[\s·._-]/g, "")
+    .replace(/[\u30a1-\u30f6\u30fd\u30fe]/g, character =>
+      String.fromCharCode(character.charCodeAt(0) - 0x60)
+    );
 }
 
 const agencyByGroup = {
@@ -986,6 +992,13 @@ function agencyFilterName(agency) {
   const value = String(agency || "").trim();
   return agencyParentDisplayNames[value] || value;
 }
+
+const candidateSearchTextById = new Map(idols.map(idol => [
+  idol.id,
+  [idol.name, idol.japaneseName, idol.japaneseSearchName, idol.koreanName,
+    idol.group, idol.nationality, idol.agency, agencyFilterName(idol.agency)]
+    .map(normalizeSearchText)
+]));
 
 function fullAgencyName(group, agency = "") {
   const value = String(agency || "").trim();
@@ -1770,9 +1783,8 @@ function getCandidates(ignoreFilter = "", dedupePeople = true) {
 
   const candidates = idols.filter(idol => {
     const displayedAgency = agencyFilterName(idol.agency);
-    const matchesText = !query ||
-      [idol.name, idol.japaneseName, idol.japaneseSearchName, idol.koreanName, idol.group, idol.nationality, idol.agency, displayedAgency]
-        .some(value => normalizeSearchText(value).includes(query));
+    const matchesText = !query || candidateSearchTextById.get(idol.id)
+      .some(value => value.includes(query));
 
     return matchesText &&
       (!generation || idol.generation === generation) &&
