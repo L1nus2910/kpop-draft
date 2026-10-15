@@ -11,12 +11,12 @@
   <meta property="og:description" content="推しでつくる、夢のドラフト。非公式ファン制作のK-POPドラフトゲーム。">
   <meta property="og:url" content="https://l1nus2910.github.io/kpop-draft/">
   <meta name="twitter:card" content="summary">
-  <link rel="stylesheet" href="style.css?v=20261015-mobile-layout-1">
+  <link rel="stylesheet" href="style.css?v=20261015-mobile-draft-2">
   <script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-database-compat.js"></script>
   <script src="firebase-config.js" defer></script>
-  <script src="app.js?v=20261015-host-pick-refresh-1" defer></script>
+  <script src="app.js?v=20261015-round-one-host-gate-1" defer></script>
 </head>
 <body>
   <header class="topbar">
@@ -288,6 +288,17 @@
         </div>
 
         <p class="draft-hint" id="draftHint">設定を選んで「ドラフトを始める」を押してね。</p>
+
+        <section class="first-round-reveal-gate" id="firstRoundRevealGate" hidden aria-live="polite">
+          <div>
+            <span class="first-round-reveal-kicker">FIRST ROUND · SEALED BIDS</span>
+            <strong>全員の1巡目入札がそろいました</strong>
+            <p id="firstRoundRevealHint">ホストが開示を確認すると、指名メンバーを順番に発表します。</p>
+          </div>
+          <button class="button button-primary" id="confirmFirstRoundReveal" type="button" hidden>
+            1巡目の入札結果を開示
+          </button>
+        </section>
 
         <div class="nomination-list" id="nominationList"></div>
 
