@@ -1582,6 +1582,7 @@ function escapeHTML(value) {
 let excluded = new Set(readSaved("stagePickExcluded", []));
 let savedPresets = readSaved("stagePickPresets", {});
 let selectedId = null;
+let candidateSortMode = "recommended";
 let gameStarted = false;
 let finalResultsWasVisible = false;
 let drafted = new Set();
@@ -1727,6 +1728,36 @@ function preferredPersonCandidates(candidates, query = "") {
   return [...preferred.values()];
 }
 
+function compareCandidates(a, b) {
+  const scoreA = Number(a.popularityScore) || 0;
+  const scoreB = Number(b.popularityScore) || 0;
+  const recommended = () =>
+    (b.popularityStars || 0) - (a.popularityStars || 0) ||
+    (Number(b.popularitySortScore) || 0) - (Number(a.popularitySortScore) || 0) ||
+    a.japaneseName.localeCompare(b.japaneseName, "ja");
+
+  if (candidateSortMode === "score") {
+    return scoreB - scoreA || recommended();
+  }
+  if (candidateSortMode === "generation") {
+    const generationA = Number.parseInt(a.generation, 10) || 0;
+    const generationB = Number.parseInt(b.generation, 10) || 0;
+    return generationA - generationB || recommended();
+  }
+  if (candidateSortMode === "name") {
+    return a.japaneseName.localeCompare(b.japaneseName, "ja") || recommended();
+  }
+  return recommended();
+}
+
+function updateCandidateSortControls() {
+  document.querySelectorAll("[data-sort-candidates]").forEach(button => {
+    const active = button.dataset.sortCandidates === candidateSortMode;
+    button.setAttribute("aria-pressed", String(active));
+    button.classList.toggle("is-active", active);
+  });
+}
+
 function getCandidates(ignoreFilter = "", dedupePeople = true) {
   const query = normalizeSearchText($("searchInput").value.trim());
   const generation = ignoreFilter === "generationFilter" ? "" : $("generationFilter").value;
@@ -1749,11 +1780,7 @@ function getCandidates(ignoreFilter = "", dedupePeople = true) {
       (!hideDrafted || !personHasBeenDrafted(idol)) &&
       ($("showExcluded").checked || !excluded.has(idol.id));
   });
-  return (dedupePeople ? preferredPersonCandidates(candidates, query) : candidates).sort((a, b) =>
-    b.popularityStars - a.popularityStars ||
-    b.popularitySortScore - a.popularitySortScore ||
-    a.japaneseName.localeCompare(b.japaneseName, "ja")
-  );
+  return (dedupePeople ? preferredPersonCandidates(candidates, query) : candidates).sort(compareCandidates);
 }
 
 function updateDependentFilters() {
@@ -1825,6 +1852,8 @@ function renderCandidates() {
     ? [pendingIdol, ...candidates]
     : candidates;
   $("candidateCount").textContent = candidates.length;
+  $("poolResultCount").textContent = candidates.length;
+  updateCandidateSortControls();
   $("rosterTotal").textContent = idols.length;
   $("groupTotal").textContent = groups.length;
 
@@ -1882,6 +1911,7 @@ function renderCandidates() {
             <span class="candidate-name">${escapeHTML(idol.japaneseName)}</span>
             ${rankingStars}
           </span>
+          <span class="candidate-agency">${escapeHTML(agencyFilterName(idol.agency))}</span>
           <span class="candidate-group">${escapeHTML(idol.group)}</span>
           <span class="candidate-rank-details">${rankingDetails}</span>
           <span class="tags">
@@ -2026,6 +2056,12 @@ $("candidateList").addEventListener("click", event => {
 });
 
 $("searchInput").addEventListener("input", renderCandidates);
+document.querySelectorAll("[data-sort-candidates]").forEach(button => {
+  button.addEventListener("click", () => {
+    candidateSortMode = button.dataset.sortCandidates || "recommended";
+    renderCandidates();
+  });
+});
 
 $("resetFilters").addEventListener("click", () => {
   $("searchInput").value = "";

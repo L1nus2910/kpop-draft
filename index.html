@@ -53,13 +53,22 @@
           <p class="mode-copy" id="modeDescription">ひとりでAIと対戦できます。AIの人数や指名人数を選んでね。</p>
         </div>
         <div class="mode-intro-art" aria-hidden="true">
+          <div class="mode-art-orbit mode-art-orbit--outer"></div>
+          <div class="mode-art-orbit mode-art-orbit--inner"></div>
           <img src="assets/kdraft-512-v3.png" alt="">
-          <span>BUILD YOUR<br>DREAM LINEUP</span>
+          <span class="mode-art-caption">YOUR<br><strong>DREAM TEAM</strong><br>STARTS HERE</span>
+          <span class="mode-art-spark mode-art-spark--one">✦</span>
+          <span class="mode-art-spark mode-art-spark--two">✧</span>
         </div>
       </div>
       <div class="mode-controls">
+        <div class="mode-control-heading">
+          <span class="mode-control-mark" aria-hidden="true">✦</span>
+          <strong>プレイ設定</strong>
+          <span class="mode-control-en">SET YOUR DRAFT</span>
+        </div>
         <label class="mode-field mode-field--play">
-          <span>プレイ形式</span>
+          <span class="mode-field-label"><i class="mode-field-icon" aria-hidden="true">✧</i>プレイ形式</span>
           <select id="playMode">
             <option value="ai" selected>AI対戦</option>
             <option value="local">友達と1つの端末で</option>
@@ -67,7 +76,7 @@
           </select>
         </label>
         <label class="mode-field mode-field--ai" id="aiCountWrap" hidden>
-          <span>AI相手の人数（自分を含まない）</span>
+          <span class="mode-field-label"><i class="mode-field-icon" aria-hidden="true">♟</i>AI相手の人数（自分を含まない）</span>
           <select id="aiCount">
             <option value="1">1人</option><option value="2">2人</option>
             <option value="3" selected>3人</option><option value="4">4人</option>
@@ -77,7 +86,7 @@
           </select>
         </label>
         <label class="mode-field mode-field--local" id="localTeamCountWrap">
-          <span>チーム数（同じ画面で遊ぶ）</span>
+          <span class="mode-field-label"><i class="mode-field-icon" aria-hidden="true">♧</i>チーム数（同じ画面で遊ぶ）</span>
           <select id="localTeamCount">
             <option value="1">1チーム</option><option value="2">2チーム</option>
             <option value="3">3チーム</option><option value="4" selected>4チーム</option>
@@ -120,7 +129,7 @@
           </section>
         </div>
         <label class="mode-field mode-field--pick-limit">
-          <span>各チームの指名人数</span>
+          <span class="mode-field-label"><i class="mode-field-icon" aria-hidden="true">♙</i>各チームの指名人数</span>
           <select id="pickLimit">
             <option value="1">1人</option><option value="2">2人</option>
             <option value="3">3人</option><option value="4">4人</option>
@@ -129,14 +138,14 @@
           </select>
         </label>
         <label class="mode-field mode-field--start-order">
-          <span>開始時のチーム順</span>
+          <span class="mode-field-label"><i class="mode-field-icon" aria-hidden="true">↕</i>開始時のチーム順</span>
           <select id="startOrderMode">
             <option value="fixed" selected>設定した順番のまま</option>
             <option value="random">開始前にランダム抽選</option>
           </select>
         </label>
         <label class="mode-field mode-field--order">
-          <span>2巡目以降の指名順</span>
+          <span class="mode-field-label"><i class="mode-field-icon" aria-hidden="true">⇄</i>2巡目以降の指名順</span>
           <select id="orderMode">
             <option value="snake" selected>前巡の逆順（ウェーバー）</option>
             <option value="fixed">チーム順に固定</option>
@@ -192,12 +201,14 @@
 
     <div class="workspace">
       <aside class="draft-panel panel" id="draft">
-        <div class="section-heading">
+        <div class="section-heading draft-hero">
           <div>
             <p class="eyebrow">DRAFT ROOM</p>
             <h2>ドラフト</h2>
+            <p class="draft-hero-caption">K-POP GIRL GROUP DRAFT <span aria-hidden="true">✦</span> BUILD YOUR DREAM LINEUP</p>
           </div>
           <span class="round-pill" id="roundStatus">1巡目</span>
+          <div class="draft-hero-gem" aria-hidden="true"><span>✧</span><b>K</b></div>
         </div>
 
         <p class="draft-hint" id="draftHint">設定を選んで「ドラフトを始める」を押してね。</p>
@@ -216,9 +227,13 @@
         <div class="nomination-list" id="nominationList"></div>
 
         <div class="turn-card">
-          <span>次の指名チーム</span>
-          <strong id="currentTeam">未開始</strong>
+          <span class="turn-card-icon" aria-hidden="true">♛</span>
+          <div class="turn-card-team">
+            <span>次の指名チーム</span>
+            <strong id="currentTeam">未開始</strong>
+          </div>
           <p id="selectedMember">開始後は候補カードを選び、確認してから指名を提出できます。</p>
+          <span class="turn-card-stamp" aria-hidden="true">ON<br>STAGE</span>
         </div>
 
         <div id="pickConfirmationMount">
@@ -255,18 +270,26 @@
       </aside>
 
       <section class="pool-panel panel" id="pool" tabindex="-1">
-        <div class="section-heading pool-heading">
-          <div>
+        <div class="pool-hero">
+          <div class="pool-hero-copy">
             <p class="eyebrow">THE CANDIDATE POOL</p>
             <h2>候補メンバー</h2>
             <p class="pool-heading-copy">理想のメンバーを探して、あなただけのドリームチームをつくろう。</p>
+          </div>
+          <div class="pool-hero-art" aria-hidden="true">
+            <span class="pool-hero-orbit pool-hero-orbit--one"></span>
+            <span class="pool-hero-orbit pool-hero-orbit--two"></span>
+            <span class="pool-hero-star">✦</span>
+            <span class="pool-hero-mini">FIND<br>YOUR<br>FAVORITE</span>
           </div>
         </div>
 
         <div class="pool-search-row">
           <label class="search-field">
-            <span>名前で検索</span>
+            <span class="search-field-label">名前で検索</span>
+            <span class="search-input-wrap"><span aria-hidden="true">⌕</span>
             <input id="searchInput" type="search" placeholder="例：モモ / Momo / 모모">
+            </span>
           </label>
           <button class="button button-secondary pool-random-button" id="randomButton" type="button">
             ✦ ランダムに選ぶ
@@ -275,20 +298,20 @@
 
         <div class="candidate-filter-panel">
           <div class="filter-grid">
-            <label>
-              <span>世代</span>
+            <label class="filter-card">
+              <i class="filter-icon" aria-hidden="true">01</i><span>世代</span>
               <select id="generationFilter"><option value="">すべて</option></select>
             </label>
-            <label>
-              <span>国籍</span>
+            <label class="filter-card">
+              <i class="filter-icon" aria-hidden="true">◎</i><span>国籍</span>
               <select id="nationalityFilter"><option value="">すべて</option></select>
             </label>
-            <label>
-              <span>所属事務所</span>
+            <label class="filter-card">
+              <i class="filter-icon" aria-hidden="true">▥</i><span>所属事務所</span>
               <select id="agencyFilter"><option value="">すべて</option></select>
             </label>
-            <label>
-              <span>グループ</span>
+            <label class="filter-card">
+              <i class="filter-icon" aria-hidden="true">♧</i><span>グループ</span>
               <select id="groupFilter"><option value="">すべて</option></select>
             </label>
           </div>
@@ -304,11 +327,21 @@
           </div>
         </div>
 
+        <div class="candidate-toolbar">
+          <div class="candidate-sort-tabs" role="group" aria-label="候補メンバーの並び順">
+            <button type="button" data-sort-candidates="recommended" aria-pressed="true">★ おすすめ</button>
+            <button type="button" data-sort-candidates="score" aria-pressed="false">評価順</button>
+            <button type="button" data-sort-candidates="generation" aria-pressed="false">世代順</button>
+            <button type="button" data-sort-candidates="name" aria-pressed="false">名前順</button>
+          </div>
+          <span class="pool-result-count"><strong id="poolResultCount">—</strong> 人の候補</span>
+        </div>
+
         <details class="recommendation-guide">
           <summary class="recommendation-guide-summary">
             <span class="recommendation-guide-star" aria-hidden="true">★</span>
-            <strong>人気おすすめ順</strong>
-            <span class="recommendation-guide-summary-label">評価方法・参考資料を見る</span>
+            <strong>人気おすすめ順について</strong>
+            <span class="recommendation-guide-summary-label">星とスコアの評価方法を見る</span>
             <span class="recommendation-guide-chevron" aria-hidden="true">＋</span>
           </summary>
           <div class="recommendation-guide-content">
