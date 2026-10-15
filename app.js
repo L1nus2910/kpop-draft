@@ -4471,6 +4471,9 @@ function showNextPickReveal() {
     $("pickReveal").hidden = true;
     if (pendingR1Resolution) finishFirstRoundResolution();
     else renderDraft();
+    // The host does not apply its own Firebase snapshots. Refresh the candidate
+    // controls here so they reflect the newly opened turn immediately.
+    renderCandidates();
     advanceAI();
     syncOnlineState();
     return;
