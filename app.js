@@ -1,4 +1,4 @@
-const onlineClientBuild = "20261016-pick-route-diagnostic-2";
+const onlineClientBuild = "20261016-pick-route-diagnostic-3";
 
 const groups = [
   {
@@ -2756,6 +2756,7 @@ function renderOnlineSyncDebug() {
     : onlineStatePhaseSummary({
         r1Started,
         round,
+        r1RevealPending,
         r1Nominations,
         r1NominationOrder,
         pendingR1Resolution: pendingR1Resolution ? {
@@ -5109,7 +5110,10 @@ function resolveFirstRound(hostConfirmed = false) {
   const batchOrder = r1NominationOrder.slice();
   const nominations = batchOrder.map(team => {
     const id = r1Nominations.find(item => item.team === team)?.id || "";
-    return { team, id: excluded.has(id) ? "" : id };
+    // Exclusions belong to each browser. A guest nomination was already
+    // validated when the host accepted its action; the host's local list must
+    // not erase that nomination when opening the sealed first-round bids.
+    return { team, id };
   });
   const validNominations = nominations.map(item => ({
     team: item.team,
