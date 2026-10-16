@@ -1,4 +1,4 @@
-const onlineClientBuild = "20261016-pick-route-diagnostic-3";
+const onlineClientBuild = "20261016-room-exit-skip-1";
 
 const groups = [
   {
@@ -1636,6 +1636,7 @@ let onlineGameStatus = "";
 let onlineUid = "";
 let onlineIsHost = false;
 let onlinePlayers = {};
+let onlineDepartedTeams = new Set();
 let onlineActionPending = false;
 let onlineActionsListenerRef = null;
 let onlineConfirmationsListenerRef = null;
@@ -2252,6 +2253,7 @@ function renderNominations() {
 
   $("nominationList").innerHTML = teamNames.map(team => {
     const nomination = r1Nominations.find(item => item.team === team);
+    const departed = activeMode === "online" && onlineDepartedTeams.has(team);
     const sealed = areR1BidsSealed() || r1RevealPending;
     const nominationRevealed = !pendingR1Resolution || pendingR1Resolution.revealedTeams.has(team);
     const idol = nomination && !sealed && nominationRevealed && idols.find(item => item.id === nomination.id);
@@ -2260,7 +2262,11 @@ function renderNominations() {
     const attemptLabel = r1NominationAttempt === 1
       ? "初回指名"
       : `${r1NominationAttempt}回目の再指名`;
-    const status = firstPick
+    const status = departed
+      ? firstPick
+        ? `1巡目確定：${escapeHTML(firstPick.name)}・以降はスキップ`
+        : "退出済み・残り指名をスキップ"
+      : firstPick
       ? `1巡目確定：${escapeHTML(firstPick.name)}`
       : pendingR1Resolution && nomination && !nominationRevealed
         ? "一斉発表待ち"
@@ -2562,6 +2568,7 @@ function setOnlineRoomConnected(code, isHost, initialPlayers = null, deferGameAc
   onlineRoomRef = firebase.database().ref(`rooms/${code}`);
   onlineIsHost = isHost;
   onlinePlayers = initialPlayers || {};
+  onlineDepartedTeams = new Set();
   onlineGameStatus = "lobby";
   onlineListenersAttached = false;
   onlineStateRevision = 0;
@@ -2630,7 +2637,10 @@ function setOnlineRoomConnected(code, isHost, initialPlayers = null, deferGameAc
   } else {
     onlineRoomRef.child(`players/${onlineUid}`).on("value", snapshot => {
       if (connectedRoomRef !== onlineRoomRef) return;
-      if (snapshot.exists()) {
+      const player = snapshot.val();
+      if (player?.departed) {
+        resetOnlineRoomToSetup(connectedRoomRef, onlineUid);
+      } else if (snapshot.exists()) {
         attachOnlineGuestListeners();
       } else {
         setOnlineStatus("参加申請を送っています。ホストの承認を待っています…");
@@ -2667,15 +2677,16 @@ function renderOnlineLobby() {
   const players = Object.entries(onlinePlayers).sort(([, a], [, b]) =>
     Number(a.order || 0) - Number(b.order || 0)
   );
+  const activePlayers = players.filter(([, player]) => !player.departed);
   $("onlinePlayerList").innerHTML = players.map(([, player], index) => `
-    <li><span class="online-player-number">${index + 1}</span><strong>${escapeHTML(player.teamName || player.name || "プレイヤー")}</strong><small>${player.host ? "ホスト" : "参加者"}</small></li>
+    <li><span class="online-player-number">${index + 1}</span><strong>${escapeHTML(player.teamName || player.name || "プレイヤー")}</strong><small>${player.departed ? "退出済み" : player.host ? "ホスト" : "参加者"}</small></li>
   `).join("");
-  const hostCanStart = onlineIsHost && onlineGameStatus === "lobby" && players.length >= 2;
+  const hostCanStart = onlineIsHost && onlineGameStatus === "lobby" && activePlayers.length >= 2;
   $("startOnlineGame").hidden = !onlineIsHost || onlineGameStatus !== "lobby";
   $("startOnlineGame").disabled = !hostCanStart;
   $("startOnlineGame").textContent = hostCanStart
-    ? `${players.length}人でドラフト開始`
-    : `参加者待ち（${players.length} / 10人）`;
+    ? `${activePlayers.length}人でドラフト開始`
+    : `参加者待ち（${activePlayers.length} / 10人）`;
   const finished = onlineGameStatus === "playing" && gameStarted && allTeamsComplete() && !pendingR1Resolution && $("pickReveal").hidden && pickRevealQueue.length === 0;
   $("restartOnlineGame").hidden = !onlineIsHost || !finished;
   $("restartOnlineGame").disabled = onlineRestartPending;
@@ -2685,10 +2696,13 @@ function renderOnlineLobby() {
       ? onlineIsHost
         ? "結果を確認したら「同じルームで再ドラフト」を押してください。参加者はそのまま次のドラフトに参加できます。"
         : "ドラフトが終了しました。ホストが再ドラフトを始めると、このルームのまま次のドラフトに進みます。"
-      : "ドラフト進行中です。終了後も同じルームで再ドラフトできます。"
+      : "ドラフト進行中です。参加者が退出した場合、その後の指名はスキップします。"
     : "2〜10人で遊べます。参加者がそろったらホストが開始します。終了後も同じルームで再ドラフトできます。";
   $("closeOnlineRoom").hidden = !onlineIsHost || !onlineRoomRef;
-  $("leaveOnlineRoom").hidden = onlineIsHost || !["lobby", "closed"].includes(onlineGameStatus);
+  const leaveButton = $("leaveOnlineRoom");
+  leaveButton.hidden = onlineIsHost || !["lobby", "closed", "playing"].includes(onlineGameStatus);
+  leaveButton.disabled = onlineActionPending || onlineRestartPending;
+  leaveButton.textContent = onlinePendingAction?.kind === "leave" ? "退出を処理中…" : "ルームを退出";
   $("closeOnlineRoom").textContent = "ルーム終了・データ削除";
   if (onlineGameStatus === "playing") setOnlineStatus(finished ? "ドラフト終了・結果を確認できます" : "ドラフト進行中");
   else if (onlineGameStatus === "lobby") setOnlineStatus(onlineIsHost ? "友達の参加を待っています" : "ルームに参加しました");
@@ -2982,15 +2996,8 @@ async function closeOnlineRoom() {
   }
 }
 
-async function leaveOnlineRoom() {
-  if (!onlineRoomRef || onlineIsHost || !["lobby", "closed"].includes(onlineGameStatus)) return;
-
-  const roomRef = onlineRoomRef;
-  const leavingUid = onlineUid;
-  const wasLobby = onlineGameStatus === "lobby";
-
-  // Detach and reset the local screen first. A remote permission/network error
-  // must never leave the player stuck in a room they already chose to leave.
+function resetOnlineRoomToSetup(roomRef, leavingUid) {
+  if (!roomRef) return;
   detachOnlineActionsListener();
   roomRef.child("players").off();
   roomRef.child("status").off();
@@ -3015,6 +3022,7 @@ async function leaveOnlineRoom() {
   onlineRoomCode = "";
   onlineIsHost = false;
   onlinePlayers = {};
+  onlineDepartedTeams = new Set();
   onlineGameStatus = "";
   onlineListenersAttached = false;
   onlineActionPending = false;
@@ -3078,6 +3086,7 @@ async function leaveOnlineRoom() {
 
   const url = new URL(location.href);
   url.searchParams.delete("room");
+  url.hash = "";
   history.replaceState(null, "", url);
   updateModeSetup();
   renderNominations();
@@ -3087,6 +3096,30 @@ async function leaveOnlineRoom() {
   $("onlineRoomStatus").textContent = "接続中…";
 
   window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+async function leaveOnlineRoom() {
+  if (!onlineRoomRef || onlineIsHost || !["lobby", "closed", "playing"].includes(onlineGameStatus)) return;
+
+  if (onlineGameStatus === "playing") {
+    if (onlineActionPending) {
+      setOnlineStatus("別の操作を反映中です。完了してから退出してください。");
+      return;
+    }
+    if (submitOnlineAction({ kind: "leave" })) {
+      $("leaveOnlineRoom").disabled = true;
+      $("leaveOnlineRoom").textContent = "退出を処理中…";
+      setOnlineStatus("退出を送信しました。ホストが反映すると初期画面に戻ります。以降の指名はスキップされます。");
+    }
+    return;
+  }
+
+  const roomRef = onlineRoomRef;
+  const leavingUid = onlineUid;
+  const wasLobby = onlineGameStatus === "lobby";
+
+  // Reset locally first so an old or closed room cannot trap the player.
+  resetOnlineRoomToSetup(roomRef, leavingUid);
   if (!wasLobby || !leavingUid) return;
   void (async () => {
     const playerRemoval = roomRef.child(`players/${leavingUid}`).remove();
@@ -3115,7 +3148,7 @@ function onlineRevealParticipantUids(reveal = activePickReveal) {
   // The host snapshots the exact participants when the reveal is queued. This
   // avoids relying on each device resolving the same team-name-to-UID mapping.
   if (Array.isArray(reveal.participantUids) && reveal.participantUids.length) {
-    return [...new Set(reveal.participantUids.filter(Boolean))];
+    return [...new Set(reveal.participantUids.filter(uid => uid && !onlinePlayers[uid]?.departed))];
   }
   const teams = reveal.type === "lottery"
     ? (reveal.teams?.length ? reveal.teams : reveal.drawOrder || [])
@@ -3428,6 +3461,7 @@ function serializeOnlineGame() {
     r1NominationOrder.some(team => !submittedTeams.has(team)));
   return {
     teamNames,
+    departedTeams: [...onlineDepartedTeams],
     gameStarted,
     picks,
     drafted: [...drafted],
@@ -3676,6 +3710,7 @@ function applyOnlineGameState(state) {
       (actionWasAcknowledged && Boolean(actionAck.accepted))
     );
     teamNames = state.teamNames || [];
+    onlineDepartedTeams = new Set(state.departedTeams || []);
     gameStarted = Boolean(state.gameStarted);
     activeMode = "online";
     aiTeams = new Set();
@@ -4161,6 +4196,40 @@ async function processOnlineAction(snapshot, processingRoomRef = onlineRoomRef) 
   try {
     if (!action || !onlinePlayers[action.uid]) {
       actionRejectionReason = "参加者情報を確認できませんでした。全員が同じルームに入り直してください。";
+    } else if (action.kind === "leave") {
+      const player = onlinePlayers[action.uid];
+      if (onlineGameStatus !== "playing" || player.host || !ownerTeam) {
+        actionRejectionReason = "このルームから退出できません。ホストまたは参加状態を確認してください。";
+      } else {
+        const departedAt = player.departedAt || Date.now();
+        if (!player.departed) {
+          await processingRoomRef.child(`players/${action.uid}`).update({ departed: true, departedAt });
+          if (processingRoomRef !== onlineRoomRef || !onlineIsHost) return;
+          onlinePlayers[action.uid] = { ...player, departed: true, departedAt };
+        }
+        onlineDepartedTeams.add(ownerTeam);
+        onlineRevealAcks.delete(action.uid);
+        const hasSubmittedNomination = r1Nominations.some(item => item.team === ownerTeam);
+        if (!r1Started && !pendingR1Resolution && !r1RevealPending && !hasSubmittedNomination) {
+          const removedIndex = r1NominationOrder.indexOf(ownerTeam);
+          r1NominationOrder = r1NominationOrder.filter(team => team !== ownerTeam);
+          if (removedIndex >= 0 && removedIndex < r1NominationIndex) {
+            r1NominationIndex = Math.max(0, r1NominationIndex - 1);
+          }
+        }
+        if (r1Started) advancePastCompletedTurns();
+        if (!r1Started && !pendingR1Resolution && !r1RevealPending && allR1BidsSubmitted()) {
+          resolveFirstRound();
+        }
+        scheduleAINextLotteryEnvelope();
+        renderNominations();
+        renderDraft();
+        renderCandidates();
+        renderOnlineLobby();
+        actionAccepted = true;
+      }
+    } else if (onlinePlayers[action.uid].departed) {
+      actionRejectionReason = "このチームは退出済みのため、残りの指名はスキップされます。";
     } else {
       if (action.kind === "pick" && ownerTeam && !r1Started && !canSubmitR1Nomination(ownerTeam)) {
         recoverHostRebidFromPickAction(action, ownerTeam);
@@ -4254,7 +4323,7 @@ async function processOnlineAction(snapshot, processingRoomRef = onlineRoomRef) 
 }
 
 function onlinePlayersInDraftOrder() {
-  return Object.entries(onlinePlayers).sort(([, a], [, b]) =>
+  return Object.entries(onlinePlayers).filter(([, player]) => !player.departed).sort(([, a], [, b]) =>
     Number(a.order || 0) - Number(b.order || 0)
   );
 }
@@ -4301,6 +4370,11 @@ async function restartOnlineGame() {
     await Promise.all(oldActionIds.map(actionId =>
       onlineRoomRef.child(`actions/${actionId}`).remove()
     ));
+    const departedUids = Object.entries(onlinePlayers)
+      .filter(([, player]) => player.departed)
+      .map(([uid]) => uid);
+    await Promise.all(departedUids.map(uid => onlineRoomRef.child(`players/${uid}`).remove()));
+    departedUids.forEach(uid => delete onlinePlayers[uid]);
     onlineActionAcks = {};
     onlinePendingAction = null;
     onlineActionPending = false;
@@ -4348,6 +4422,7 @@ function startGame(mode, aiCount = 3) {
   $("pickReveal").hidden = true;
   setFinalScreenshotMode(false, false);
   activeMode = mode;
+  onlineDepartedTeams = new Set();
   pickLimit = Number($("pickLimit").value);
   orderMode = $("orderMode").value;
   startOrderMode = $("startOrderMode").value || "fixed";
@@ -4459,6 +4534,7 @@ window.addEventListener("keydown", event => {
 });
 
 function teamIsComplete(team) {
+  if (activeMode === "online" && onlineDepartedTeams.has(team)) return true;
   return (picks[team] || []).length >= pickLimit;
 }
 
@@ -4467,19 +4543,20 @@ function allTeamsComplete() {
 }
 
 function canSubmitR1Nomination(team) {
+  if (activeMode === "online" && onlineDepartedTeams.has(team)) return false;
   if (!team || !r1NominationOrder.includes(team) || r1Nominations.some(item => item.team === team)) return false;
   return activeMode === "online" || team === r1NominationOrder[r1NominationIndex];
 }
 
 function r1BidCount() {
   const submittedTeams = new Set(r1Nominations.map(item => item.team));
-  return r1NominationOrder.filter(team => submittedTeams.has(team)).length;
+  return r1NominationOrder.filter(team => !onlineDepartedTeams.has(team) && submittedTeams.has(team)).length;
 }
 
 function allR1BidsSubmitted() {
-  return r1NominationOrder.length > 0 && r1NominationOrder.every(team =>
-    r1Nominations.some(item => item.team === team)
-  );
+  return r1NominationOrder.length > 0 && r1NominationOrder
+    .filter(team => !onlineDepartedTeams.has(team))
+    .every(team => r1Nominations.some(item => item.team === team));
 }
 
 function areR1BidsSealed() {
@@ -4713,7 +4790,8 @@ function scheduleAINextLotteryEnvelope() {
   const reveal = activePickReveal;
   if (!reveal || reveal.type !== "lottery" || reveal.winner || reveal.opening || reveal.revealing || pickRevealPhase !== "revealed") return;
   const team = reveal.drawOrder[reveal.drawIndex];
-  if (!team || !aiTeams.has(team)) return;
+  const departedOnlineTeam = activeMode === "online" && onlineIsHost && onlineDepartedTeams.has(team);
+  if (!team || (!aiTeams.has(team) && !departedOnlineTeam)) return;
   const availableEnvelopes = reveal.envelopes.filter(envelope => !reveal.selections.has(envelope));
   if (!availableEnvelopes.length) return;
 
@@ -5059,18 +5137,25 @@ function nextRoundOrder() {
   return teamNames.slice();
 }
 
-function advanceAfterPick() {
-  turnIndex += 1;
-  if (allTeamsComplete()) return;
-
+function advancePastCompletedTurns() {
+  if (!r1Started) return;
   while (turnIndex < waiverOrder.length && teamIsComplete(waiverOrder[turnIndex])) {
     turnIndex += 1;
   }
-  if (turnIndex >= waiverOrder.length) {
+  if (turnIndex >= waiverOrder.length && !allTeamsComplete()) {
     round += 1;
     waiverOrder = nextRoundOrder();
     turnIndex = 0;
+    while (turnIndex < waiverOrder.length && teamIsComplete(waiverOrder[turnIndex])) {
+      turnIndex += 1;
+    }
   }
+}
+
+function advanceAfterPick() {
+  turnIndex += 1;
+  if (allTeamsComplete()) return;
+  advancePastCompletedTurns();
 }
 
 function recordPick(team, idol) {
@@ -5157,7 +5242,7 @@ function finishFirstRoundResolution() {
   const batch = pendingR1Resolution;
   if (!batch) return;
   pendingR1Resolution = null;
-  r1NominationOrder = batch.batchOrder.filter(team => batch.waiting.has(team));
+  r1NominationOrder = batch.batchOrder.filter(team => batch.waiting.has(team) && !onlineDepartedTeams.has(team));
   r1NominationIndex = 0;
   r1Nominations = [];
   selectedId = null;
@@ -5606,12 +5691,15 @@ function renderDraft() {
       : "ドラフト進行中";
 
   const totalPicks = teamNames.reduce((sum, team) => sum + picks[team].length, 0);
-  const totalSlots = teamNames.length * pickLimit;
+  const totalSlots = teamNames.reduce((sum, team) =>
+    sum + (activeMode === "online" && onlineDepartedTeams.has(team) ? picks[team].length : pickLimit), 0);
   $("draftBoardCount").textContent = `${totalPicks} / ${totalSlots}人`;
   $("draftBoardSummary").textContent = !gameStarted
     ? `各チーム${pickLimit}人。ドラフト開始後、巡目ごとに表示します。`
     : finished
-      ? "全チームの指名が完了しました。"
+      ? onlineDepartedTeams.size
+        ? `${onlineDepartedTeams.size}チームが退出したため、残り指名をスキップしました。`
+        : "全チームの指名が完了しました。"
       : r1RevealPending
         ? "全員の1巡目入札がそろいました。ホストの確認後に順番に公開します。"
         : pendingR1Resolution
@@ -5686,6 +5774,10 @@ function renderDraft() {
       }
     }
 
+    if (activeMode === "online" && onlineDepartedTeams.has(team)) {
+      return `${lossMarkup}<span class="empty-pick">スキップ</span>`;
+    }
+
     if (lossMarkup) return lossMarkup;
     return `<span class="empty-pick${current ? " is-current" : ""}">${current ? "指名中" : "—"}</span>`;
   };
@@ -5699,7 +5791,9 @@ function renderDraft() {
             const teamSubtitle = aiTeams.has(team)
               ? aiStrategyFor(team).label
               : activeMode === "online"
-                ? (team === onlineTeamForUid(onlineUid) ? "あなたのチーム" : "参加チーム")
+                ? onlineDepartedTeams.has(team)
+                  ? "退出済み"
+                  : (team === onlineTeamForUid(onlineUid) ? "あなたのチーム" : "参加チーム")
                 : (activeMode === "ai" && index === 0 ? "あなたのチーム" : `チーム ${String(index + 1).padStart(2, "0")}`);
             return `
               <th class="team-column" scope="col" style="--team-color: ${teamColorPalette[index % teamColorPalette.length]}">
@@ -5734,7 +5828,9 @@ function renderDraft() {
   compactBoard.hidden = finished;
   if (finished) {
     $("finalResultsSummary").textContent =
-      `${teamNames.length}チームが各${pickLimit}人を指名しました（合計${totalPicks}人）。`;
+      onlineDepartedTeams.size
+        ? `${onlineDepartedTeams.size}チームが退出し、残り指名をスキップしました（合計${totalPicks}人）。`
+        : `${teamNames.length}チームが各${pickLimit}人を指名しました（合計${totalPicks}人）。`;
     $("finalResultsBoard").innerHTML = $("draftBoard").innerHTML;
     renderFinalSnapshot();
     if (!finalResultsWasVisible) {

@@ -43,7 +43,7 @@
           ".read": "auth != null && root.child('rooms').child($roomId).child('hostUid').val() == auth.uid",
           "$actionId": {
             ".write": "auth != null && ((!data.exists() && auth.uid == newData.child('uid').val() && root.child('rooms').child($roomId).child('players').child(auth.uid).exists()) || root.child('rooms').child($roomId).child('hostUid').val() == auth.uid)",
-            ".validate": "!newData.exists() || (newData.hasChildren(['uid', 'kind']) && newData.child('uid').val() == auth.uid && (newData.child('kind').val() == 'pick' || newData.child('kind').val() == 'envelope' || newData.child('kind').val() == 'next' || newData.child('kind').val() == 'skip'))"
+            ".validate": "!newData.exists() || (newData.hasChildren(['uid', 'kind']) && newData.child('uid').val() == auth.uid && (newData.child('kind').val() == 'pick' || newData.child('kind').val() == 'envelope' || newData.child('kind').val() == 'next' || newData.child('kind').val() == 'skip' || (newData.child('kind').val() == 'leave' && root.child('rooms').child($roomId).child('status').val() == 'playing')))"
           }
         }
       }
