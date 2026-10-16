@@ -1600,14 +1600,31 @@ let savedPresets = readSaved("stagePickPresets", {});
 let selectedId = null;
 let candidateSortMode = "recommended";
 let candidateSearchRenderTimer = null;
+let candidateVisibleLimit = 64;
+let candidateFilterSignature = "";
+let candidatePoolRevision = 0;
+let candidateResultsCacheRevision = -1;
+const candidateResultsCache = new Map();
+let dependentFilterSignature = "";
+const CANDIDATE_PAGE_SIZE = 64;
 let gameStarted = false;
 let finalResultsWasVisible = false;
 let drafted = new Set();
+function setDraftedMembers(values) {
+  const next = new Set(values || []);
+  const changed = next.size !== drafted.size || [...next].some(id => !drafted.has(id));
+  drafted = next;
+  if (changed) candidatePoolRevision += 1;
+}
 function personHasBeenDrafted(idol) {
   return drafted.has(idol.personKey || idol.id);
 }
 function markPersonDrafted(idol) {
-  drafted.add(idol.personKey || idol.id);
+  const key = idol.personKey || idol.id;
+  if (!drafted.has(key)) {
+    drafted.add(key);
+    candidatePoolRevision += 1;
+  }
 }
 let pendingDraftPickId = null;
 let lastCandidateInteraction = '未操作';
@@ -1646,6 +1663,7 @@ let onlineConfirmationsAddedListenerCallback = null;
 let onlineConfirmationsChangedListenerCallback = null;
 let onlineActionsPollTimer = null;
 let onlineActionsPollRoomRef = null;
+let onlineActionsListenerFailed = false;
 let onlinePendingAction = null;
 let lastPickRevealPointerActionAt = 0;
 let onlineActionAcks = {};
@@ -1668,6 +1686,7 @@ let onlineConfirmationQueue = Promise.resolve();
 let onlineQueuedConfirmationIds = new Set();
 let onlineHandledConfirmationIds = new Set();
 let onlineGuestStatePollTimer = null;
+let onlineGuestStatePollingFallback = false;
 let onlineGuestRebidFallbackTimer = null;
 let onlineListenersAttached = false;
 let onlineHandledActionIds = new Set();
@@ -1793,6 +1812,16 @@ function getCandidates(ignoreFilter = "", dedupePeople = true) {
   const agency = ignoreFilter === "agencyFilter" ? "" : $("agencyFilter").value;
   const group = ignoreFilter === "groupFilter" ? "" : $("groupFilter").value;
   const hideDrafted = $("hideDrafted").checked;
+  if (candidateResultsCacheRevision !== candidatePoolRevision) {
+    candidateResultsCache.clear();
+    candidateResultsCacheRevision = candidatePoolRevision;
+  }
+  const cacheKey = JSON.stringify([
+    ignoreFilter, dedupePeople, candidateSortMode, query,
+    generation, nationality, agency, group,
+    hideDrafted, $("showExcluded").checked, candidatePoolRevision
+  ]);
+  if (candidateResultsCache.has(cacheKey)) return candidateResultsCache.get(cacheKey);
 
   const candidates = idols.filter(idol => {
     const displayedAgency = agencyFilterName(idol.agency);
@@ -1807,10 +1836,28 @@ function getCandidates(ignoreFilter = "", dedupePeople = true) {
       (!hideDrafted || !personHasBeenDrafted(idol)) &&
       ($("showExcluded").checked || !excluded.has(idol.id));
   });
-  return (dedupePeople ? preferredPersonCandidates(candidates, query) : candidates).sort(compareCandidates);
+  const result = (dedupePeople ? preferredPersonCandidates(candidates, query) : candidates).sort(compareCandidates);
+  if (candidateResultsCache.size >= 24) candidateResultsCache.clear();
+  candidateResultsCache.set(cacheKey, result);
+  return result;
+}
+
+function dependentFilterCacheKey() {
+  return JSON.stringify([
+    normalizeSearchText($("searchInput").value.trim()),
+    $("generationFilter").value,
+    $("nationalityFilter").value,
+    $("agencyFilter").value,
+    $("groupFilter").value,
+    $("hideDrafted").checked,
+    $("showExcluded").checked,
+    candidatePoolRevision
+  ]);
 }
 
 function updateDependentFilters() {
+  const cacheKey = dependentFilterCacheKey();
+  if (cacheKey === dependentFilterSignature) return;
   for (let pass = 0; pass < dependentFilters.length; pass += 1) {
     let changed = false;
     dependentFilters.forEach(filter => {
@@ -1834,6 +1881,7 @@ function updateDependentFilters() {
     });
     if (!changed) break;
   }
+  dependentFilterSignature = dependentFilterCacheKey();
 }
 
 function isOnlineR1RebidTurn(team) {
@@ -1872,6 +1920,20 @@ function candidateGateSignature(team, canPickNow) {
 function renderCandidates() {
   const confirmationPanel = $("pickConfirmation");
   $("pickConfirmationMount").append(confirmationPanel);
+  const nextFilterSignature = JSON.stringify([
+    normalizeSearchText($("searchInput").value.trim()),
+    $("generationFilter").value,
+    $("nationalityFilter").value,
+    $("agencyFilter").value,
+    $("groupFilter").value,
+    $("hideDrafted").checked,
+    $("showExcluded").checked,
+    candidateSortMode
+  ]);
+  if (nextFilterSignature !== candidateFilterSignature) {
+    candidateFilterSignature = nextFilterSignature;
+    candidateVisibleLimit = CANDIDATE_PAGE_SIZE;
+  }
   updateDependentFilters();
   const candidates = getCandidates();
   const pendingIdol = idols.find(item => item.id === pendingDraftPickId);
@@ -1893,6 +1955,7 @@ function renderCandidates() {
     $("candidateList").dataset.gateSignature = gateSignature;
     return;
   }
+  const visibleList = list.slice(0, candidateVisibleLimit);
 
   const nominatedPersonKeys = (areR1BidsSealed() || r1RevealPending)
     ? new Set()
@@ -1901,7 +1964,7 @@ function renderCandidates() {
     ).map(item => idols.find(idol => idol.id === item.id)?.personKey).filter(Boolean));
   const ownOnlineTeam = activeMode === "online" ? onlineTeamForUid(onlineUid) : "";
   const ownOnlineBidSubmitted = Boolean(ownOnlineTeam && r1Nominations.some(item => item.team === ownOnlineTeam));
-  $("candidateList").innerHTML = list.map(idol => {
+  $("candidateList").innerHTML = visibleList.map(idol => {
     const isExcluded = excluded.has(idol.id);
     const isNominated = !r1Started && nominatedPersonKeys.has(idol.personKey);
     const isUnavailable = isExcluded || personHasBeenDrafted(idol);
@@ -1954,7 +2017,9 @@ function renderCandidates() {
         </div>
       </article>
     `;
-  }).join("");
+  }).join("") + (visibleList.length < list.length
+    ? `<button class="candidate-load-more" type="button" data-action="load-more">さらに候補を見る（あと${list.length - visibleList.length}人）</button>`
+    : "");
   $("candidateList").dataset.gateSignature = gateSignature;
 
   if (pendingIdol) {
@@ -2146,7 +2211,11 @@ $("candidateList").addEventListener("click", event => {
   } else if (button.dataset.action === "exclude") {
     if (excluded.has(id)) excluded.delete(id);
     else excluded.add(id);
+    candidatePoolRevision += 1;
     localStorage.setItem("stagePickExcluded", JSON.stringify([...excluded]));
+    renderCandidates();
+  } else if (button.dataset.action === "load-more") {
+    candidateVisibleLimit += CANDIDATE_PAGE_SIZE;
     renderCandidates();
   }
 });
@@ -2464,6 +2533,8 @@ function attachOnlineActionsListener() {
       console.error("Online actions listener was cancelled", error);
       setOnlineStatus(message);
       if (!$("pickReveal").hidden) $("pickRevealActionHint").textContent = message;
+      onlineActionsListenerFailed = true;
+      startOnlineActionsPolling();
     });
     onlineActionsListenerRef = actionsRef;
   }
@@ -2476,10 +2547,18 @@ function attachOnlineActionsListener() {
     if (roomRef === onlineRoomRef && onlineIsHost) enqueueOnlineConfirmation(snapshot);
   };
   confirmationsRef.on("child_added", onlineConfirmationsAddedListenerCallback, error => {
-    if (roomRef === onlineRoomRef && onlineIsHost) reportOnlineConfirmationsReadError(error);
+    if (roomRef === onlineRoomRef && onlineIsHost) {
+      onlineActionsListenerFailed = true;
+      reportOnlineConfirmationsReadError(error);
+      startOnlineActionsPolling();
+    }
   });
   confirmationsRef.on("child_changed", onlineConfirmationsChangedListenerCallback, error => {
-    if (roomRef === onlineRoomRef && onlineIsHost) reportOnlineConfirmationsReadError(error);
+    if (roomRef === onlineRoomRef && onlineIsHost) {
+      onlineActionsListenerFailed = true;
+      reportOnlineConfirmationsReadError(error);
+      startOnlineActionsPolling();
+    }
   });
   onlineConfirmationsListenerRef = confirmationsRef;
 }
@@ -2514,7 +2593,7 @@ function startOnlineActionsPolling() {
       if (onlineActionsPollRoomRef === roomRef) detachOnlineActionsListener();
       return;
     }
-    let nextDelay = gameStarted && activeMode === "online" ? 900 : 1200;
+    let nextDelay = gameStarted && activeMode === "online" ? 3000 : 4000;
     if (gameStarted && activeMode === "online") {
       const [actionsResult, confirmationsResult] = await Promise.allSettled([
         actionsRef.once("value"),
@@ -2525,13 +2604,13 @@ function startOnlineActionsPolling() {
         actionsResult.value.forEach(actionSnapshot => enqueueOnlineAction(actionSnapshot));
       } else {
         reportOnlineActionsReadError(actionsResult.reason);
-        nextDelay = actionsResult.reason?.code === "PERMISSION_DENIED" ? 5000 : 1800;
+        nextDelay = actionsResult.reason?.code === "PERMISSION_DENIED" ? 8000 : 3000;
       }
       if (confirmationsResult.status === "fulfilled") {
         confirmationsResult.value.forEach(enqueueOnlineConfirmation);
       } else {
         reportOnlineConfirmationsReadError(confirmationsResult.reason);
-        nextDelay = confirmationsResult.reason?.code === "PERMISSION_DENIED" ? 5000 : 1800;
+        nextDelay = confirmationsResult.reason?.code === "PERMISSION_DENIED" ? 8000 : 3000;
       }
     }
     if (roomRef === onlineRoomRef && onlineIsHost && onlineGameStatus === "playing") {
@@ -2561,6 +2640,8 @@ function setOnlineRoomConnected(code, isHost, initialPlayers = null, deferGameAc
     clearTimeout(onlineGuestStatePollTimer);
     onlineGuestStatePollTimer = null;
   }
+  onlineGuestStatePollingFallback = false;
+  onlineActionsListenerFailed = false;
   if (onlineGuestRebidFallbackTimer !== null) {
     clearTimeout(onlineGuestRebidFallbackTimer);
     onlineGuestRebidFallbackTimer = null;
@@ -2619,12 +2700,15 @@ function setOnlineRoomConnected(code, isHost, initialPlayers = null, deferGameAc
     if (connectedRoomRef !== onlineRoomRef) return;
     onlineGameStatus = snapshot.val() || "closed";
     renderOnlineLobby();
-    if (onlineGameStatus === "playing" && onlineIsHost) startOnlineActionsPolling();
+    if (onlineGameStatus === "playing" && onlineIsHost && onlineActionsListenerFailed) {
+      startOnlineActionsPolling();
+    }
     if (onlineGameStatus !== "playing" && onlineActionsPollRoomRef === onlineRoomRef) {
       detachOnlineActionsListener();
     }
     if (onlineGameStatus === "playing" && !onlineIsHost) {
       attachOnlineGuestListeners();
+      scheduleOnlineGuestStatePoll();
     }
     if (onlineGameStatus === "closed") setOnlineStatus("このルームは終了しました");
   });
@@ -2837,7 +2921,8 @@ async function acceptOnlineJoinRequest(snapshot, sourceRoomRef = onlineRoomRef) 
 }
 
 function scheduleOnlineGuestStatePoll() {
-  if (onlineGuestStatePollTimer !== null || onlineIsHost || !onlineRoomRef) return;
+  if (!onlineGuestStatePollingFallback || onlineGuestStatePollTimer !== null || onlineIsHost ||
+      !onlineRoomRef || onlineGameStatus !== "playing") return;
   onlineGuestStatePollTimer = window.setTimeout(async () => {
     onlineGuestStatePollTimer = null;
     const roomRef = onlineRoomRef;
@@ -2861,7 +2946,7 @@ function scheduleOnlineGuestStatePoll() {
       }
     }
     scheduleOnlineGuestStatePoll();
-  }, 900);
+  }, 3000);
 }
 
 function attachOnlineGuestListeners() {
@@ -2871,6 +2956,11 @@ function attachOnlineGuestListeners() {
     onlineListenersAttached = true;
     roomRef.child("state").on("value", snapshot => {
       if (roomRef !== onlineRoomRef || onlineIsHost) return;
+      onlineGuestStatePollingFallback = false;
+      if (onlineGuestStatePollTimer !== null) {
+        clearTimeout(onlineGuestStatePollTimer);
+        onlineGuestStatePollTimer = null;
+      }
       const state = snapshot.val();
       if (state) {
         recordOnlineRemoteState(state);
@@ -2882,9 +2972,12 @@ function attachOnlineGuestListeners() {
       onlineLastStateReadError = error?.message || "listener failed";
       renderOnlineSyncDebug();
       setOnlineStatus(error.message || "共有状態を受信できません。接続を確認してください。");
+      if (error?.code !== "PERMISSION_DENIED") {
+        onlineGuestStatePollingFallback = true;
+        scheduleOnlineGuestStatePoll();
+      }
     });
   }
-  scheduleOnlineGuestStatePoll();
 }
 
 async function createOnlineRoom() {
@@ -3006,6 +3099,8 @@ function resetOnlineRoomToSetup(roomRef, leavingUid) {
     clearTimeout(onlineGuestStatePollTimer);
     onlineGuestStatePollTimer = null;
   }
+  onlineGuestStatePollingFallback = false;
+  onlineActionsListenerFailed = false;
   clearOnlineGuestRebidFallback();
   if (onlineStateWriteTimer !== null) {
     clearTimeout(onlineStateWriteTimer);
@@ -3044,7 +3139,7 @@ function resetOnlineRoomToSetup(roomRef, leavingUid) {
   aiTeams = new Set();
   aiStrategyByTeam = new Map();
   teamNames = localTeamNames.slice(0, 4);
-  drafted = new Set();
+  setDraftedMembers([]);
   selectedId = null;
   pendingDraftPickId = null;
   picks = Object.fromEntries(teamNames.map(team => [team, []]));
@@ -3721,7 +3816,7 @@ function applyOnlineGameState(state) {
       }
       return [team, []];
     }));
-    drafted = new Set(state.drafted || []);
+    setDraftedMembers(state.drafted || []);
     round = Number(state.round || 1);
     r1Started = Boolean(state.r1Started);
     r1NominationOrder = state.r1NominationOrder || [];
@@ -4448,7 +4543,7 @@ function startGame(mode, aiCount = 3) {
   assignAIStrategies([...aiTeams]);
   if (startOrderMode === "random") teamNames = shuffle(teamNames);
   gameStarted = true;
-  drafted = new Set();
+  setDraftedMembers([]);
   selectedId = null;
   pendingDraftPickId = null;
   picks = Object.fromEntries(teamNames.map(team => [team, []]));
