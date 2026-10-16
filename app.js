@@ -2704,6 +2704,10 @@ function renderOnlineLobby() {
   leaveButton.hidden = onlineIsHost || !["lobby", "closed", "playing"].includes(onlineGameStatus);
   leaveButton.disabled = onlineActionPending || onlineRestartPending;
   leaveButton.textContent = onlinePendingAction?.kind === "leave" ? "退出を処理中…" : "ルームを退出";
+  const finalLeaveButton = $("leaveOnlineRoomFromResults");
+  finalLeaveButton.disabled = onlineActionPending || onlineRestartPending;
+  finalLeaveButton.textContent = onlinePendingAction?.kind === "leave" ? "退出を処理中…" : "ルームを退出";
+  $("closeOnlineRoomFromResults").disabled = onlineRestartPending;
   $("closeOnlineRoom").textContent = "ルーム終了・データ削除";
   if (onlineGameStatus === "playing") setOnlineStatus(finished ? "ドラフト終了・結果を確認できます" : "ドラフト進行中");
   else if (onlineGameStatus === "lobby") setOnlineStatus(onlineIsHost ? "友達の参加を待っています" : "ルームに参加しました");
@@ -2972,26 +2976,15 @@ async function closeOnlineRoom() {
   if (!onlineIsHost || !onlineRoomRef) return;
   if (!window.confirm("ルームを終了し、参加者名・設定・指名結果を含むルームデータを削除します。続けますか？")) return;
   try {
+    const roomRef = onlineRoomRef;
+    const closingUid = onlineUid;
     if (onlineStateWriteTimer !== null) {
       clearTimeout(onlineStateWriteTimer);
       onlineStateWriteTimer = null;
     }
-    await onlineRoomRef.remove();
+    await roomRef.remove();
+    resetOnlineRoomToSetup(roomRef, closingUid);
     setOnlineStatus("ルームを閉じました。");
-    $("onlineLobbyHint").textContent = "ルームを閉じました。新しいルームを作れます。";
-    $("onlineLobby").hidden = true;
-    $("createOnlineRoom").hidden = false;
-    $("joinOnlineRoom").hidden = false;
-    $("onlineRoomCode").disabled = false;
-    onlineRoomRef = null;
-    onlineRoomCode = "";
-    onlineIsHost = false;
-    onlinePlayers = {};
-    onlineGameStatus = "";
-    const url = new URL(location.href);
-    url.searchParams.delete("room");
-    history.replaceState(null, "", url);
-    renderOnlineLobby();
   } catch (error) {
     setOnlineStatus(error.message || "ルームを閉じられませんでした。");
   }
@@ -3110,6 +3103,8 @@ async function leaveOnlineRoom() {
     if (submitOnlineAction({ kind: "leave" })) {
       $("leaveOnlineRoom").disabled = true;
       $("leaveOnlineRoom").textContent = "退出を処理中…";
+      $("leaveOnlineRoomFromResults").disabled = true;
+      $("leaveOnlineRoomFromResults").textContent = "退出を処理中…";
       setOnlineStatus("退出を送信しました。ホストが反映すると初期画面に戻ります。以降の指名はスキップされます。");
     }
     return;
@@ -3637,6 +3632,7 @@ function applyOnlineGameState(state) {
   const incomingRevision = Number(state.stateRevision);
   const incomingGameSessionId = String(state.gameSessionId || "");
   const gameSessionChanged = Boolean(incomingGameSessionId && incomingGameSessionId !== gameSessionId);
+  const shouldScrollToCandidatePool = Boolean(state.gameStarted && (!gameStarted || gameSessionChanged));
   const incomingNominationOrder = Array.isArray(state.r1NominationOrder) ? state.r1NominationOrder : [];
   const incomingIsRebidPhase = !state.r1Started && !state.pendingR1Resolution &&
     incomingNominationOrder.length > 0 && (state.pickRevealPhase || "closed") === "closed" &&
@@ -3811,6 +3807,7 @@ function applyOnlineGameState(state) {
   }
   renderOnlineSyncDebug();
   if (!renderSucceeded) return;
+  if (shouldScrollToCandidatePool) scrollToCandidatePool();
   scheduleOnlineGuestRebidFallback();
   recoverIdleGuestFirstRoundResolution();
 }
@@ -4397,6 +4394,19 @@ function restartLocalOrAiDraft() {
   startGame(mode, mode === "ai" ? Number($("aiCount").value) : 3);
 }
 
+function scrollToCandidatePool() {
+  requestAnimationFrame(() => {
+    if (!gameStarted) return;
+    const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    $("pool").scrollIntoView({
+      behavior: reducedMotion ? "auto" : "smooth",
+      block: "start",
+      inline: "nearest"
+    });
+    $("pool").focus({ preventScroll: true });
+  });
+}
+
 function startGame(mode, aiCount = 3) {
   clearOnlineGuestRebidFallback();
   if (aiAdvanceTimer !== null) {
@@ -4466,10 +4476,7 @@ function startGame(mode, aiCount = 3) {
   renderDraft();
   advanceAI();
   syncOnlineState();
-  requestAnimationFrame(() => {
-    $("pool").scrollIntoView({ behavior: "smooth", block: "start" });
-    $("pool").focus({ preventScroll: true });
-  });
+  scrollToCandidatePool();
 }
 
 $("playMode").addEventListener("change", updateModeSetup);
@@ -4498,6 +4505,8 @@ $("joinOnlineRoom").addEventListener("click", joinOnlineRoom);
 $("copyOnlineInvite").addEventListener("click", copyOnlineInvite);
 $("closeOnlineRoom").addEventListener("click", closeOnlineRoom);
 $("leaveOnlineRoom").addEventListener("click", leaveOnlineRoom);
+$("leaveOnlineRoomFromResults").addEventListener("click", leaveOnlineRoom);
+$("closeOnlineRoomFromResults").addEventListener("click", closeOnlineRoom);
 $("startOnlineGame").addEventListener("click", startOnlineGame);
 $("restartOnlineGame").addEventListener("click", restartOnlineGame);
 $("restartOfflineDraft").addEventListener("click", restartLocalOrAiDraft);
@@ -5625,6 +5634,8 @@ function renderDraft() {
 
   $("pickConfirmation").hidden = !canConfirm;
   $("restartOfflineDraft").hidden = !finished || !["ai", "local"].includes(activeMode) || $("playMode").value !== activeMode;
+  $("leaveOnlineRoomFromResults").hidden = !finished || activeMode !== "online" || onlineIsHost || !onlineRoomRef;
+  $("closeOnlineRoomFromResults").hidden = !finished || activeMode !== "online" || !onlineIsHost || !onlineRoomRef;
   if (canConfirm) {
     $("pickConfirmName").textContent = pendingIdol.japaneseName;
     $("pickConfirmDetails").textContent = `${pendingIdol.group}・${fullAgencyName(pendingIdol.group, pendingIdol.agency) || "事務所未登録"}`;
@@ -5931,6 +5942,14 @@ if (invitedRoomCode) {
   $("onlineRoomCode").value = invitedRoomCode.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8);
   updateModeSetup();
   setOnlineStatus("招待リンクから参加できます。名前を確認して「コードで参加」を押してください。");
+  requestAnimationFrame(() => {
+    const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    $("onlinePlayerName").scrollIntoView({
+      behavior: reducedMotion ? "auto" : "smooth",
+      block: "center",
+      inline: "nearest"
+    });
+  });
 }
 
 // Open the short site information panel from the persistent header.

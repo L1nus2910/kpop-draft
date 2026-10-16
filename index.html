@@ -18,9 +18,9 @@
   <meta property="og:description" content="推しでつくる、夢のドラフト。非公式ファン制作のK-POPドラフトゲーム。">
   <meta property="og:url" content="https://l1nus2910.github.io/kpop-draft/">
   <meta name="twitter:card" content="summary">
-  <link rel="stylesheet" href="style.css?v=20261016-app-interface-1">
+  <link rel="stylesheet" href="style.css?v=20261017-online-navigation-1">
   <script src="firebase-config.js" defer></script>
-  <script src="app.js?v=20261016-room-exit-skip-1" defer></script>
+  <script src="app.js?v=20261017-online-navigation-1" defer></script>
 </head>
 <body>
   <header class="topbar">
@@ -190,6 +190,8 @@
           <button class="button button-secondary" id="shareFinalResultsX" type="button" aria-label="ドラフト結果の画像とハッシュタグ、サイトリンクをXへ共有する">画像付きでX共有</button>
           <button class="button button-primary" id="restartOfflineDraft" type="button" aria-label="現在の設定で再ドラフトを始める" hidden>再ドラフト</button>
           <button class="button button-primary" id="restartOnlineGame" type="button" hidden>同じルームで再ドラフト</button>
+          <button class="button button-secondary" id="leaveOnlineRoomFromResults" type="button" hidden>ルームを退出</button>
+          <button class="button button-secondary" id="closeOnlineRoomFromResults" type="button" hidden>ルーム終了・データ削除</button>
           <button class="button button-secondary" id="finalScreenshotToggle" type="button" aria-pressed="false">スクショ用レイアウト</button>
         </div>
       </div>

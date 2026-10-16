@@ -3539,6 +3539,11 @@ body.final-screenshot-mode .final-snapshot-grid {
   display: grid;
 }
 
+body.final-screenshot-mode #leaveOnlineRoomFromResults,
+body.final-screenshot-mode #closeOnlineRoomFromResults {
+  display: none !important;
+}
+
 @media (max-width: 700px) {
   #pool {
     scroll-margin-top: 140px;
