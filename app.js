@@ -2984,43 +2984,124 @@ async function closeOnlineRoom() {
 
 async function leaveOnlineRoom() {
   if (!onlineRoomRef || onlineIsHost || !["lobby", "closed"].includes(onlineGameStatus)) return;
+
   const roomRef = onlineRoomRef;
-  try {
-    if (onlineGameStatus === "lobby" && onlineUid) {
-      await Promise.all([
-        roomRef.child(`players/${onlineUid}`).remove(),
-        roomRef.child(`joinRequests/${onlineUid}`).remove()
-      ]);
-    }
-    roomRef.child("players").off();
-    roomRef.child("status").off();
-    roomRef.child(`players/${onlineUid}`).off();
-    roomRef.child(`joinRequests/${onlineUid}`).off();
-    roomRef.child("settings").off();
-    roomRef.child("state").off();
-    if (onlineGuestStatePollTimer !== null) {
-      clearTimeout(onlineGuestStatePollTimer);
-      onlineGuestStatePollTimer = null;
-    }
-    onlineRoomRef = null;
-    onlineRoomCode = "";
-    onlineIsHost = false;
-    onlinePlayers = {};
-    onlineGameStatus = "";
-    onlineListenersAttached = false;
-    $("onlineLobby").hidden = true;
-    $("createOnlineRoom").hidden = false;
-    $("joinOnlineRoom").hidden = false;
-    $("onlineRoomCode").disabled = false;
-    $("onlineRoomCode").value = "";
-    const url = new URL(location.href);
-    url.searchParams.delete("room");
-    history.replaceState(null, "", url);
-    updateModeSetup();
-    setOnlineStatus("ルームを退出しました。別のルームに参加できます。");
-  } catch (error) {
-    setOnlineStatus(error.message || "ルームを退出できませんでした。");
+  const leavingUid = onlineUid;
+  const wasLobby = onlineGameStatus === "lobby";
+
+  // Detach and reset the local screen first. A remote permission/network error
+  // must never leave the player stuck in a room they already chose to leave.
+  detachOnlineActionsListener();
+  roomRef.child("players").off();
+  roomRef.child("status").off();
+  roomRef.child("settings").off();
+  roomRef.child("state").off();
+  roomRef.child("joinRequests").off();
+  if (leavingUid) {
+    roomRef.child(`players/${leavingUid}`).off();
+    roomRef.child(`joinRequests/${leavingUid}`).off();
   }
+  if (onlineGuestStatePollTimer !== null) {
+    clearTimeout(onlineGuestStatePollTimer);
+    onlineGuestStatePollTimer = null;
+  }
+  clearOnlineGuestRebidFallback();
+  if (onlineStateWriteTimer !== null) {
+    clearTimeout(onlineStateWriteTimer);
+    onlineStateWriteTimer = null;
+  }
+
+  onlineRoomRef = null;
+  onlineRoomCode = "";
+  onlineIsHost = false;
+  onlinePlayers = {};
+  onlineGameStatus = "";
+  onlineListenersAttached = false;
+  onlineActionPending = false;
+  onlinePendingAction = null;
+  onlineActionAcks = {};
+  onlineRestartPending = false;
+
+  if (aiAdvanceTimer !== null) {
+    clearTimeout(aiAdvanceTimer);
+    aiAdvanceTimer = null;
+  }
+  if (pickRevealTimer !== null) {
+    clearTimeout(pickRevealTimer);
+    pickRevealTimer = null;
+  }
+  pickRevealQueue = [];
+  pickRevealPhase = "closed";
+  activePickReveal = null;
+  onlineRevealAcks = new Set();
+  onlineShownRevealKey = "";
+  gameSessionId = "";
+  gameStarted = false;
+  finalResultsWasVisible = false;
+  activeMode = "ai";
+  aiTeams = new Set();
+  aiStrategyByTeam = new Map();
+  teamNames = localTeamNames.slice(0, 4);
+  drafted = new Set();
+  selectedId = null;
+  pendingDraftPickId = null;
+  picks = Object.fromEntries(teamNames.map(team => [team, []]));
+  round = 1;
+  r1Started = false;
+  r1NominationOrder = [];
+  r1NominationIndex = 0;
+  r1NominationAttempt = 1;
+  r1Nominations = [];
+  r1Queue = [];
+  r1RevealPending = false;
+  pendingR1Resolution = null;
+  waiverOrder = teamNames.slice();
+  firstRoundWaiverOrder = [];
+  turnIndex = 0;
+  lotterySummary = "";
+  firstRoundLotteryLosses = Object.fromEntries(teamNames.map(team => [team, []]));
+
+  $("playMode").value = "ai";
+  $("pickLimit").value = "5";
+  $("orderMode").value = "snake";
+  $("startOrderMode").value = "fixed";
+  $("pickReveal").hidden = true;
+  $("onlineLobby").hidden = true;
+  $("onlinePlayerList").innerHTML = "";
+  $("onlineRoomCodeLabel").textContent = "";
+  $("createOnlineRoom").hidden = false;
+  $("joinOnlineRoom").hidden = false;
+  $("onlineRoomCode").disabled = false;
+  $("onlineRoomCode").value = "";
+  $("onlineLobbyHint").textContent = "2〜10人で遊べます。参加者がそろったらホストが開始します。終了後も同じルームで再ドラフトできます。";
+  setFinalScreenshotMode(false, false);
+
+  const url = new URL(location.href);
+  url.searchParams.delete("room");
+  history.replaceState(null, "", url);
+  updateModeSetup();
+  renderNominations();
+  renderCandidates();
+  renderDraft();
+  setOnlineStatus("ルーム作成や参加の結果がここに表示されます。");
+  $("onlineRoomStatus").textContent = "接続中…";
+
+  window.scrollTo({ top: 0, behavior: "smooth" });
+  if (!wasLobby || !leavingUid) return;
+  void (async () => {
+    const playerRemoval = roomRef.child(`players/${leavingUid}`).remove();
+    const requestRef = roomRef.child(`joinRequests/${leavingUid}`);
+    const requestRemoval = (async () => {
+      // The host removes a join request when accepting it. Only delete it when
+      // it still exists; Realtime Database rules reject deleting a missing one.
+      const requestSnapshot = await requestRef.once("value");
+      if (requestSnapshot.exists()) await requestRef.remove();
+    })();
+    const results = await Promise.allSettled([playerRemoval, requestRemoval]);
+    results.forEach(result => {
+      if (result.status === "rejected") console.warn("Could not fully remove online room membership", result.reason);
+    });
+  })().catch(error => console.warn("Could not fully remove online room membership", error));
 }
 
 function teamOwnerUid(team) {
