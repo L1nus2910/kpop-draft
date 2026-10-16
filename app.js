@@ -1,4 +1,4 @@
-const onlineClientBuild = "20261016-pick-route-diagnostic-1";
+const onlineClientBuild = "20261016-pick-route-diagnostic-2";
 
 const groups = [
   {
@@ -2069,7 +2069,11 @@ function cancelDraftPick() {
 function confirmDraftPick(submittingUid = "") {
   if (!$("pickReveal").hidden) return;
   const idol = idols.find(item => item.id === pendingDraftPickId);
-  if (!idol || excluded.has(idol.id) || personHasBeenDrafted(idol)) {
+  // Exclusions are saved per browser, so the host's local list must not reject
+  // a guest's valid pick. The guest already applies their own exclusions when
+  // choosing; the host still validates the shared drafted-person state.
+  const isRemoteOnlinePick = activeMode === "online" && submittingUid && submittingUid !== onlineUid;
+  if (!idol || (!isRemoteOnlinePick && excluded.has(idol.id)) || personHasBeenDrafted(idol)) {
     cancelDraftPick();
     return;
   }
