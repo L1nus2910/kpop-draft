@@ -1,3 +1,5 @@
+const onlineClientBuild = "20261016-pick-route-diagnostic-1";
+
 const groups = [
   {
     name: "Girls' Generation",
@@ -2733,6 +2735,18 @@ function renderOnlineSyncDebug() {
   const desiredCandidateGate = candidateGateSignature(currentTeam, candidateGate.canPickNow);
   if (candidateList?.dataset.gateSignature !== desiredCandidateGate) renderCandidates();
   const submittedTeams = r1Nominations.map(item => item.team);
+  const ownActionAck = onlineUid ? onlineActionAcks[onlineUid] : null;
+  const newestActionAck = Object.values(onlineActionAcks || {}).sort((a, b) =>
+    Number(b?.at || 0) - Number(a?.at || 0)
+  )[0] || null;
+  const actionDebug = onlinePendingAction
+    ? `送信中 ${onlinePendingAction.kind} team=${onlinePendingAction.team || "?"} candidate=${onlinePendingAction.idolName || onlinePendingAction.idolId || "—"} group=${onlinePendingAction.idolGroup || "—"} attempt=${onlinePendingAction.r1NominationAttempt} client=${onlinePendingAction.clientBuild || "?"}`
+    : ownActionAck
+      ? `応答 ${ownActionAck.kind || "?"} accepted=${Boolean(ownActionAck.accepted)} reason=${ownActionAck.reason || "なし"} client=${ownActionAck.clientBuild || "?"} host=${ownActionAck.hostBuild || "旧版/不明"} requested=${ownActionAck.requestedIdol || "—"} hostResolved=${ownActionAck.hostResolvedIdol || "—"} attempt=${ownActionAck.actionAttempt ?? "—"}/${ownActionAck.hostAttemptBefore ?? "—"} phase=${ownActionAck.hostPhaseBefore || "—"} → ${ownActionAck.hostPhaseAfter || "—"}`
+      : "応答なし";
+  const newestActionDebug = newestActionAck && newestActionAck !== ownActionAck
+    ? `最新応答 ${newestActionAck.kind || "?"} accepted=${Boolean(newestActionAck.accepted)} team=${newestActionAck.team || "?"} reason=${newestActionAck.reason || "なし"} client=${newestActionAck.clientBuild || "?"} host=${newestActionAck.hostBuild || "旧版/不明"} requested=${newestActionAck.requestedIdol || "—"} hostResolved=${newestActionAck.hostResolvedIdol || "—"} attempt=${newestActionAck.actionAttempt ?? "—"}/${newestActionAck.hostAttemptBefore ?? "—"} phase=${newestActionAck.hostPhaseBefore || "—"} → ${newestActionAck.hostPhaseAfter || "—"}`
+    : "";
   const localPhase = onlineIsHost
     ? onlineStatePhaseSummary(serializeOnlineGame())
     : onlineStatePhaseSummary({
@@ -2749,6 +2763,7 @@ function renderOnlineSyncDebug() {
         pickRevealQueue: pickRevealQueue.map(serializeOnlineReveal)
       });
   panel.textContent = [
+    `clientBuild=${onlineClientBuild}`,
     `room=${onlineRoomCode} role=${onlineIsHost ? "host" : "guest"} uid=${onlineUid.slice(0, 8)}`,
     `writeRev=${onlineIsHost ? onlineStateRevision : "—"} writeAt=${onlineLastStateWriteAt || "—"}${onlineLastStateWriteError ? ` error=${onlineLastStateWriteError}` : ""}`,
     `remoteRev=${onlineLastRemoteStateRevision ?? "—"} appliedRev=${onlineAppliedStateRevision} renderedRev=${onlineRenderedStateRevision} readAt=${onlineLastStateReadAt || "—"}${onlineLastStateReadError ? ` readError=${onlineLastStateReadError}` : ""}${onlineLastRenderError ? ` renderError=${onlineLastRenderError}` : ""}`,
@@ -2759,6 +2774,8 @@ function renderOnlineSyncDebug() {
     `pickGate control=${currentTeam ? canControlTeam(currentTeam) : false} pending=${onlineActionPending} revealHidden=${$("pickReveal").hidden} resolution=${Boolean(pendingR1Resolution)} firstRoundHostConfirm=${r1RevealPending}`,
     `candidateUI=${candidateList?.dataset.gateSignature === desiredCandidateGate ? "fresh" : "stale"} selectable=${candidateGate.canPickNow} disabled=${candidateList?.querySelectorAll(".candidate-select:disabled").length ?? 0}`,
     `candidateTap=${lastCandidateInteraction} pendingPick=${pendingDraftPickId || "なし"} confirmVisible=${!$("pickConfirmation").hidden}`,
+    `pickAction=${actionDebug}`,
+    newestActionDebug,
     `r1Picks=${teamNames.map(team => `${displayTeamName(team)}:${(picks[team] || []).filter(item => item.round === 1).map(item => item.name).join("+") || "—"}`).join(",")}`,
     `boardR1=${[...$("draftBoard").querySelectorAll("tbody tr:first-child td")].map(cell => cell.innerText.replace(/\s+/g, " ").trim() || "—").join("|") || "—"}`
   ].join("\n");
@@ -3811,9 +3828,16 @@ function submitOnlineAction(action) {
   const payload = { uid: onlineUid, ...action, createdAt: Date.now() };
   if (action.kind === "pick") {
     const team = onlineTeamForUid(onlineUid);
+    const idol = idols.find(item => item.id === action.idolId);
     payload.r1NominationAttempt = r1NominationAttempt;
     payload.round = round;
     payload.pickCount = (picks[team] || []).length;
+    payload.clientBuild = onlineClientBuild;
+    payload.idolData = idol ? {
+      personKey: idol.personKey,
+      japaneseName: idol.japaneseName,
+      group: idol.group
+    } : null;
   }
   if (["envelope", "next", "skip"].includes(action.kind)) {
     payload.revealKey = currentRevealKey();
@@ -3834,6 +3858,9 @@ function submitOnlineAction(action) {
     key: actionKey,
     kind: action.kind,
     idolId: action.idolId || "",
+    idolName: payload.idolData?.japaneseName || "",
+    idolGroup: payload.idolData?.group || "",
+    clientBuild: payload.clientBuild || "",
     team: onlineTeamForUid(onlineUid),
     r1NominationAttempt,
     round: round,
@@ -4032,6 +4059,17 @@ async function processOnlineAction(snapshot, processingRoomRef = onlineRoomRef) 
   onlineHandledActionIds.add(snapshot.key);
   const ownerTeam = onlineTeamForUid(action?.uid);
   const revealMatches = actionMatchesCurrentReveal(action);
+  const hostPhaseBefore = onlineStatePhaseSummary(serializeOnlineGame());
+  const hostAttemptBefore = r1NominationAttempt;
+  const actionIdol = action?.kind === "pick"
+    ? idols.find(item => item.id === String(action.idolId || ""))
+    : null;
+  const requestedIdol = action?.idolData
+    ? `${action.idolData.japaneseName || "?"}/${action.idolData.group || "?"} [${action.idolData.personKey || "keyなし"}]`
+    : String(action?.idolId || "IDなし");
+  const hostResolvedIdol = actionIdol
+    ? `${actionIdol.japaneseName}/${actionIdol.group} [${actionIdol.personKey || actionIdol.id}]`
+    : action?.kind === "pick" ? `ID ${String(action?.idolId || "なし")} が候補一覧にない` : "対象外";
   let actionAccepted = false;
   let actionRejectionReason = "";
   try {
@@ -4098,8 +4136,21 @@ async function processOnlineAction(snapshot, processingRoomRef = onlineRoomRef) 
     if (action?.uid && processingRoomRef === onlineRoomRef) {
       onlineActionAcks[action.uid] = {
         key: snapshot.key,
+        kind: action?.kind || "?",
         accepted: actionAccepted,
         reason: actionAccepted ? "" : actionRejectionReason || "操作を確認できませんでした。発表画面を確認して、もう一度試してください。",
+        team: ownerTeam || "",
+        clientBuild: action?.clientBuild || "",
+        hostBuild: onlineClientBuild,
+        requestedIdol,
+        hostResolvedIdol,
+        actionAttempt: action?.r1NominationAttempt != null && Number.isFinite(Number(action.r1NominationAttempt))
+          ? Number(action.r1NominationAttempt)
+          : null,
+        hostAttemptBefore,
+        hostAttemptAfter: r1NominationAttempt,
+        hostPhaseBefore,
+        hostPhaseAfter: onlineStatePhaseSummary(serializeOnlineGame()),
         at: Date.now()
       };
     }
