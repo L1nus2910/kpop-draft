@@ -5102,12 +5102,15 @@ async function createDraftResultsShareImage() {
   const padding = 44;
   const roundColumnWidth = 112;
   const headerHeight = 96;
-  const rowHeight = 108;
+  const regularRowHeight = 108;
+  const firstRoundHasLosses = teamNames.some(team => (firstRoundLotteryLosses[team] || []).length > 0);
+  const firstRoundRowHeight = firstRoundHasLosses ? 136 : regularRowHeight;
   const headingHeight = 164;
   const footerHeight = 60;
   const tableWidth = canvasWidth - padding * 2;
   const teamColumnWidth = (tableWidth - roundColumnWidth) / columnCount;
-  const canvasHeight = padding + headingHeight + headerHeight + pickLimit * rowHeight + footerHeight;
+  const rowsHeight = firstRoundRowHeight + Math.max(0, pickLimit - 1) * regularRowHeight;
+  const canvasHeight = padding + headingHeight + headerHeight + rowsHeight + footerHeight;
   const canvas = document.createElement("canvas");
   canvas.width = canvasWidth;
   canvas.height = canvasHeight;
@@ -5153,8 +5156,10 @@ async function createDraftResultsShareImage() {
     drawShareCanvasText(ctx, `${(picks[team] || []).length} / ${pickLimit}人`, x + teamColumnWidth / 2, tableY + 70, teamColumnWidth - 16, 15, "#ffffff", 700, "center", 11);
   });
 
+  let rowY = tableY + headerHeight;
   for (let roundIndex = 1; roundIndex <= pickLimit; roundIndex += 1) {
-    const y = tableY + headerHeight + (roundIndex - 1) * rowHeight;
+    const rowHeight = roundIndex === 1 ? firstRoundRowHeight : regularRowHeight;
+    const y = rowY;
     ctx.fillStyle = "#eeeafa";
     ctx.fillRect(tableX, y, roundColumnWidth, rowHeight);
     ctx.strokeStyle = "#ddd9e9";
@@ -5163,19 +5168,31 @@ async function createDraftResultsShareImage() {
 
     teamNames.forEach((team, index) => {
       const x = tableX + roundColumnWidth + teamColumnWidth * index;
-      ctx.fillStyle = roundIndex % 2 === 0 ? "#f5f7fc" : "#ffffff";
+      const losses = roundIndex === 1 ? (firstRoundLotteryLosses[team] || []) : [];
+      ctx.fillStyle = losses.length ? "#fff7fa" : roundIndex % 2 === 0 ? "#f5f7fc" : "#ffffff";
       ctx.fillRect(x, y, teamColumnWidth, rowHeight);
       ctx.strokeStyle = "#e0e3ed";
       ctx.strokeRect(x, y, teamColumnWidth, rowHeight);
+      if (losses.length) {
+        const lostNames = losses.map(item => item.name);
+        const displayedLostNames = lostNames.length > 2
+          ? `${lostNames.slice(0, 2).join("・")} ほか${lostNames.length - 2}名`
+          : lostNames.join("・");
+        drawShareCanvasText(ctx, "抽選で落選", x + 10, y + 17, teamColumnWidth - 20, 12, "#b34d6d", 800, "left", 10);
+        drawShareCanvasText(ctx, displayedLostNames, x + teamColumnWidth / 2, y + 40, teamColumnWidth - 18, 13, "#a25469", 600, "center", 10);
+      }
       const pick = (picks[team] || []).find(item => item.round === roundIndex);
       if (!pick) {
-        drawShareCanvasText(ctx, "—", x + teamColumnWidth / 2, y + rowHeight / 2, teamColumnWidth - 18, 20, "#a8aabd", 500, "center");
+        drawShareCanvasText(ctx, "—", x + teamColumnWidth / 2, y + (losses.length ? 96 : rowHeight / 2), teamColumnWidth - 18, 20, "#a8aabd", 500, "center");
         return;
       }
-      drawShareCanvasText(ctx, pick.name, x + teamColumnWidth / 2, y + 43, teamColumnWidth - 18, Math.min(26, teamColumnWidth * 0.15), "#172449", 800, "center", 13);
+      const pickNameY = y + (losses.length ? 78 : 43);
+      const affiliationY = y + (losses.length ? 108 : 76);
+      drawShareCanvasText(ctx, pick.name, x + teamColumnWidth / 2, pickNameY, teamColumnWidth - 18, Math.min(26, teamColumnWidth * 0.15), "#172449", 800, "center", 13);
       const affiliation = memberAffiliationLabel(pick);
-      drawShareCanvasText(ctx, affiliation, x + teamColumnWidth / 2, y + 76, teamColumnWidth - 18, Math.min(16, teamColumnWidth * 0.09), "#68738f", 600, "center", 10);
+      drawShareCanvasText(ctx, affiliation, x + teamColumnWidth / 2, affiliationY, teamColumnWidth - 18, Math.min(16, teamColumnWidth * 0.09), "#68738f", 600, "center", 10);
     });
+    rowY += rowHeight;
   }
 
   drawShareCanvasText(ctx, "KDraft", canvasWidth - padding, canvasHeight - 42, tableWidth, 14, "#7b6cb2", 700, "right", 11);
