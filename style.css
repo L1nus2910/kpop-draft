@@ -5601,6 +5601,10 @@ body::before {
   box-shadow: 0 8px 22px rgba(25, 76, 116, 0.08);
 }
 
+#confirmFirstRoundReveal {
+  scroll-margin-block: 120px 24px;
+}
+
 .first-round-reveal-gate > div {
   display: grid;
   gap: 5px;

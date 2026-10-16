@@ -1620,6 +1620,7 @@ let r1NominationAttempt = 1;
 let r1Nominations = [];
 let r1Queue = [];
 let r1RevealPending = false;
+let firstRoundRevealAutoScrollArmed = false;
 let pendingR1Resolution = null;
 let waiverOrder = teamNames.slice().reverse();
 let firstRoundWaiverOrder = [];
@@ -5599,8 +5600,25 @@ function renderDraft() {
     $("finalShareStatus").textContent = "";
   }
 
-  $("firstRoundRevealGate").hidden = !r1RevealPending;
-  $("confirmFirstRoundReveal").hidden = !r1RevealPending || activeMode !== "online" || !onlineIsHost;
+  const revealGate = $("firstRoundRevealGate");
+  const revealButton = $("confirmFirstRoundReveal");
+  const canHostRevealFirstRound = Boolean(r1RevealPending && activeMode === "online" && onlineIsHost);
+  revealGate.hidden = !r1RevealPending;
+  revealButton.hidden = !canHostRevealFirstRound;
+  if (canHostRevealFirstRound && !firstRoundRevealAutoScrollArmed) {
+    firstRoundRevealAutoScrollArmed = true;
+    requestAnimationFrame(() => {
+      if (!r1RevealPending || activeMode !== "online" || !onlineIsHost || revealButton.hidden) return;
+      const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      revealButton.scrollIntoView({
+        behavior: reducedMotion ? "auto" : "smooth",
+        block: "center",
+        inline: "nearest"
+      });
+    });
+  } else if (!canHostRevealFirstRound) {
+    firstRoundRevealAutoScrollArmed = false;
+  }
   $("firstRoundRevealHint").textContent = activeMode === "online" && onlineIsHost
     ? "入札内容はまだ各端末に表示されていません。確認してから発表を始めてください。"
     : "ホストが開示を確認すると、各端末で指名メンバーの発表が始まります。";
