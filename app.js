@@ -4202,12 +4202,7 @@ $("leaveOnlineRoom").addEventListener("click", leaveOnlineRoom);
 $("startOnlineGame").addEventListener("click", startOnlineGame);
 $("restartOnlineGame").addEventListener("click", restartOnlineGame);
 $("restartOfflineDraft").addEventListener("click", restartLocalOrAiDraft);
-$("shareFinalResultsX").addEventListener("click", () => {
-  const postText = `${publicSiteUrl} #KDraft`;
-  const intentUrl = new URL("https://twitter.com/intent/tweet");
-  intentUrl.searchParams.set("text", postText);
-  window.open(intentUrl.toString(), "_blank", "noopener,noreferrer");
-});
+$("shareFinalResultsX").addEventListener("click", shareDraftResultsOnX);
 $("confirmFirstRoundReveal").addEventListener("click", confirmFirstRoundReveal);
 $("startGame").addEventListener("click", () => {
   const mode = $("playMode").value;
@@ -5074,6 +5069,175 @@ function renderFinalSnapshot() {
   `;
 }
 
+function drawShareCanvasText(ctx, value, x, y, maxWidth, fontSize, color, weight = 600, align = "left", minFontSize = 12) {
+  const family = 'Arial, "Hiragino Kaku Gothic ProN", "Yu Gothic", Meiryo, sans-serif';
+  let text = String(value ?? "");
+  let size = fontSize;
+  const setFont = () => { ctx.font = `${weight} ${size}px ${family}`; };
+  setFont();
+  while (size > minFontSize && ctx.measureText(text).width > maxWidth) {
+    size -= 1;
+    setFont();
+  }
+  if (ctx.measureText(text).width > maxWidth) {
+    const characters = Array.from(text);
+    while (characters.length > 1) {
+      characters.pop();
+      const shortened = `${characters.join("")}…`;
+      if (ctx.measureText(shortened).width <= maxWidth) {
+        text = shortened;
+        break;
+      }
+    }
+  }
+  ctx.fillStyle = color;
+  ctx.textAlign = align;
+  ctx.textBaseline = "middle";
+  ctx.fillText(text, x, y);
+}
+
+async function createDraftResultsShareImage() {
+  const columnCount = Math.max(1, teamNames.length);
+  const canvasWidth = Math.max(1100, Math.min(2300, 300 + columnCount * 190));
+  const padding = 44;
+  const roundColumnWidth = 112;
+  const headerHeight = 96;
+  const rowHeight = 108;
+  const headingHeight = 164;
+  const footerHeight = 60;
+  const tableWidth = canvasWidth - padding * 2;
+  const teamColumnWidth = (tableWidth - roundColumnWidth) / columnCount;
+  const canvasHeight = padding + headingHeight + headerHeight + pickLimit * rowHeight + footerHeight;
+  const canvas = document.createElement("canvas");
+  canvas.width = canvasWidth;
+  canvas.height = canvasHeight;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("結果画像を作成できませんでした。");
+
+  const background = ctx.createLinearGradient(0, 0, canvasWidth, canvasHeight);
+  background.addColorStop(0, "#f1e9ff");
+  background.addColorStop(0.55, "#f8f5ff");
+  background.addColorStop(1, "#e8f5ff");
+  ctx.fillStyle = background;
+  ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(20, 20, canvasWidth - 40, canvasHeight - 40);
+  const accent = ctx.createLinearGradient(padding, 0, canvasWidth - padding, 0);
+  accent.addColorStop(0, "#d95ed3");
+  accent.addColorStop(0.53, "#7455e7");
+  accent.addColorStop(1, "#42aee8");
+  ctx.fillStyle = accent;
+  ctx.fillRect(20, 20, canvasWidth - 40, 8);
+
+  drawShareCanvasText(ctx, "KDRAFT  ·  K-POP GIRL GROUP DRAFT", padding, 62, tableWidth, 18, "#6950cf", 800);
+  drawShareCanvasText(ctx, "ドラフト結果", padding, 112, tableWidth, 44, "#172449", 800);
+  const totalPicks = teamNames.reduce((sum, team) => sum + (picks[team] || []).length, 0);
+  drawShareCanvasText(ctx, `${columnCount}チーム  ·  合計${totalPicks}人`, padding, 158, tableWidth, 19, "#66708f", 600);
+
+  const tableX = padding;
+  const tableY = padding + headingHeight;
+  ctx.fillStyle = "#e9e5f3";
+  ctx.fillRect(tableX, tableY, roundColumnWidth, headerHeight);
+  ctx.strokeStyle = "#d8d5e5";
+  ctx.lineWidth = 1;
+  ctx.strokeRect(tableX, tableY, roundColumnWidth, headerHeight);
+  drawShareCanvasText(ctx, "巡目", tableX + roundColumnWidth / 2, tableY + headerHeight / 2, roundColumnWidth - 12, 20, "#384366", 800, "center");
+
+  teamNames.forEach((team, index) => {
+    const x = tableX + roundColumnWidth + teamColumnWidth * index;
+    ctx.fillStyle = teamColorPalette[index % teamColorPalette.length];
+    ctx.fillRect(x, tableY, teamColumnWidth, headerHeight);
+    ctx.strokeStyle = "rgba(255,255,255,.35)";
+    ctx.strokeRect(x, tableY, teamColumnWidth, headerHeight);
+    drawShareCanvasText(ctx, displayTeamName(team), x + teamColumnWidth / 2, tableY + 36, teamColumnWidth - 16, Math.min(23, teamColumnWidth * 0.13), "#ffffff", 800, "center", 12);
+    drawShareCanvasText(ctx, `${(picks[team] || []).length} / ${pickLimit}人`, x + teamColumnWidth / 2, tableY + 70, teamColumnWidth - 16, 15, "#ffffff", 700, "center", 11);
+  });
+
+  for (let roundIndex = 1; roundIndex <= pickLimit; roundIndex += 1) {
+    const y = tableY + headerHeight + (roundIndex - 1) * rowHeight;
+    ctx.fillStyle = "#eeeafa";
+    ctx.fillRect(tableX, y, roundColumnWidth, rowHeight);
+    ctx.strokeStyle = "#ddd9e9";
+    ctx.strokeRect(tableX, y, roundColumnWidth, rowHeight);
+    drawShareCanvasText(ctx, `${roundIndex}巡目`, tableX + roundColumnWidth / 2, y + rowHeight / 2, roundColumnWidth - 12, 18, "#414b6e", 800, "center", 12);
+
+    teamNames.forEach((team, index) => {
+      const x = tableX + roundColumnWidth + teamColumnWidth * index;
+      ctx.fillStyle = roundIndex % 2 === 0 ? "#f5f7fc" : "#ffffff";
+      ctx.fillRect(x, y, teamColumnWidth, rowHeight);
+      ctx.strokeStyle = "#e0e3ed";
+      ctx.strokeRect(x, y, teamColumnWidth, rowHeight);
+      const pick = (picks[team] || []).find(item => item.round === roundIndex);
+      if (!pick) {
+        drawShareCanvasText(ctx, "—", x + teamColumnWidth / 2, y + rowHeight / 2, teamColumnWidth - 18, 20, "#a8aabd", 500, "center");
+        return;
+      }
+      drawShareCanvasText(ctx, pick.name, x + teamColumnWidth / 2, y + 43, teamColumnWidth - 18, Math.min(26, teamColumnWidth * 0.15), "#172449", 800, "center", 13);
+      const affiliation = memberAffiliationLabel(pick);
+      drawShareCanvasText(ctx, affiliation, x + teamColumnWidth / 2, y + 76, teamColumnWidth - 18, Math.min(16, teamColumnWidth * 0.09), "#68738f", 600, "center", 10);
+    });
+  }
+
+  drawShareCanvasText(ctx, "KDraft", canvasWidth - padding, canvasHeight - 42, tableWidth, 14, "#7b6cb2", 700, "right", 11);
+  const blob = await new Promise((resolve, reject) => {
+    canvas.toBlob(result => result ? resolve(result) : reject(new Error("結果画像を書き出せませんでした。")), "image/png");
+  });
+  return new File([blob], "kdraft-draft-results.png", { type: "image/png" });
+}
+
+function downloadDraftResultsImage(imageFile) {
+  const imageUrl = URL.createObjectURL(imageFile);
+  const link = document.createElement("a");
+  link.href = imageUrl;
+  link.download = imageFile.name;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(imageUrl), 60_000);
+}
+
+function createXPostIntent(postText) {
+  const intentUrl = new URL("https://twitter.com/intent/tweet");
+  intentUrl.searchParams.set("text", postText);
+  return intentUrl.toString();
+}
+
+async function shareDraftResultsOnX() {
+  const button = $("shareFinalResultsX");
+  const status = $("finalShareStatus");
+  const postText = `#KDraft\n${publicSiteUrl}`;
+  button.disabled = true;
+  button.textContent = "画像を準備中…";
+  status.hidden = true;
+  try {
+    const image = await createDraftResultsShareImage();
+    const canShareFiles = typeof navigator.share === "function" &&
+      (typeof navigator.canShare !== "function" || navigator.canShare({ files: [image] }));
+    if (canShareFiles) {
+      try {
+        await navigator.share({ files: [image], text: postText, title: "KDraft ドラフト結果" });
+        status.textContent = "共有メニューを開きました。Xを選ぶと画像と文面を共有できます。";
+        status.hidden = false;
+        return;
+      } catch (error) {
+        if (error?.name === "AbortError") return;
+      }
+    }
+
+    downloadDraftResultsImage(image);
+    window.open(createXPostIntent(postText), "_blank", "noopener,noreferrer");
+    status.textContent = "結果画像を保存しました。Xの投稿画面で画像を添付してください。";
+    status.hidden = false;
+  } catch (error) {
+    console.error("Could not share draft results", error);
+    status.textContent = "結果画像を作成できませんでした。もう一度お試しください。";
+    status.hidden = false;
+  } finally {
+    button.disabled = false;
+    button.textContent = "画像付きでX共有";
+  }
+}
+
 function renderDraft() {
   const currentTeam = currentTeamName();
   const ownOnlineTeam = activeMode === "online" ? onlineTeamForUid(onlineUid) : "";
@@ -5085,6 +5249,10 @@ function renderDraft() {
     gameStarted && pendingIdol &&
     candidateSelectionGate(currentTeam).canPickNow
   );
+  if (!finished) {
+    $("finalShareStatus").hidden = true;
+    $("finalShareStatus").textContent = "";
+  }
 
   $("firstRoundRevealGate").hidden = !r1RevealPending;
   $("confirmFirstRoundReveal").hidden = !r1RevealPending || activeMode !== "online" || !onlineIsHost;

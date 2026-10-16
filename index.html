@@ -18,9 +18,9 @@
   <meta property="og:description" content="推しでつくる、夢のドラフト。非公式ファン制作のK-POPドラフトゲーム。">
   <meta property="og:url" content="https://l1nus2910.github.io/kpop-draft/">
   <meta name="twitter:card" content="summary">
-  <link rel="stylesheet" href="style.css?v=20261015-redraft-light-1">
+  <link rel="stylesheet" href="style.css?v=20261016-x-image-share-2">
   <script src="firebase-config.js" defer></script>
-  <script src="app.js?v=20261016-x-share-1" defer></script>
+  <script src="app.js?v=20261016-x-image-share-2" defer></script>
 </head>
 <body>
   <header class="topbar">
@@ -187,12 +187,13 @@
         </div>
         <div class="final-results-actions">
           <span class="final-results-status">指名完了</span>
-          <button class="button button-secondary" id="shareFinalResultsX" type="button" aria-label="サイトのリンクとハッシュタグを添えてXで投稿する">Xに投稿</button>
+          <button class="button button-secondary" id="shareFinalResultsX" type="button" aria-label="ドラフト結果の画像とハッシュタグ、サイトリンクをXへ共有する">画像付きでX共有</button>
           <button class="button button-primary" id="restartOfflineDraft" type="button" aria-label="現在の設定で再ドラフトを始める" hidden>再ドラフト</button>
           <button class="button button-primary" id="restartOnlineGame" type="button" hidden>同じルームで再ドラフト</button>
           <button class="button button-secondary" id="finalScreenshotToggle" type="button" aria-pressed="false">スクショ用レイアウト</button>
         </div>
       </div>
+      <p class="final-share-status" id="finalShareStatus" role="status" aria-live="polite" hidden></p>
       <p class="table-scroll-hint" id="finalResultsTableHint">表を左右にスワイプして、すべてのチームを確認できます。</p>
       <div class="final-results-scroll" id="finalResultsBoard" role="region" aria-label="最終ドラフト結果一覧" tabindex="0"></div>
       <div class="final-snapshot-grid" id="finalSnapshotGrid" hidden aria-label="スクリーンショット用チーム別指名一覧"></div>

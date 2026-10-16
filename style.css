@@ -3400,6 +3400,14 @@ select {
   gap: 8px;
 }
 
+.final-share-status {
+  margin: -10px 0 16px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+  text-align: right;
+}
+
 .final-snapshot-grid[hidden] {
   display: none !important;
 }
