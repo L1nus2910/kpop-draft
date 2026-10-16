@@ -2113,11 +2113,12 @@ $("candidateList").addEventListener("click", event => {
   const target = event.target instanceof Element ? event.target : event.target?.parentElement;
   const button = target?.closest("button[data-action]");
   if (!button) {
-    const candidateButton = target?.closest("button.candidate-select");
-    const candidateCard = candidateButton?.closest(".candidate-card");
-    if (candidateButton && candidateCard && !target?.closest("#pickConfirmation")) {
+    const candidateCard = target?.closest(".candidate-card");
+    const candidateButton = candidateCard?.querySelector("button.candidate-select");
+    if (candidateButton && candidateCard &&
+        !target?.closest("#pickConfirmation, .card-actions")) {
       const id = candidateButton.dataset.id || candidateCard.dataset.candidateId;
-      lastCandidateInteraction = `候補タップ補正:${id} disabled=${candidateButton.disabled}`;
+      lastCandidateInteraction = `カード面タップ補正:${id} disabled=${candidateButton.disabled}`;
       if (!candidateButton.disabled && id) selectMember(id);
       renderOnlineSyncDebug();
       return;
@@ -5103,8 +5104,10 @@ async function createDraftResultsShareImage() {
   const roundColumnWidth = 112;
   const headerHeight = 96;
   const regularRowHeight = 108;
-  const firstRoundHasLosses = teamNames.some(team => (firstRoundLotteryLosses[team] || []).length > 0);
-  const firstRoundRowHeight = firstRoundHasLosses ? 136 : regularRowHeight;
+  const firstRoundLossCount = Math.max(0, ...teamNames.map(team => (firstRoundLotteryLosses[team] || []).length));
+  const firstRoundRowHeight = firstRoundLossCount
+    ? Math.max(regularRowHeight, firstRoundLossCount * 43 + 64)
+    : regularRowHeight;
   const headingHeight = 164;
   const footerHeight = 60;
   const tableWidth = canvasWidth - padding * 2;
@@ -5131,6 +5134,22 @@ async function createDraftResultsShareImage() {
   accent.addColorStop(1, "#42aee8");
   ctx.fillStyle = accent;
   ctx.fillRect(20, 20, canvasWidth - 40, 8);
+
+  const drawMember = (member, centerX, top, maxWidth, muted = false) => {
+    const nameColor = muted ? "#aab5c1" : "#24334c";
+    const detailColor = muted ? "#b7c1cb" : "#708198";
+    const agency = shortAgencyName(fullAgencyName(member?.group, member?.agency));
+    drawShareCanvasText(ctx, member?.name || member?.japaneseName || "", centerX, top + 8,
+      maxWidth, muted ? 12 : 16, nameColor, muted ? 600 : 800, "center", muted ? 9 : 11);
+    if (agency) {
+      drawShareCanvasText(ctx, agency, centerX, top + 22, maxWidth,
+        muted ? 9 : 11, detailColor, 500, "center", 8);
+    }
+    if (member?.group) {
+      drawShareCanvasText(ctx, member.group, centerX, top + 34, maxWidth,
+        muted ? 9 : 11, detailColor, 500, "center", 8);
+    }
+  };
 
   drawShareCanvasText(ctx, "KDRAFT  ·  K-POP GIRL GROUP DRAFT", padding, 62, tableWidth, 18, "#6950cf", 800);
   drawShareCanvasText(ctx, "ドラフト結果", padding, 112, tableWidth, 44, "#172449", 800);
@@ -5169,28 +5188,27 @@ async function createDraftResultsShareImage() {
     teamNames.forEach((team, index) => {
       const x = tableX + roundColumnWidth + teamColumnWidth * index;
       const losses = roundIndex === 1 ? (firstRoundLotteryLosses[team] || []) : [];
-      ctx.fillStyle = losses.length ? "#fff7fa" : roundIndex % 2 === 0 ? "#f5f7fc" : "#ffffff";
+      ctx.fillStyle = roundIndex % 2 === 0 ? "#f5f7fc" : "#ffffff";
       ctx.fillRect(x, y, teamColumnWidth, rowHeight);
       ctx.strokeStyle = "#e0e3ed";
       ctx.strokeRect(x, y, teamColumnWidth, rowHeight);
-      if (losses.length) {
-        const lostNames = losses.map(item => item.name);
-        const displayedLostNames = lostNames.length > 2
-          ? `${lostNames.slice(0, 2).join("・")} ほか${lostNames.length - 2}名`
-          : lostNames.join("・");
-        drawShareCanvasText(ctx, "抽選で落選", x + 10, y + 17, teamColumnWidth - 20, 12, "#b34d6d", 800, "left", 10);
-        drawShareCanvasText(ctx, displayedLostNames, x + teamColumnWidth / 2, y + 40, teamColumnWidth - 18, 13, "#a25469", 600, "center", 10);
-      }
       const pick = (picks[team] || []).find(item => item.round === roundIndex);
       if (!pick) {
-        drawShareCanvasText(ctx, "—", x + teamColumnWidth / 2, y + (losses.length ? 96 : rowHeight / 2), teamColumnWidth - 18, 20, "#a8aabd", 500, "center");
+        drawShareCanvasText(ctx, "—", x + teamColumnWidth / 2, y + rowHeight / 2, teamColumnWidth - 18, 20, "#a8aabd", 500, "center");
         return;
       }
-      const pickNameY = y + (losses.length ? 78 : 43);
-      const affiliationY = y + (losses.length ? 108 : 76);
-      drawShareCanvasText(ctx, pick.name, x + teamColumnWidth / 2, pickNameY, teamColumnWidth - 18, Math.min(26, teamColumnWidth * 0.15), "#172449", 800, "center", 13);
-      const affiliation = memberAffiliationLabel(pick);
-      drawShareCanvasText(ctx, affiliation, x + teamColumnWidth / 2, affiliationY, teamColumnWidth - 18, Math.min(16, teamColumnWidth * 0.09), "#68738f", 600, "center", 10);
+      const centerX = x + teamColumnWidth / 2;
+      if (losses.length) {
+        const stackHeight = losses.length * 43 + 42;
+        let memberTop = y + Math.max(8, (rowHeight - stackHeight) / 2);
+        losses.forEach(lost => {
+          drawMember(lost, centerX, memberTop, teamColumnWidth - 16, true);
+          memberTop += 43;
+        });
+        drawMember(pick, centerX, memberTop, teamColumnWidth - 16);
+      } else {
+        drawMember(pick, centerX, y + (rowHeight - 42) / 2, teamColumnWidth - 16);
+      }
     });
     rowY += rowHeight;
   }

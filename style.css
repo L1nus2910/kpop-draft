@@ -8975,6 +8975,11 @@ body.final-screenshot-mode .final-results-heading h2 { color: #32245f; }
   transition: border-color 130ms ease, background-color 130ms ease;
 }
 
+/* Keep the first visible mobile candidate fully hit-testable on Safari. */
+#candidateList > .candidate-card:first-child {
+  content-visibility: visible;
+}
+
 .candidate-card::before,
 .candidate-card::after { display: none; }
 
