@@ -5137,7 +5137,9 @@ body::before {
 
 /* Refined member reveal hierarchy: name first, affiliations at equal scale. */
 .pick-flip-front {
-  position: relative;
+  position: absolute;
+  inset: 0;
+  box-sizing: border-box;
   align-content: center;
   gap: clamp(12px, 2.4vh, 20px);
   padding: 24px;
@@ -5237,8 +5239,8 @@ body::before {
 
 @media (max-width: 650px) {
   .pick-flip-front {
-    gap: clamp(10px, 2vh, 16px);
-    padding: 18px 12px;
+    gap: clamp(12px, 2vh, 18px);
+    padding: 18px 14px;
   }
 
   .pick-flip-front::before {

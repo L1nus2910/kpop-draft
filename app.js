@@ -3096,6 +3096,42 @@ function clearOnlineGuestRebidFallback() {
   }
 }
 
+function firstRoundConflictCount(batch = pendingR1Resolution) {
+  if (!batch) return 0;
+  const conflicts = new Map();
+  (batch.nominations || []).forEach(item => {
+    const idol = idols.find(candidate => candidate.id === item.idolId);
+    if (!idol) return;
+    const personKey = idol.personKey || idol.id;
+    conflicts.set(personKey, (conflicts.get(personKey) || 0) + 1);
+  });
+  return [...conflicts.values()].filter(count => count > 1).length;
+}
+
+function applyFirstRoundLotteryOutcome(reveal) {
+  const batch = pendingR1Resolution;
+  if (!batch || reveal?.type !== "lottery" || !reveal.winner) return false;
+
+  const winnerPicks = picks[reveal.winner] || (picks[reveal.winner] = []);
+  if (!winnerPicks.some(item => item.round === 1)) {
+    winnerPicks.push(pickRecord(reveal.idol, 1));
+  }
+  markPersonDrafted(reveal.idol);
+  batch.waiting.delete(reveal.winner);
+  reveal.teams.forEach(team => {
+    if (team === reveal.winner) return;
+    const losses = firstRoundLotteryLosses[team] || (firstRoundLotteryLosses[team] = []);
+    if (!losses.some(item => item.name === reveal.idol.japaneseName && item.group === reveal.idol.group)) {
+      losses.push({
+        name: reveal.idol.japaneseName,
+        group: reveal.idol.group,
+        agency: reveal.idol.agency
+      });
+    }
+  });
+  return true;
+}
+
 function scheduleOnlineGuestRebidFallback() {
   clearOnlineGuestRebidFallback();
   if (onlineIsHost || activeMode !== "online" || !onlineRoomRef || !pendingR1Resolution ||
@@ -3138,25 +3174,7 @@ function scheduleOnlineGuestRebidFallback() {
         expectedRevealKey !== currentRevealKey() || pickRevealQueue.length > 0) return;
 
     if (reveal.type === "nomination") completeFirstRoundNomination(reveal);
-    if (reveal.type === "lottery" && reveal.winner) {
-      const winnerPicks = picks[reveal.winner] || (picks[reveal.winner] = []);
-      if (!winnerPicks.some(item => item.round === 1)) {
-        winnerPicks.push(pickRecord(reveal.idol, 1));
-      }
-      markPersonDrafted(reveal.idol);
-      pendingR1Resolution.waiting.delete(reveal.winner);
-      reveal.teams.forEach(team => {
-        if (team === reveal.winner) return;
-        const losses = firstRoundLotteryLosses[team] || (firstRoundLotteryLosses[team] = []);
-        if (!losses.some(item => item.name === reveal.idol.japaneseName && item.group === reveal.idol.group)) {
-          losses.push({
-            name: reveal.idol.japaneseName,
-            group: reveal.idol.group,
-            agency: reveal.idol.agency
-          });
-        }
-      });
-    }
+    if (reveal.type === "lottery" && reveal.winner) applyFirstRoundLotteryOutcome(reveal);
 
     activePickReveal = null;
     pickRevealPhase = "closed";
@@ -3178,15 +3196,7 @@ function recoverIdleGuestFirstRoundResolution() {
   // If a guest missed the host's final transition snapshot, it is safe to
   // reopen nominations only when every conflict represented in the batch has
   // a corresponding result and there is no reveal left to display.
-  const conflicts = new Map();
-  (batch.nominations || []).forEach(item => {
-    const idol = idols.find(candidate => candidate.id === item.idolId);
-    if (!idol) return;
-    const personKey = idol.personKey || idol.id;
-    conflicts.set(personKey, (conflicts.get(personKey) || 0) + 1);
-  });
-  const conflictCount = [...conflicts.values()].filter(count => count > 1).length;
-  if ((batch.results || []).length < conflictCount) return false;
+  if ((batch.results || []).length < firstRoundConflictCount(batch)) return false;
 
   finishFirstRoundResolution();
   renderOnlinePickReveal();
@@ -3500,6 +3510,32 @@ function applyOnlineGameState(state) {
     incomingRevision > onlineRenderedStateRevision && incomingRevision >= onlineAppliedStateRevision;
   if (onlineAppliedStateRevision >= 0 && !gameSessionChanged && !recoversMissedRebidTransition &&
       (!Number.isFinite(incomingRevision) || incomingRevision <= onlineAppliedStateRevision) && !revisionNeedsRender) return;
+  const localRebidIsAheadOfHost = !onlineIsHost && !gameSessionChanged && !r1Started && !pendingR1Resolution &&
+    !state.r1Started && Boolean(state.pendingR1Resolution) &&
+    Number(state.r1NominationAttempt || 1) < r1NominationAttempt &&
+    (!incomingGameSessionId || incomingGameSessionId === gameSessionId);
+  if (localRebidIsAheadOfHost) {
+    const recoveryActionAck = onlineUid ? state.actionAcks?.[onlineUid] : null;
+    const recoveryActionWasRejected = Boolean(onlinePendingAction &&
+      recoveryActionAck?.key === onlinePendingAction.key && !recoveryActionAck.accepted);
+    if (Number.isFinite(incomingRevision)) {
+      onlineAppliedStateRevision = Math.max(onlineAppliedStateRevision, incomingRevision);
+      onlineRenderedStateRevision = Math.max(onlineRenderedStateRevision, incomingRevision);
+      onlineStateRevision = Math.max(onlineStateRevision, incomingRevision);
+    }
+    onlineActionAcks = state.actionAcks || onlineActionAcks;
+    if (recoveryActionWasRejected) {
+      onlinePendingAction = null;
+      onlineActionPending = false;
+      setOnlineStatus(recoveryActionAck.reason || "ホスト側で抽選結果を反映中です。選択中の候補は保持しています。少し待ってからもう一度提出してください。");
+    }
+    renderNominations();
+    renderOnlinePickReveal();
+    renderDraft();
+    renderCandidates();
+    renderOnlineSyncDebug();
+    return;
+  }
   if (Number.isFinite(incomingRevision)) {
     onlineAppliedStateRevision = gameSessionChanged || recoversMissedRebidTransition
       ? incomingRevision
@@ -3773,6 +3809,12 @@ function submitOnlineAction(action) {
   const actionRef = onlineRoomRef.child("actions").push();
   const actionKey = actionRef.key;
   const payload = { uid: onlineUid, ...action, createdAt: Date.now() };
+  if (action.kind === "pick") {
+    const team = onlineTeamForUid(onlineUid);
+    payload.r1NominationAttempt = r1NominationAttempt;
+    payload.round = round;
+    payload.pickCount = (picks[team] || []).length;
+  }
   if (["envelope", "next", "skip"].includes(action.kind)) {
     payload.revealKey = currentRevealKey();
     payload.revealPhase = pickRevealPhase;
@@ -3933,6 +3975,42 @@ async function removeProcessedOnlineAction(snapshot) {
   await snapshot.ref.remove().catch(() => {});
 }
 
+function recoverHostRebidFromPickAction(action, team) {
+  const batch = pendingR1Resolution;
+  const actionAttempt = Number(action?.r1NominationAttempt);
+  const actionPickCount = Number(action?.pickCount);
+  if (!batch || r1Started || Number(action?.round) !== 1 ||
+      !Number.isInteger(actionAttempt) || actionAttempt !== r1NominationAttempt + 1 ||
+      !batch.waiting.has(team) || actionPickCount !== (picks[team] || []).length ||
+      pickRevealQueue.length > 0) return false;
+
+  const reveal = activePickReveal;
+  const unrevealedNominations = (batch.nominations || []).filter(item => !batch.revealedTeams.has(item.team));
+  if (reveal) {
+    if (pickRevealPhase !== "revealed") return false;
+    if (reveal.type === "nomination") {
+      if (unrevealedNominations.some(item => item.team !== reveal.team)) return false;
+    } else if (reveal.type === "lottery") {
+      if (!reveal.winner || unrevealedNominations.length > 0) return false;
+    } else {
+      return false;
+    }
+  } else if (pickRevealPhase !== "closed" || !$("pickReveal").hidden || unrevealedNominations.length > 0) {
+    return false;
+  }
+
+  if ((batch.results || []).length < firstRoundConflictCount(batch)) return false;
+  if (reveal?.type === "nomination") completeFirstRoundNomination(reveal);
+  if (reveal?.type === "lottery") applyFirstRoundLotteryOutcome(reveal);
+
+  activePickReveal = null;
+  pickRevealPhase = "closed";
+  $("pickReveal").hidden = true;
+  finishFirstRoundResolution();
+  renderOnlinePickReveal();
+  return !pendingR1Resolution && canSubmitR1Nomination(team);
+}
+
 async function processOnlineAction(snapshot, processingRoomRef = onlineRoomRef) {
   if (!onlineIsHost || !onlineRoomRef || processingRoomRef !== onlineRoomRef) return;
   if (onlineProcessedActionIds.has(snapshot.key)) {
@@ -3960,6 +4038,9 @@ async function processOnlineAction(snapshot, processingRoomRef = onlineRoomRef) 
     if (!action || !onlinePlayers[action.uid]) {
       actionRejectionReason = "参加者情報を確認できませんでした。全員が同じルームに入り直してください。";
     } else {
+      if (action.kind === "pick" && ownerTeam && !r1Started && !canSubmitR1Nomination(ownerTeam)) {
+        recoverHostRebidFromPickAction(action, ownerTeam);
+      }
       const canAcceptPick = action.kind === "pick" && ownerTeam && (
         !r1Started ? canSubmitR1Nomination(ownerTeam) : ownerTeam === currentTeamName()
       );
@@ -3979,6 +4060,10 @@ async function processOnlineAction(snapshot, processingRoomRef = onlineRoomRef) 
         actionAccepted = wasFirstRound
           ? r1Nominations.some(item => item.team === ownerTeam) || (picks[ownerTeam] || []).length > previousPickCount
           : (picks[ownerTeam] || []).length > previousPickCount;
+      } else if (action.kind === "pick") {
+        actionRejectionReason = pendingR1Resolution
+          ? "ホスト側で抽選結果を反映中です。候補は保持したまま、少し待ってからもう一度提出してください。"
+          : "指名順が更新されました。画面を確認して、もう一度提出してください。";
       } else if (action.kind === "envelope" && revealMatches && activePickReveal?.type === "lottery") {
         const drawer = activePickReveal.drawOrder[activePickReveal.drawIndex];
         if (drawer && teamOwnerUid(drawer) === action.uid) {
