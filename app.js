@@ -1558,6 +1558,7 @@ idols.forEach(idol => {
 });
 
 const $ = id => document.getElementById(id);
+const publicSiteUrl = "https://l1nus2910.github.io/kpop-draft/";
 const localTeamNames = [
   "チームA", "チームB", "チームC", "チームD", "チームE",
   "チームF", "チームG", "チームH", "チームI", "チームJ"
@@ -4201,6 +4202,12 @@ $("leaveOnlineRoom").addEventListener("click", leaveOnlineRoom);
 $("startOnlineGame").addEventListener("click", startOnlineGame);
 $("restartOnlineGame").addEventListener("click", restartOnlineGame);
 $("restartOfflineDraft").addEventListener("click", restartLocalOrAiDraft);
+$("shareFinalResultsX").addEventListener("click", () => {
+  const postText = `${publicSiteUrl} #KDraft`;
+  const intentUrl = new URL("https://twitter.com/intent/tweet");
+  intentUrl.searchParams.set("text", postText);
+  window.open(intentUrl.toString(), "_blank", "noopener,noreferrer");
+});
 $("confirmFirstRoundReveal").addEventListener("click", confirmFirstRoundReveal);
 $("startGame").addEventListener("click", () => {
   const mode = $("playMode").value;
