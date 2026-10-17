@@ -1,4 +1,4 @@
-const onlineClientBuild = "20261017-reveal-history-sync-3";
+const onlineClientBuild = "20261017-host-force-remove-1";
 
 const groups = [
   {
@@ -1828,6 +1828,8 @@ let onlineIsHost = false;
 let onlinePlayers = {};
 let onlineDepartedTeams = new Set();
 let onlineActionPending = false;
+let onlineForceKickPending = false;
+let onlineStartPending = false;
 let onlineActionsListenerRef = null;
 let onlineConfirmationsListenerRef = null;
 let onlineActionsListenerCallback = null;
@@ -2890,6 +2892,8 @@ function setOnlineRoomConnected(code, isHost, initialPlayers = null, deferGameAc
   onlineQueuedConfirmationIds = new Set();
   onlineHandledConfirmationIds = new Set();
   onlineActionPending = false;
+  onlineForceKickPending = false;
+  onlineStartPending = false;
   onlinePendingAction = null;
   onlineActionAcks = {};
   onlineHandledActionIds = new Set();
@@ -2946,6 +2950,7 @@ function setOnlineRoomConnected(code, isHost, initialPlayers = null, deferGameAc
       const player = snapshot.val();
       if (player?.departed) {
         resetOnlineRoomToSetup(connectedRoomRef, onlineUid);
+        if (player.kickedByHost) setOnlineStatus("ホストによってルームから退出させられました。");
       } else if (snapshot.exists()) {
         attachOnlineGuestListeners();
       } else {
@@ -2984,26 +2989,44 @@ function renderOnlineLobby() {
     Number(a.order || 0) - Number(b.order || 0)
   );
   const activePlayers = players.filter(([, player]) => !player.departed);
-  $("onlinePlayerList").innerHTML = players.map(([, player], index) => `
-    <li><span class="online-player-number">${index + 1}</span><strong>${escapeHTML(player.teamName || player.name || "プレイヤー")}</strong><small>${player.departed ? "退出済み" : player.host ? "ホスト" : "参加者"}</small></li>
-  `).join("");
-  const hostCanStart = onlineIsHost && onlineGameStatus === "lobby" && activePlayers.length >= 2;
+  $("onlinePlayerList").innerHTML = players.map(([uid, player], index) => {
+    const playerName = player.teamName || player.name || "プレイヤー";
+    const canKick = onlineIsHost && !player.host && !player.departed &&
+      !onlineStartPending && !onlineRestartPending && ["lobby", "playing"].includes(onlineGameStatus);
+    return `
+      <li>
+        <span class="online-player-number">${index + 1}</span>
+        <strong>${escapeHTML(playerName)}</strong>
+        <small>${player.departed ? player.kickedByHost ? "強制退出済み" : "退出済み" : player.host ? "ホスト" : "参加者"}</small>
+        ${canKick ? `<button class="online-player-kick" type="button" data-kick-player="${escapeHTML(uid)}" aria-label="${escapeHTML(playerName)}を強制退出"${onlineForceKickPending ? " disabled" : ""}>退出</button>` : ""}
+      </li>
+    `;
+  }).join("");
+  const hostCanStart = onlineIsHost && onlineGameStatus === "lobby" && activePlayers.length >= 2 && !onlineForceKickPending && !onlineStartPending;
   $("startOnlineGame").hidden = !onlineIsHost || onlineGameStatus !== "lobby";
-  $("startOnlineGame").disabled = !hostCanStart;
-  $("startOnlineGame").textContent = hostCanStart
-    ? `${activePlayers.length}人でドラフト開始`
-    : `参加者待ち（${activePlayers.length} / 10人）`;
+  $("startOnlineGame").disabled = onlineForceKickPending || onlineStartPending || !hostCanStart;
+  $("startOnlineGame").textContent = onlineStartPending
+    ? "ドラフトを準備中…"
+    : onlineForceKickPending
+      ? "退出を処理中…"
+    : hostCanStart
+      ? `${activePlayers.length}人でドラフト開始`
+      : `参加者待ち（${activePlayers.length} / 10人）`;
   const finished = onlineGameStatus === "playing" && gameStarted && allTeamsComplete() && !pendingR1Resolution && $("pickReveal").hidden && pickRevealQueue.length === 0;
   $("restartOnlineGame").hidden = !onlineIsHost || !finished;
-  $("restartOnlineGame").disabled = onlineRestartPending;
-  $("restartOnlineGame").textContent = onlineRestartPending ? "再ドラフトを準備中…" : "同じルームで再ドラフト";
+  $("restartOnlineGame").disabled = onlineRestartPending || onlineForceKickPending || onlineStartPending;
+  $("restartOnlineGame").textContent = onlineRestartPending ? "再ドラフトを準備中…" : onlineForceKickPending ? "退出を処理中…" : "同じルームで再ドラフト";
   $("onlineLobbyHint").textContent = onlineGameStatus === "playing"
     ? finished
       ? onlineIsHost
         ? "結果を確認したら「同じルームで再ドラフト」を押してください。参加者はそのまま次のドラフトに参加できます。"
         : "ドラフトが終了しました。ホストが再ドラフトを始めると、このルームのまま次のドラフトに進みます。"
-      : "ドラフト進行中です。参加者が退出した場合、その後の指名はスキップします。"
-    : "2〜10人で遊べます。参加者がそろったらホストが開始します。終了後も同じルームで再ドラフトできます。";
+      : onlineIsHost
+        ? "ドラフト進行中です。参加者一覧の「退出」から強制退出できます。退出したチームの残り指名はスキップします。"
+        : "ドラフト進行中です。参加者が退出した場合、その後の指名はスキップします。"
+    : onlineIsHost
+      ? "2〜10人で遊べます。参加者がそろったら開始できます。参加者一覧から退出させられます。終了後も同じルームで再ドラフトできます。"
+      : "2〜10人で遊べます。参加者がそろったらホストが開始します。終了後も同じルームで再ドラフトできます。";
   $("closeOnlineRoom").hidden = !onlineIsHost || !onlineRoomRef;
   const leaveButton = $("leaveOnlineRoom");
   leaveButton.hidden = onlineIsHost || !["lobby", "closed", "playing"].includes(onlineGameStatus);
@@ -3012,7 +3035,8 @@ function renderOnlineLobby() {
   const finalLeaveButton = $("leaveOnlineRoomFromResults");
   finalLeaveButton.disabled = onlineActionPending || onlineRestartPending;
   finalLeaveButton.textContent = onlinePendingAction?.kind === "leave" ? "退出を処理中…" : "ルームを退出";
-  $("closeOnlineRoomFromResults").disabled = onlineRestartPending;
+  $("closeOnlineRoom").disabled = onlineForceKickPending || onlineStartPending;
+  $("closeOnlineRoomFromResults").disabled = onlineRestartPending || onlineForceKickPending || onlineStartPending;
   $("closeOnlineRoom").textContent = "ルーム終了・データ削除";
   if (onlineGameStatus === "playing") setOnlineStatus(finished ? "ドラフト終了・結果を確認できます" : "ドラフト進行中");
   else if (onlineGameStatus === "lobby") setOnlineStatus(onlineIsHost ? "友達の参加を待っています" : "ルームに参加しました");
@@ -3115,16 +3139,21 @@ async function acceptOnlineJoinRequest(snapshot, sourceRoomRef = onlineRoomRef) 
   const uid = snapshot.key;
   const request = snapshot.val();
   if (!uid || !request) return;
+  if (onlinePlayers[uid]?.kickedByHost) {
+    await snapshot.ref.update({ status: "kicked" });
+    return;
+  }
   if (onlinePlayers[uid]) {
     await snapshot.ref.remove();
     return;
   }
-  if (Object.keys(onlinePlayers).length >= 10) {
+  const activePlayers = Object.entries(onlinePlayers).filter(([, player]) => !player.departed);
+  if (activePlayers.length >= 10) {
     await snapshot.ref.update({ status: "full" });
     return;
   }
   const baseName = normalizeOnlineName(request.name);
-  const occupied = new Set(Object.values(onlinePlayers).map(player => player.teamName));
+  const occupied = new Set(activePlayers.map(([, player]) => player.teamName));
   let teamName = baseName;
   let suffix = 2;
   while (occupied.has(teamName)) teamName = `${baseName} ${suffix++}`;
@@ -3236,6 +3265,9 @@ async function joinOnlineRoom() {
     if (!statusSnapshot.exists()) throw new Error("そのルームが見つかりません。コードを確認してください。");
     const memberSnapshot = await roomRef.child(`players/${uid}`).once("value");
     if (memberSnapshot.exists()) {
+      if (memberSnapshot.val()?.kickedByHost) {
+        throw new Error("ホストにより退出されたため、このルームには再参加できません。");
+      }
       const playersSnapshot = await roomRef.child("players").once("value");
       const isHost = Boolean(memberSnapshot.val()?.host);
       const isPlaying = statusSnapshot.val() === "playing";
@@ -3287,7 +3319,7 @@ async function copyOnlineInvite() {
 }
 
 async function closeOnlineRoom() {
-  if (!onlineIsHost || !onlineRoomRef) return;
+  if (!onlineIsHost || !onlineRoomRef || onlineForceKickPending || onlineStartPending) return;
   if (!window.confirm("ルームを終了し、参加者名・設定・指名結果を含むルームデータを削除します。続けますか？")) return;
   try {
     const roomRef = onlineRoomRef;
@@ -3338,6 +3370,8 @@ function resetOnlineRoomToSetup(roomRef, leavingUid) {
   onlineGameStatus = "";
   onlineListenersAttached = false;
   onlineActionPending = false;
+  onlineForceKickPending = false;
+  onlineStartPending = false;
   onlinePendingAction = null;
   onlineActionAcks = {};
   onlineRestartPending = false;
@@ -4630,6 +4664,94 @@ function recoverHostRebidFromPickAction(action, team) {
   return !pendingR1Resolution && canSubmitR1Nomination(team);
 }
 
+async function markOnlinePlayerDeparted(uid, roomRef = onlineRoomRef, kickedByHost = false) {
+  if (!uid || !roomRef || roomRef !== onlineRoomRef || !onlineIsHost ||
+      !["lobby", "playing"].includes(onlineGameStatus)) return false;
+  const player = onlinePlayers[uid];
+  const ownerTeam = onlineTeamForUid(uid);
+  if (!player || player.host || !ownerTeam) return false;
+
+  const departedAt = Number(player.departedAt) || Date.now();
+  const updates = { departed: true, departedAt };
+  if (kickedByHost || player.kickedByHost) updates.kickedByHost = true;
+  if (!player.departed || (kickedByHost && !player.kickedByHost)) {
+    await roomRef.child(`players/${uid}`).update(updates);
+  }
+  if (roomRef !== onlineRoomRef || !onlineIsHost) return false;
+  onlinePlayers[uid] = { ...player, ...updates };
+
+  if (onlineGameStatus === "playing") {
+    onlineDepartedTeams.add(ownerTeam);
+    onlineRevealAcks.delete(uid);
+    const hasSubmittedNomination = r1Nominations.some(item => item.team === ownerTeam);
+    if (!r1Started && !pendingR1Resolution && !r1RevealPending && !hasSubmittedNomination) {
+      const removedIndex = r1NominationOrder.indexOf(ownerTeam);
+      r1NominationOrder = r1NominationOrder.filter(team => team !== ownerTeam);
+      if (removedIndex >= 0 && removedIndex < r1NominationIndex) {
+        r1NominationIndex = Math.max(0, r1NominationIndex - 1);
+      }
+    }
+    if (r1Started) advancePastCompletedTurns();
+    if (!r1Started && !pendingR1Resolution && !r1RevealPending && allR1BidsSubmitted()) {
+      resolveFirstRound();
+    }
+    scheduleAINextLotteryEnvelope();
+    renderNominations();
+    renderDraft();
+    renderCandidates();
+  }
+  renderOnlineLobby();
+  return true;
+}
+
+async function forceRemoveOnlinePlayer(uid) {
+  const roomRef = onlineRoomRef;
+  const player = onlinePlayers[uid];
+  if (!onlineIsHost || !roomRef || onlineForceKickPending || onlineStartPending || onlineRestartPending ||
+      !["lobby", "playing"].includes(onlineGameStatus) || !player || player.host || player.departed) return;
+  const playerName = player.teamName || player.name || "プレイヤー";
+  const isPlaying = onlineGameStatus === "playing";
+  const confirmMessage = `${playerName}をルームから強制退出させますか？${isPlaying ? "\nこのチームの残り指名はスキップされます。" : ""}`;
+  if (!window.confirm(confirmMessage)) return;
+
+  onlineForceKickPending = true;
+  renderOnlineLobby();
+  let resultMessage = "";
+  const kickTask = onlineActionQueue.then(async () => {
+    if (roomRef !== onlineRoomRef || !onlineIsHost) return false;
+    const latestSnapshot = await roomRef.child(`players/${uid}`).once("value");
+    const latestPlayer = latestSnapshot.val();
+    if (!latestPlayer || latestPlayer.host || latestPlayer.departed) return false;
+    onlinePlayers[uid] = latestPlayer;
+    const removed = await markOnlinePlayerDeparted(uid, roomRef, true);
+    if (!removed) return false;
+    if (onlineGameStatus === "playing" && !await flushOnlineState()) {
+      throw new Error("退出状態を全員に共有できませんでした。接続を確認してください。");
+    }
+    resultMessage = `${playerName}をルームから退出させました。${isPlaying ? "残りの指名をスキップします。" : ""}`;
+    return true;
+  });
+  onlineActionQueue = kickTask.catch(error => {
+    resultMessage = error?.message || "プレイヤーを退出させられませんでした。";
+    return false;
+  });
+
+  try {
+    const removed = await kickTask;
+    if (!removed && !resultMessage && roomRef === onlineRoomRef) {
+      resultMessage = "対象プレイヤーはすでに退出しているか、見つかりません。";
+    }
+  } catch (error) {
+    resultMessage = error?.message || "プレイヤーを退出させられませんでした。";
+  } finally {
+    if (roomRef === onlineRoomRef) {
+      onlineForceKickPending = false;
+      renderOnlineLobby();
+      if (resultMessage) setOnlineStatus(resultMessage);
+    }
+  }
+}
+
 async function processOnlineAction(snapshot, processingRoomRef = onlineRoomRef) {
   if (!onlineIsHost || !onlineRoomRef || processingRoomRef !== onlineRoomRef) return;
   if (onlineProcessedActionIds.has(snapshot.key)) {
@@ -4672,32 +4794,8 @@ async function processOnlineAction(snapshot, processingRoomRef = onlineRoomRef) 
       if (onlineGameStatus !== "playing" || player.host || !ownerTeam) {
         actionRejectionReason = "このルームから退出できません。ホストまたは参加状態を確認してください。";
       } else {
-        const departedAt = player.departedAt || Date.now();
-        if (!player.departed) {
-          await processingRoomRef.child(`players/${action.uid}`).update({ departed: true, departedAt });
-          if (processingRoomRef !== onlineRoomRef || !onlineIsHost) return;
-          onlinePlayers[action.uid] = { ...player, departed: true, departedAt };
-        }
-        onlineDepartedTeams.add(ownerTeam);
-        onlineRevealAcks.delete(action.uid);
-        const hasSubmittedNomination = r1Nominations.some(item => item.team === ownerTeam);
-        if (!r1Started && !pendingR1Resolution && !r1RevealPending && !hasSubmittedNomination) {
-          const removedIndex = r1NominationOrder.indexOf(ownerTeam);
-          r1NominationOrder = r1NominationOrder.filter(team => team !== ownerTeam);
-          if (removedIndex >= 0 && removedIndex < r1NominationIndex) {
-            r1NominationIndex = Math.max(0, r1NominationIndex - 1);
-          }
-        }
-        if (r1Started) advancePastCompletedTurns();
-        if (!r1Started && !pendingR1Resolution && !r1RevealPending && allR1BidsSubmitted()) {
-          resolveFirstRound();
-        }
-        scheduleAINextLotteryEnvelope();
-        renderNominations();
-        renderDraft();
-        renderCandidates();
-        renderOnlineLobby();
-        actionAccepted = true;
+        actionAccepted = await markOnlinePlayerDeparted(action.uid, processingRoomRef);
+        if (!actionAccepted) actionRejectionReason = "退出を反映できませんでした。ルームの接続状態を確認してください。";
       }
     } else if (onlinePlayers[action.uid].departed) {
       actionRejectionReason = "このチームは退出済みのため、残りの指名はスキップされます。";
@@ -4800,12 +4898,14 @@ function onlinePlayersInDraftOrder() {
 }
 
 async function startOnlineGame() {
-  if (!onlineIsHost || onlineGameStatus !== "lobby") return;
+  if (!onlineIsHost || onlineGameStatus !== "lobby" || onlineForceKickPending || onlineStartPending) return;
   const players = onlinePlayersInDraftOrder();
   if (players.length < 2 || players.length > 10) {
     setOnlineStatus("オンラインドラフトは2〜10人で開始できます。参加者の人数を確認してください。");
     return;
   }
+  onlineStartPending = true;
+  renderOnlineLobby();
   try {
     const onlineSettings = {
       pickLimit: Number($("pickLimit").value),
@@ -4817,12 +4917,15 @@ async function startOnlineGame() {
     startGame("online");
   } catch (error) {
     setOnlineStatus(error.message || "ドラフトを開始できませんでした。");
+  } finally {
+    onlineStartPending = false;
+    renderOnlineLobby();
   }
 }
 
 async function restartOnlineGame() {
   if (!onlineIsHost || !onlineRoomRef || onlineGameStatus !== "playing" ||
-      !gameStarted || !allTeamsComplete() || pendingR1Resolution || !$("pickReveal").hidden || pickRevealQueue.length || onlineRestartPending) return;
+      !gameStarted || !allTeamsComplete() || pendingR1Resolution || !$("pickReveal").hidden || pickRevealQueue.length || onlineRestartPending || onlineForceKickPending || onlineStartPending) return;
   const players = onlinePlayersInDraftOrder();
   if (players.length < 2 || players.length > 10) {
     setOnlineStatus("再ドラフトには2〜10人の参加者が必要です。ルームの参加者を確認してください。");
@@ -4977,6 +5080,11 @@ $("createOnlineRoom").addEventListener("click", createOnlineRoom);
 $("joinOnlineRoom").addEventListener("click", joinOnlineRoom);
 $("copyOnlineInvite").addEventListener("click", copyOnlineInvite);
 $("closeOnlineRoom").addEventListener("click", closeOnlineRoom);
+$("onlinePlayerList").addEventListener("click", event => {
+  const button = event.target.closest("[data-kick-player]");
+  if (!button || button.disabled) return;
+  void forceRemoveOnlinePlayer(button.dataset.kickPlayer);
+});
 $("leaveOnlineRoom").addEventListener("click", leaveOnlineRoom);
 $("leaveOnlineRoomFromResults").addEventListener("click", leaveOnlineRoom);
 $("closeOnlineRoomFromResults").addEventListener("click", closeOnlineRoom);
