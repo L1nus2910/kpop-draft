@@ -9919,3 +9919,95 @@ body::before { opacity: .045; }
 @media (orientation: landscape) and (max-width: 900px) {
   .draft-history-landscape-hint { color: #77748d; font-size: 10px; }
 }
+
+/* In history's expanded view, fit the complete results board to a phone held
+   sideways instead of keeping desktop column widths and forcing a sideways scroll. */
+@media (orientation: landscape) and (max-width: 900px) {
+  .draft-history-dialog.is-board-expanded .draft-history-dialog-inner {
+    gap: 4px;
+    padding: max(4px, env(safe-area-inset-top)) max(6px, env(safe-area-inset-right)) max(4px, env(safe-area-inset-bottom)) max(6px, env(safe-area-inset-left));
+  }
+
+  .draft-history-dialog.is-board-expanded .draft-history-fullscreen-bar {
+    min-height: 32px;
+    gap: 6px;
+    padding-bottom: 2px;
+  }
+
+  .draft-history-fullscreen-title { overflow: hidden; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+  .draft-history-landscape-hint { display: none; }
+  .draft-history-fullscreen-bar > div { gap: 5px; }
+  .draft-history-return-button { min-height: 30px; padding: 4px 9px; font-size: 10px; }
+  .draft-history-fullscreen-close { width: 30px; height: 30px; font-size: 19px; }
+
+  .draft-history-dialog.is-board-expanded .draft-history-table-scroll {
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+
+  .draft-history-dialog.is-board-expanded .draft-history-results-table {
+    width: 100%;
+    min-width: 100%;
+    max-width: 100%;
+    height: 100%;
+    table-layout: fixed;
+  }
+
+  .draft-history-dialog.is-board-expanded .draft-history-results-table th,
+  .draft-history-dialog.is-board-expanded .draft-history-results-table td {
+    padding: 2px 1px;
+    overflow-wrap: anywhere;
+  }
+
+  .draft-history-dialog.is-board-expanded .draft-history-results-table .round-column {
+    width: clamp(34px, 5vw, 44px);
+    min-width: clamp(34px, 5vw, 44px);
+    padding: 3px 1px;
+    font-size: clamp(7px, 1.15vw, 9px);
+  }
+
+  .draft-history-dialog.is-board-expanded .draft-history-results-table .team-column {
+    height: clamp(38px, 13dvh, 52px);
+    padding: 3px 1px;
+  }
+
+  .draft-history-dialog.is-board-expanded .draft-history-results-table .team-column strong {
+    font-size: clamp(8px, 1.2vw, 11px);
+    line-height: 1.15;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .draft-history-dialog.is-board-expanded .draft-history-results-table .team-column .team-column-subtitle,
+  .draft-history-dialog.is-board-expanded .draft-history-results-table .team-column span {
+    font-size: clamp(6px, .85vw, 8px);
+    line-height: 1.1;
+  }
+
+  .draft-history-dialog.is-board-expanded .draft-history-results-table .pick-cell {
+    height: clamp(34px, 10.5dvh, 50px);
+    padding: 2px 1px;
+  }
+
+  .draft-history-dialog.is-board-expanded .draft-history-results-table .draft-cell-card,
+  .draft-history-dialog.is-board-expanded .draft-history-results-table .draft-lottery-history {
+    gap: 1px;
+    margin-bottom: 1px;
+  }
+
+  .draft-history-dialog.is-board-expanded .draft-history-results-table .draft-cell-card.draft-pick-confirmed {
+    padding: 2px 1px;
+    border-radius: 4px;
+  }
+
+  .draft-history-dialog.is-board-expanded .draft-history-results-table .draft-cell-card strong {
+    font-size: clamp(7px, 1.05vw, 10px);
+    line-height: 1.15;
+  }
+
+  .draft-history-dialog.is-board-expanded .draft-history-results-table .draft-cell-card > span,
+  .draft-history-dialog.is-board-expanded .draft-history-results-table .draft-cell-card small {
+    font-size: clamp(6px, .8vw, 8px);
+    line-height: 1.1;
+  }
+}
