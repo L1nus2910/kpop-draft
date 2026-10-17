@@ -9587,3 +9587,156 @@ body::before { opacity: .045; }
   .button-primary,
   .button-secondary { transition-duration: .01ms; }
 }
+
+.draft-board-history-button {
+  min-height: 36px;
+  padding: 7px 11px;
+  border: 1px solid #d9cff3;
+  border-radius: 999px;
+  color: #6545bd;
+  background: linear-gradient(135deg, #fff, #f0f5ff);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.draft-board-history-button:active { transform: scale(.97); }
+
+.draft-history-dialog {
+  width: min(1100px, calc(100vw - 24px));
+  max-width: none;
+  max-height: min(86dvh, 820px);
+  padding: 0;
+  border: 1px solid #d8cfee;
+  border-radius: 22px;
+  color: #292747;
+  background: #f8f7ff;
+  box-shadow: 0 24px 70px rgba(33, 26, 75, .28);
+}
+
+.draft-history-dialog::backdrop { background: rgba(25, 22, 48, .58); }
+
+.draft-history-dialog-inner {
+  display: flex;
+  max-height: min(86dvh, 820px);
+  flex-direction: column;
+  padding: clamp(16px, 3vw, 26px);
+}
+
+.draft-history-dialog-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.draft-history-dialog-heading .eyebrow { margin: 0 0 4px; color: #7450ca; }
+.draft-history-dialog-heading h2 { margin: 0; font-size: clamp(20px, 4vw, 28px); }
+.draft-history-description { margin: 8px 0 14px; color: #716f8b; font-size: 13px; }
+
+.draft-history-close {
+  width: 38px;
+  height: 38px;
+  flex: 0 0 auto;
+  border: 1px solid #ded7f0;
+  border-radius: 50%;
+  color: #5f4b9d;
+  background: #fff;
+  font-size: 25px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.draft-history-list {
+  display: grid;
+  min-height: 0;
+  gap: 10px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 1px 4px 2px 1px;
+}
+
+.draft-history-empty {
+  margin: 0;
+  padding: 20px 16px;
+  border: 1px dashed #cbc2e6;
+  border-radius: 15px;
+  color: #74718d;
+  background: #fff;
+  text-align: center;
+  line-height: 1.7;
+}
+
+.draft-history-entry {
+  overflow: hidden;
+  border: 1px solid #ddd6f0;
+  border-radius: 16px;
+  background: #fff;
+}
+
+.draft-history-entry > summary {
+  display: flex;
+  min-height: 58px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 11px 15px;
+  color: #302d50;
+  cursor: pointer;
+  list-style: none;
+}
+
+.draft-history-entry > summary::-webkit-details-marker { display: none; }
+.draft-history-entry > summary::after { content: "＋"; color: #7954c9; font-weight: 900; }
+.draft-history-entry[open] > summary::after { content: "−"; }
+.draft-history-entry > summary > span:first-child { display: grid; gap: 3px; }
+.draft-history-entry > summary strong { font-size: 14px; }
+.draft-history-entry > summary small { color: #77748d; font-size: 11px; }
+
+.draft-history-team-count {
+  margin-left: auto;
+  padding: 5px 9px;
+  border-radius: 999px;
+  color: #6545bd;
+  background: #f0edfb;
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.draft-history-table-scroll {
+  max-width: 100%;
+  max-height: min(58dvh, 560px);
+  overflow: auto;
+  border: 1px solid #cbc6df;
+  border-radius: 12px;
+  background: #e5e3f0;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.draft-history-results-table { width: 100%; min-width: max-content; border: 0; }
+.draft-history-results-table th,
+.draft-history-results-table td { width: clamp(140px, 20vw, 190px); border-color: #cbc6df; }
+.draft-history-results-table .round-column { width: 60px; min-width: 60px; padding: 8px 6px; font-size: 11px; }
+.draft-history-results-table .team-column { min-width: 140px; height: 68px; padding: 7px; }
+.draft-history-results-table .team-column strong { font-size: 13px; }
+.draft-history-results-table .team-column .team-column-subtitle { font-size: 8px; }
+.draft-history-results-table .pick-cell { height: 66px; padding: 6px; }
+.draft-history-results-table .draft-cell-card strong { font-size: 12px; }
+.draft-history-results-table .draft-cell-card > span { font-size: 9px; }
+
+@media (max-width: 520px) {
+  .draft-board-history-button { min-height: 34px; padding: 6px 9px; font-size: 10px; }
+  .draft-history-entry > summary { min-height: 52px; padding: 9px 12px; }
+  .draft-history-table-scroll { max-height: 60dvh; }
+  .draft-history-results-table th,
+  .draft-history-results-table td { width: 140px; }
+  .draft-history-results-table .round-column { width: 54px; min-width: 54px; font-size: 10px; }
+  .draft-history-results-table .team-column { min-width: 140px; height: 62px; }
+  .draft-history-results-table .pick-cell { height: 60px; }
+}

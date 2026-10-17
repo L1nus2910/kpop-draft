@@ -1,4 +1,4 @@
-const onlineClientBuild = "20261016-room-exit-skip-1";
+const onlineClientBuild = "20261017-reveal-history-a2olite-2";
 
 const groups = [
   {
@@ -606,6 +606,16 @@ const groups = [
     generation: "5世代",
     activity: "活動中",
     members: [["VV", "韓国"], ["Seojin", "韓国"], ["Seohee", "韓国"], ["Hyerin", "韓国"], ["Iyoo", "韓国"]]
+  },
+  {
+    name: "A2O LITE",
+    generation: "5世代",
+    activity: "活動中",
+    members: [
+      ["Young", "韓国"], ["Himeki", "日本"], ["Vora", "韓国"],
+      ["Xili", "中国"], ["Rada", "タイ"], ["Merci", "中国"],
+      ["Ayune", "韓国"], ["OA", "日本・米国"], ["Aijing", "中国"]
+    ]
   }
 ];
 
@@ -658,6 +668,18 @@ Object.assign(japaneseNameOverrides, {
   "sally": "サリー",
   "ej": "イジェイ",
   "danielle": "ダニエル"
+});
+
+Object.assign(japaneseNameOverrides, {
+  young: "ヨン",
+  himeki: "ヒメキ",
+  vora: "ボラ",
+  xili: "シリ",
+  rada: "ラダ",
+  merci: "メルシー",
+  ayune: "アユン",
+  oa: "オア",
+  aijing: "アイチン"
 });
 
 const romanSyllables = {
@@ -898,7 +920,8 @@ const agencyByGroup = {
   "GIRLSET (VCHA)": "JYP Entertainment",
   "ME:I": "LAPONE GIRLS",
   "IS:SUE": "LAPONE GIRLS",
-  HITGS: "H MUSIC Entertainment"
+  HITGS: "H MUSIC Entertainment",
+  "A2O LITE": "A2O Entertainment"
 };
 
 const sharedPersonMemberships = [
@@ -972,12 +995,11 @@ const agencyShortLabels = {
   "Dream T Entertainment": "Dream T"
 };
 
-// Keep the original label on each idol for draft logic, while showing the
-// better-known parent company in affiliation labels and the agency filter.
+// Keep the original agency for draft logic. Explicitly mapped parent labels
+// group affiliates in the filter; ADOR remains a distinct label.
 const agencyParentDisplayNames = {
   "BELIFT LAB": "HYBE",
   "SOURCE MUSIC": "HYBE",
-  ADOR: "HYBE",
   "PLEDIS Entertainment": "HYBE",
   "ABD（HYBE傘下）": "HYBE",
   WAKEONE: "CJ ENM",
@@ -1595,6 +1617,111 @@ function escapeHTML(value) {
   })[char]);
 }
 
+function saveCompletedDraftHistory() {
+  const history = readSaved(DRAFT_HISTORY_STORAGE_KEY, []);
+  const safeHistory = Array.isArray(history) ? history : [];
+  const id = gameSessionId || `draft-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  if (safeHistory.some(entry => entry?.id === id)) return;
+
+  const entry = {
+    id,
+    completedAt: Date.now(),
+    mode: activeMode,
+    pickLimit,
+    teams: teamNames.map(team => ({
+      name: team,
+      picks: (picks[team] || []).map(pick => ({
+        round: Number(pick.round) || 1,
+        name: String(pick.name || ""),
+        group: String(pick.group || ""),
+        agency: String(pick.agency || "")
+      })),
+      losses: (firstRoundLotteryLosses[team] || []).map(lost => ({
+        round: 1,
+        name: String(lost.name || ""),
+        group: String(lost.group || ""),
+        agency: String(lost.agency || "")
+      }))
+    }))
+  };
+
+  try {
+    localStorage.setItem(DRAFT_HISTORY_STORAGE_KEY, JSON.stringify([entry, ...safeHistory].slice(0, DRAFT_HISTORY_LIMIT)));
+  } catch {
+    // History is optional and should never interrupt a completed draft.
+  }
+}
+
+function renderDraftHistory() {
+  const list = $("draftHistoryList");
+  const history = readSaved(DRAFT_HISTORY_STORAGE_KEY, []);
+  const entries = Array.isArray(history) ? history.filter(entry => entry && typeof entry === "object") : [];
+  if (!entries.length) {
+    list.innerHTML = '<p class="draft-history-empty">完了したドラフトはまだありません。ドラフト終了後にこの端末へ保存されます。</p>';
+    return;
+  }
+
+  const modeLabels = { ai: "AIドラフト", local: "友達と1台", online: "オンラインドラフト" };
+  list.innerHTML = entries.map(entry => {
+    const completedAt = new Date(Number(entry?.completedAt));
+    const dateLabel = Number.isFinite(completedAt.getTime())
+      ? completedAt.toLocaleString("ja-JP", { dateStyle: "medium", timeStyle: "short" })
+      : "日時不明";
+    const teams = Array.isArray(entry?.teams) ? entry.teams.filter(team => team && typeof team === "object") : [];
+    const rounds = Math.max(1, Number(entry?.pickLimit) || 5);
+    const totalPicks = teams.reduce((sum, team) => sum + (Array.isArray(team.picks) ? team.picks.length : 0), 0);
+    const headers = teams.map((team, index) => {
+      const teamPicks = Array.isArray(team.picks) ? team.picks : [];
+      const subtitle = entry.mode === "ai"
+        ? index === 0 ? "あなたのチーム" : "AIチーム"
+        : entry.mode === "online" ? "参加チーム" : `チーム ${String(index + 1).padStart(2, "0")}`;
+      return `
+        <th class="team-column" scope="col" style="--team-color:${teamColorPalette[index % teamColorPalette.length]}">
+          <small class="team-column-subtitle">${escapeHTML(subtitle)}</small>
+          <strong>${escapeHTML(team.name || "チーム")}</strong>
+          <span>${teamPicks.length} / ${rounds}人</span>
+        </th>
+      `;
+    }).join("");
+    const rows = Array.from({ length: rounds }, (_, index) => {
+      const roundNumber = index + 1;
+      const cells = teams.map(team => {
+        const teamPicks = Array.isArray(team.picks) ? team.picks : [];
+        const losses = Array.isArray(team.losses) ? team.losses : [];
+        const pick = teamPicks.find(item => Number(item.round) === roundNumber);
+        const roundLosses = losses.filter(item => Number(item.round || 1) === roundNumber);
+        const lossMarkup = roundLosses.length ? `
+          <div class="draft-lottery-history" aria-label="${roundNumber}巡目の抽選外れ">
+            ${roundLosses.map(item => `
+              <div class="draft-cell-card draft-lottery-loss">
+                <strong>${escapeHTML(item.name || "")}</strong>${memberAffiliationMarkup(item)}
+              </div>
+            `).join("")}
+          </div>
+        ` : "";
+        const pickMarkup = pick ? `
+          <div class="draft-cell-card draft-pick-confirmed">
+            <strong>${escapeHTML(pick.name || "")}</strong>${memberAffiliationMarkup(pick)}
+          </div>
+        ` : '<span class="empty-pick">—</span>';
+        return `<td class="pick-cell">${lossMarkup}${pickMarkup}</td>`;
+      }).join("");
+      return `<tr><th class="round-column" scope="row">${roundNumber}巡目</th>${cells}</tr>`;
+    }).join("");
+    return `
+      <details class="draft-history-entry">
+        <summary><span><strong>${escapeHTML(dateLabel)}</strong><small>${escapeHTML(modeLabels[entry?.mode] || "ドラフト")} · 合計${totalPicks}人</small></span><span class="draft-history-team-count">${teams.length}チーム</span></summary>
+        <div class="draft-history-table-scroll" role="region" aria-label="${escapeHTML(dateLabel)}のドラフト結果" tabindex="0">
+          <table class="draft-results-table draft-history-results-table">
+            <thead><tr><th class="round-column" scope="col">巡目</th>${headers}</tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>
+      </details>
+    `;
+  }).join("");
+}
+
 let excluded = new Set(readSaved("stagePickExcluded", []));
 let savedPresets = readSaved("stagePickPresets", {});
 let selectedId = null;
@@ -1609,6 +1736,8 @@ let dependentFilterSignature = "";
 const CANDIDATE_PAGE_SIZE = 64;
 let gameStarted = false;
 let finalResultsWasVisible = false;
+const DRAFT_HISTORY_STORAGE_KEY = "kdraftCompletedDraftHistory";
+const DRAFT_HISTORY_LIMIT = 20;
 let drafted = new Set();
 function setDraftedMembers(values) {
   const next = new Set(values || []);
@@ -3716,7 +3845,9 @@ function renderOnlinePickReveal() {
     $("pickRevealActionHint").textContent = onlineActionPending
       ? "ホストの画面で進行しています…"
       : activeMode === "online"
-        ? "全員が発表を確認できるよう、この画面は「次へ進む」まで表示されます。"
+        ? pickRevealPhase === "intro"
+          ? "指名チームの発表後、約2秒でメンバーを開示します。"
+          : "全員が発表を確認できるよう、この画面は「次へ進む」まで表示されます。"
         : "指名の発表は全員の画面に同期されます。";
     updateOnlineRevealConfirmation();
   }
@@ -3932,7 +4063,7 @@ function resumeOnlineHostProgress() {
     return;
   }
   if (pickRevealPhase === "intro") {
-    pickRevealTimer = window.setTimeout(revealPickCard, 450);
+    pickRevealTimer = window.setTimeout(revealPickCard, 2000);
   } else if (pickRevealPhase === "revealed") {
     if (activeMode === "online") {
       scheduleRevealAutoAdvance(onlineRevealAutoAdvanceDelay());
@@ -5127,12 +5258,12 @@ function showNextPickReveal() {
     ? activeMode === "online"
       ? "全員が封筒を選び終わると、ホストが開示を始めます。"
       : "封筒を選ぶ抽選です。結果は全員が選び終わってから同時に開きます。"
-    : "右上は演出だけを省略します。指名を確認した後は下のボタンで次へ進みます。";
+    : "指名チームの発表後、約2秒でメンバーを開示します。内容を確認したら下のボタンで次へ進みます。";
   requestAnimationFrame(() => $("pickRevealNext").focus({ preventScroll: true }));
 
   const introDelay = window.matchMedia("(prefers-reduced-motion: reduce)").matches
     ? 80
-    : isLottery ? 1050 : 720;
+    : isLottery ? 1050 : 2000;
   pickRevealTimer = window.setTimeout(revealPickCard, introDelay);
   renderOnlinePickReveal();
   syncOnlineState();
@@ -5958,6 +6089,7 @@ function renderDraft() {
     $("finalResultsBoard").innerHTML = $("draftBoard").innerHTML;
     renderFinalSnapshot();
     if (!finalResultsWasVisible) {
+      saveCompletedDraftHistory();
       requestAnimationFrame(() => finalResults.scrollIntoView({ behavior: "smooth", block: "start" }));
     }
   } else {
@@ -6048,6 +6180,18 @@ if (invitedRoomCode) {
 }
 
 // Open the short site information panel from the persistent header.
+const draftHistoryDialog = $("draftHistoryDialog");
+document.querySelectorAll(".open-draft-history").forEach(button => {
+  button.addEventListener("click", () => {
+    renderDraftHistory();
+    draftHistoryDialog.showModal();
+  });
+});
+$("draftHistoryClose").addEventListener("click", () => draftHistoryDialog.close());
+draftHistoryDialog.addEventListener("click", event => {
+  if (event.target === draftHistoryDialog) draftHistoryDialog.close();
+});
+
 const siteInfoDialog = $('siteInfoDialog');
 $('siteInfoOpen').addEventListener('click', () => siteInfoDialog.showModal());
 $('siteInfoClose').addEventListener('click', () => siteInfoDialog.close());

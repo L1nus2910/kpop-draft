@@ -18,9 +18,9 @@
   <meta property="og:description" content="推しでつくる、夢のドラフト。非公式ファン制作のK-POPドラフトゲーム。">
   <meta property="og:url" content="https://l1nus2910.github.io/kpop-draft/">
   <meta name="twitter:card" content="summary">
-  <link rel="stylesheet" href="style.css?v=20261017-online-light-1">
+  <link rel="stylesheet" href="style.css?v=20261017-draft-history-2">
   <script src="firebase-config.js" defer></script>
-  <script src="app.js?v=20261017-online-light-1" defer></script>
+  <script src="app.js?v=20261017-draft-history-2" defer></script>
 </head>
 <body>
   <header class="topbar">
@@ -187,6 +187,7 @@
         </div>
         <div class="final-results-actions">
           <span class="final-results-status">指名完了</span>
+          <button class="button button-secondary open-draft-history" type="button">過去のドラフト履歴</button>
           <button class="button button-secondary" id="shareFinalResultsX" type="button" aria-label="ドラフト結果の画像とハッシュタグ、サイトリンクをXへ共有する">画像付きでX共有</button>
           <button class="button button-primary" id="restartOfflineDraft" type="button" aria-label="現在の設定で再ドラフトを始める" hidden>再ドラフト</button>
           <button class="button button-primary" id="restartOnlineGame" type="button" hidden>同じルームで再ドラフト</button>
@@ -260,6 +261,7 @@
             </div>
             <div class="draft-board-tools">
               <span class="draft-board-count" id="draftBoardCount">0人</span>
+              <button class="draft-board-history-button open-draft-history" type="button" aria-haspopup="dialog" aria-controls="draftHistoryDialog">履歴</button>
               <span class="draft-board-inline-hint">表を左右に動かして全チームを確認</span>
               <button class="draft-board-expand-button" id="draftBoardExpand" type="button" aria-expanded="false" aria-controls="draftBoard">
                 <span aria-hidden="true">⛶</span><span class="draft-board-expand-label">表を広げて見る</span>
@@ -411,7 +413,7 @@
         <details class="site-notice" id="privacyNotice">
           <summary>プライバシー・オンラインドラフト</summary>
           <div class="site-notice-content">
-            <p>メールアドレスやパスワードによるアカウント登録はありません。候補の除外設定や保存した検索条件は、利用中のブラウザー内に保存されます。</p>
+            <p>メールアドレスやパスワードによるアカウント登録はありません。候補の除外設定、保存した検索条件、過去のドラフト結果は利用中のブラウザー内に保存されます。ドラフト履歴は最大20件で、オンラインの場合も端末ごとの保存です。</p>
             <p>オンラインドラフトでは、Firebaseの匿名認証とRealtime Databaseを使用します。匿名の識別子のほか、入力した表示名・チーム名、ルームコード、参加者、ドラフト設定、指名・抽選を含むゲーム進行情報を同期します。参加者には同じルーム内の表示名・チーム名とドラフト結果が表示されます。表示名には本名、住所、学校名、連絡先などを使わず、招待リンクやコードは参加してほしい相手だけに共有してください。</p>
             <p>Realtime Databaseはシンガポール（asia-southeast1）に設定されています。Googleの案内ではFirebase Authenticationは米国内のデータセンターで運用され、サービス提供のためIPアドレスやブラウザー情報等が処理される場合があります。Firebase SDKもGoogleのサーバーから読み込まれます。詳しくは <a href="https://firebase.google.com/support/privacy" target="_blank" rel="noopener noreferrer">Firebaseのプライバシー案内</a>をご確認ください。</p>
             <p>ルーム情報は、ホストが「ルーム終了・データ削除」を実行するまでRealtime Databaseに残ります。終了時はホストに削除を依頼してください。削除対象はこのアプリのルームデータです。サービス事業者側の技術ログ等は各社の規定に従います。サイトの配信元である <a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement" target="_blank" rel="noopener noreferrer">GitHubのプライバシー説明</a>もご確認ください。</p>
@@ -420,6 +422,16 @@
         </details>
       </div>
     </footer>
+  <dialog class="draft-history-dialog" id="draftHistoryDialog" aria-labelledby="draftHistoryTitle">
+    <div class="draft-history-dialog-inner">
+      <div class="draft-history-dialog-heading">
+        <div><p class="eyebrow">DRAFT ARCHIVE</p><h2 id="draftHistoryTitle">過去のドラフト履歴</h2></div>
+        <button class="draft-history-close" id="draftHistoryClose" type="button" aria-label="閉じる">×</button>
+      </div>
+      <p class="draft-history-description">この端末のブラウザーに保存された最大20件の結果です。</p>
+      <div class="draft-history-list" id="draftHistoryList" aria-live="polite"></div>
+    </div>
+  </dialog>
   <dialog class="site-info-dialog" id="siteInfoDialog" aria-labelledby="siteInfoTitle">
     <div class="site-info-dialog-inner">
       <button class="site-info-close" id="siteInfoClose" type="button" aria-label="閉じる">×</button>
