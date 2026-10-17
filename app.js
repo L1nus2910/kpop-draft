@@ -1817,7 +1817,7 @@ let turnIndex = 0;
 let lotterySummary = "";
 let pickLimit = 5;
 let orderMode = "snake";
-let startOrderMode = "fixed";
+let startOrderMode = "random";
 let firstRoundLotteryLosses = {};
 let onlineRoomRef = null;
 let firebaseSdkLoadPromise = null;
@@ -2973,7 +2973,7 @@ function setOnlineRoomConnected(code, isHost, initialPlayers = null, deferGameAc
     $("pickLimit").value = String(settings.pickLimit || 5);
     const savedOrderMode = settings.orderMode || "snake";
     $("orderMode").value = savedOrderMode === "random" ? "fixed" : savedOrderMode;
-    $("startOrderMode").value = settings.startOrderMode || (savedOrderMode === "random" ? "random" : "fixed");
+    $("startOrderMode").value = settings.startOrderMode || "random";
     updateModeSetup();
   });
 
@@ -3418,7 +3418,7 @@ function resetOnlineRoomToSetup(roomRef, leavingUid) {
   $("playMode").value = "ai";
   $("pickLimit").value = "5";
   $("orderMode").value = "snake";
-  $("startOrderMode").value = "fixed";
+  $("startOrderMode").value = "random";
   $("pickReveal").hidden = true;
   $("onlineLobby").hidden = true;
   $("onlinePlayerList").innerHTML = "";
@@ -4240,7 +4240,7 @@ function applyOnlineGameState(state) {
     lotterySummary = state.lotterySummary || "";
     pickLimit = Number(state.pickLimit || 5);
     orderMode = state.orderMode === "random" ? "fixed" : (state.orderMode || "snake");
-    startOrderMode = state.startOrderMode || "fixed";
+    startOrderMode = state.startOrderMode || "random";
     firstRoundLotteryLosses = state.firstRoundLotteryLosses || {};
     gameSessionId = incomingGameSessionId || gameSessionId;
     onlineActionAcks = state.actionAcks || {};
@@ -5012,7 +5012,7 @@ function startGame(mode, aiCount = 3) {
   onlineDepartedTeams = new Set();
   pickLimit = Number($("pickLimit").value);
   orderMode = $("orderMode").value;
-  startOrderMode = $("startOrderMode").value || "fixed";
+  startOrderMode = $("startOrderMode").value || "random";
   teamNames = mode === "ai"
     ? [(playerTeamNameValue.trim() || "あなた"), ...Array.from({ length: aiCount }, (_, index) => `AI${index + 1}`)]
     : mode === "online"
