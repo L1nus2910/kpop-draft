@@ -1,4 +1,4 @@
-const onlineClientBuild = "20261017-reveal-history-a2olite-2";
+const onlineClientBuild = "20261017-reveal-history-sync-3";
 
 const groups = [
   {
@@ -1662,7 +1662,7 @@ function renderDraftHistory() {
   }
 
   const modeLabels = { ai: "AIドラフト", local: "友達と1台", online: "オンラインドラフト" };
-  list.innerHTML = entries.map(entry => {
+  list.innerHTML = entries.map((entry, index) => {
     const completedAt = new Date(Number(entry?.completedAt));
     const dateLabel = Number.isFinite(completedAt.getTime())
       ? completedAt.toLocaleString("ja-JP", { dateStyle: "medium", timeStyle: "short" })
@@ -1670,56 +1670,99 @@ function renderDraftHistory() {
     const teams = Array.isArray(entry?.teams) ? entry.teams.filter(team => team && typeof team === "object") : [];
     const rounds = Math.max(1, Number(entry?.pickLimit) || 5);
     const totalPicks = teams.reduce((sum, team) => sum + (Array.isArray(team.picks) ? team.picks.length : 0), 0);
-    const headers = teams.map((team, index) => {
-      const teamPicks = Array.isArray(team.picks) ? team.picks : [];
-      const subtitle = entry.mode === "ai"
-        ? index === 0 ? "あなたのチーム" : "AIチーム"
-        : entry.mode === "online" ? "参加チーム" : `チーム ${String(index + 1).padStart(2, "0")}`;
-      return `
-        <th class="team-column" scope="col" style="--team-color:${teamColorPalette[index % teamColorPalette.length]}">
-          <small class="team-column-subtitle">${escapeHTML(subtitle)}</small>
-          <strong>${escapeHTML(team.name || "チーム")}</strong>
-          <span>${teamPicks.length} / ${rounds}人</span>
-        </th>
-      `;
-    }).join("");
-    const rows = Array.from({ length: rounds }, (_, index) => {
-      const roundNumber = index + 1;
-      const cells = teams.map(team => {
-        const teamPicks = Array.isArray(team.picks) ? team.picks : [];
-        const losses = Array.isArray(team.losses) ? team.losses : [];
-        const pick = teamPicks.find(item => Number(item.round) === roundNumber);
-        const roundLosses = losses.filter(item => Number(item.round || 1) === roundNumber);
-        const lossMarkup = roundLosses.length ? `
-          <div class="draft-lottery-history" aria-label="${roundNumber}巡目の抽選外れ">
-            ${roundLosses.map(item => `
-              <div class="draft-cell-card draft-lottery-loss">
-                <strong>${escapeHTML(item.name || "")}</strong>${memberAffiliationMarkup(item)}
-              </div>
-            `).join("")}
-          </div>
-        ` : "";
-        const pickMarkup = pick ? `
-          <div class="draft-cell-card draft-pick-confirmed">
-            <strong>${escapeHTML(pick.name || "")}</strong>${memberAffiliationMarkup(pick)}
-          </div>
-        ` : '<span class="empty-pick">—</span>';
-        return `<td class="pick-cell">${lossMarkup}${pickMarkup}</td>`;
-      }).join("");
-      return `<tr><th class="round-column" scope="row">${roundNumber}巡目</th>${cells}</tr>`;
-    }).join("");
     return `
-      <details class="draft-history-entry">
+      <details class="draft-history-entry" data-history-index="${index}">
         <summary><span><strong>${escapeHTML(dateLabel)}</strong><small>${escapeHTML(modeLabels[entry?.mode] || "ドラフト")} · 合計${totalPicks}人</small></span><span class="draft-history-team-count">${teams.length}チーム</span></summary>
-        <div class="draft-history-table-scroll" role="region" aria-label="${escapeHTML(dateLabel)}のドラフト結果" tabindex="0">
-          <table class="draft-results-table draft-history-results-table">
-            <thead><tr><th class="round-column" scope="col">巡目</th>${headers}</tr></thead>
-            <tbody>${rows}</tbody>
-          </table>
+        <div class="draft-history-entry-body">
+          <div class="draft-history-entry-actions">
+            <button class="draft-history-expand-button" type="button" aria-label="${escapeHTML(dateLabel)}のドラフト結果を全体表示">全体表示</button>
+          </div>
+          <div class="draft-history-fullscreen-bar">
+            <strong class="draft-history-fullscreen-title">${escapeHTML(dateLabel)} · ${teams.length}チーム</strong>
+            <small class="draft-history-landscape-hint">スマホを横向きにすると全チームを見やすく表示できます</small>
+            <div>
+              <button class="draft-history-return-button" type="button">履歴一覧へ</button>
+              <button class="draft-history-fullscreen-close" type="button" aria-label="履歴を閉じる">×</button>
+            </div>
+          </div>
+          <div class="draft-history-table-scroll" role="region" aria-label="${escapeHTML(dateLabel)}のドラフト結果" tabindex="0">
+            <div class="draft-history-table-mount"></div>
+          </div>
         </div>
       </details>
     `;
   }).join("");
+
+  list.querySelectorAll(".draft-history-entry").forEach(details => {
+    details.addEventListener("toggle", () => {
+      if (!details.open) {
+        if (details.classList.contains("is-expanded")) return;
+        const mount = details.querySelector(".draft-history-table-mount");
+        if (mount) mount.replaceChildren();
+        details.dataset.rendered = "";
+        return;
+      }
+      list.querySelectorAll(".draft-history-entry").forEach(other => {
+        if (other !== details) other.open = false;
+      });
+      if (details.dataset.rendered === "true") return;
+      const entry = entries[Number(details.dataset.historyIndex)];
+      if (!entry) return;
+      renderDraftHistoryTable(details, entry);
+    });
+  });
+}
+
+function renderDraftHistoryTable(details, entry) {
+  const mount = details.querySelector(".draft-history-table-mount");
+  if (!mount) return;
+  const teams = Array.isArray(entry?.teams) ? entry.teams.filter(team => team && typeof team === "object") : [];
+  const rounds = Math.max(1, Number(entry?.pickLimit) || 5);
+  const headers = teams.map((team, index) => {
+    const teamPicks = Array.isArray(team.picks) ? team.picks : [];
+    const subtitle = entry.mode === "ai"
+      ? index === 0 ? "あなたのチーム" : "AIチーム"
+      : entry.mode === "online" ? "参加チーム" : `チーム ${String(index + 1).padStart(2, "0")}`;
+    return `
+      <th class="team-column" scope="col" style="--team-color:${teamColorPalette[index % teamColorPalette.length]}">
+        <small class="team-column-subtitle">${escapeHTML(subtitle)}</small>
+        <strong>${escapeHTML(team.name || "チーム")}</strong>
+        <span>${teamPicks.length} / ${rounds}人</span>
+      </th>
+    `;
+  }).join("");
+  const rows = Array.from({ length: rounds }, (_, index) => {
+    const roundNumber = index + 1;
+    const cells = teams.map(team => {
+      const teamPicks = Array.isArray(team.picks) ? team.picks : [];
+      const losses = Array.isArray(team.losses) ? team.losses : [];
+      const pick = teamPicks.find(item => Number(item.round) === roundNumber);
+      const roundLosses = losses.filter(item => Number(item.round || 1) === roundNumber);
+      const lossMarkup = roundLosses.length ? `
+        <div class="draft-lottery-history" aria-label="${roundNumber}巡目の抽選外れ">
+          ${roundLosses.map(item => `
+            <div class="draft-cell-card draft-lottery-loss">
+              <strong>${escapeHTML(item.name || "")}</strong>${memberAffiliationMarkup(item)}
+            </div>
+          `).join("")}
+        </div>
+      ` : "";
+      const pickMarkup = pick ? `
+        <div class="draft-cell-card draft-pick-confirmed">
+          <strong>${escapeHTML(pick.name || "")}</strong>${memberAffiliationMarkup(pick)}
+        </div>
+      ` : '<span class="empty-pick">—</span>';
+      return `<td class="pick-cell">${lossMarkup}${pickMarkup}</td>`;
+    }).join("");
+    return `<tr><th class="round-column" scope="row">${roundNumber}巡目</th>${cells}</tr>`;
+  }).join("");
+  mount.innerHTML = `
+    <table class="draft-results-table draft-history-results-table" style="--history-team-count:${teams.length}">
+      <thead><tr><th class="round-column" scope="col">巡目</th>${headers}</tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  `;
+  details.dataset.rendered = "true";
 }
 
 let excluded = new Set(readSaved("stagePickExcluded", []));
@@ -1818,6 +1861,12 @@ let onlineGuestStatePollTimer = null;
 let onlineGuestStatePollingFallback = false;
 let onlineGuestRebidFallbackTimer = null;
 let onlineListenersAttached = false;
+let onlineServerTimeOffsetMs = 0;
+let onlineServerTimeOffsetRef = null;
+let onlineServerTimeOffsetCallback = null;
+let onlineRevealTimelineTimer = null;
+let onlineRevealTimelineKey = "";
+let onlineRevealTimelineStage = "";
 let onlineHandledActionIds = new Set();
 let onlineQueuedActionIds = new Set();
 let onlineProcessedActionIds = new Set();
@@ -1827,6 +1876,46 @@ let onlineRevealAcks = new Set();
 let onlineHostRestoring = false;
 let gameSessionId = "";
 let onlineRestartPending = false;
+const ONLINE_REVEAL_SYNC_LEAD_MS = 450;
+
+function onlineServerNow() {
+  return Date.now() + onlineServerTimeOffsetMs;
+}
+
+function detachOnlineServerClock() {
+  if (onlineServerTimeOffsetRef && onlineServerTimeOffsetCallback) {
+    onlineServerTimeOffsetRef.off("value", onlineServerTimeOffsetCallback);
+  }
+  onlineServerTimeOffsetRef = null;
+  onlineServerTimeOffsetCallback = null;
+  onlineServerTimeOffsetMs = 0;
+}
+
+function attachOnlineServerClock() {
+  detachOnlineServerClock();
+  if (!window.firebase?.database) return;
+  onlineServerTimeOffsetRef = window.firebase.database().ref(".info/serverTimeOffset");
+  onlineServerTimeOffsetCallback = snapshot => {
+    const offset = Number(snapshot.val());
+    onlineServerTimeOffsetMs = Number.isFinite(offset) ? offset : 0;
+    if (onlineRevealTimelineTimer !== null) {
+      clearTimeout(onlineRevealTimelineTimer);
+      onlineRevealTimelineTimer = null;
+      onlineRevealTimelineStage = "";
+    }
+    scheduleOnlineRevealVisualTimeline();
+  };
+  onlineServerTimeOffsetRef.on("value", onlineServerTimeOffsetCallback);
+}
+
+function clearOnlineRevealTimeline() {
+  if (onlineRevealTimelineTimer !== null) {
+    clearTimeout(onlineRevealTimelineTimer);
+    onlineRevealTimelineTimer = null;
+  }
+  onlineRevealTimelineKey = "";
+  onlineRevealTimelineStage = "";
+}
 
 const teamColorPalette = [
   "#a72e45", "#24539d", "#116d68", "#98500f", "#6740a5",
@@ -2754,6 +2843,8 @@ function startOnlineActionsPolling() {
 function setOnlineRoomConnected(code, isHost, initialPlayers = null, deferGameActions = false) {
   const previousRoomRef = onlineRoomRef;
   detachOnlineActionsListener();
+  detachOnlineServerClock();
+  clearOnlineRevealTimeline();
   if (previousRoomRef) {
     previousRoomRef.child("players").off();
     previousRoomRef.child("status").off();
@@ -2777,6 +2868,7 @@ function setOnlineRoomConnected(code, isHost, initialPlayers = null, deferGameAc
   }
   onlineRoomCode = code;
   onlineRoomRef = firebase.database().ref(`rooms/${code}`);
+  attachOnlineServerClock();
   onlineIsHost = isHost;
   onlinePlayers = initialPlayers || {};
   onlineDepartedTeams = new Set();
@@ -2822,7 +2914,7 @@ function setOnlineRoomConnected(code, isHost, initialPlayers = null, deferGameAc
     if (gameStarted && activeMode === "online") {
       renderNominations();
       renderDraft();
-      renderCandidates();
+      if ($("pickReveal").hidden) renderCandidates();
     }
   });
   onlineRoomRef.child("status").on("value", snapshot => {
@@ -3075,7 +3167,7 @@ function scheduleOnlineGuestStatePoll() {
       }
     }
     scheduleOnlineGuestStatePoll();
-  }, 3000);
+  }, $("pickReveal").hidden ? 3000 : 800);
 }
 
 function attachOnlineGuestListeners() {
@@ -3215,6 +3307,8 @@ async function closeOnlineRoom() {
 function resetOnlineRoomToSetup(roomRef, leavingUid) {
   if (!roomRef) return;
   detachOnlineActionsListener();
+  detachOnlineServerClock();
+  clearOnlineRevealTimeline();
   roomRef.child("players").off();
   roomRef.child("status").off();
   roomRef.child("settings").off();
@@ -3439,10 +3533,121 @@ function onlineRevealAutoAdvanceDelay(reveal = activePickReveal) {
 function scheduleRevealAutoAdvance(delay) {
   if (!onlineIsHost || !delay || pickRevealTimer !== null) return;
   const reveal = activePickReveal;
+  const dueAt = Number(reveal?.nextRevealAt) || onlineServerNow() + delay;
   pickRevealTimer = window.setTimeout(() => {
     pickRevealTimer = null;
     if (activePickReveal === reveal && pickRevealPhase === "revealed") showNextPickReveal();
-  }, delay);
+  }, Math.max(0, dueAt - onlineServerNow()));
+}
+
+function applyOnlineLotteryOpeningVisual(reveal, showOutcome = false) {
+  const buttons = [...$("lotteryTickets").querySelectorAll("[data-lottery-envelope]")];
+  buttons.forEach(button => {
+    const envelope = Number(button.dataset.lotteryEnvelope);
+    const team = reveal.selections.get(envelope);
+    if (!team) return;
+    const won = envelope === Number(reveal.winningEnvelope);
+    const result = button.querySelector(".lottery-envelope-result");
+    result.querySelector("strong").textContent = displayTeamName(team);
+    result.querySelector("small").textContent = won ? "交渉権獲得" : "再指名へ";
+    button.style.setProperty("--lottery-team-color", teamColorPalette[Math.max(0, teamNames.indexOf(team)) % teamColorPalette.length]);
+    button.classList.remove("is-opening");
+    button.classList.add("is-open");
+    if (showOutcome) {
+      button.classList.add(won ? "is-winner" : "is-loser");
+      result.classList.add(won ? "is-winner" : "is-loser");
+      button.setAttribute("aria-label", won
+        ? `${displayTeamName(team)}が交渉権を獲得`
+        : `${displayTeamName(team)}は再指名へ`);
+    }
+  });
+  if (showOutcome) {
+    const winner = reveal.selections.get(Number(reveal.winningEnvelope));
+    if (winner) {
+      $("lotteryBoard").classList.add("is-revealed");
+      $("lotteryTurn").textContent = `交渉権獲得チーム：${displayTeamName(winner)}`;
+      $("lotteryOutcome").textContent = "このチームが交渉権を獲得しました";
+      const winnerIndex = Math.max(0, teamNames.indexOf(winner));
+      $("lotteryBoard").style.setProperty("--lottery-winner-color", teamColorPalette[winnerIndex % teamColorPalette.length]);
+    }
+  }
+}
+
+function scheduleOnlineRevealVisualTimeline() {
+  const reveal = activePickReveal;
+  if (activeMode !== "online" || !reveal || $("pickReveal").hidden) {
+    clearOnlineRevealTimeline();
+    return;
+  }
+
+  const timelineKey = `${gameSessionId}:${reveal.type}:${reveal.round}:${reveal.idol?.id || reveal.idolId || ""}:${Number(reveal.introStartedAt) || 0}`;
+  if (timelineKey !== onlineRevealTimelineKey) {
+    if (onlineRevealTimelineTimer !== null) clearTimeout(onlineRevealTimelineTimer);
+    onlineRevealTimelineTimer = null;
+    onlineRevealTimelineKey = timelineKey;
+    onlineRevealTimelineStage = "";
+  }
+
+  const scheduleAt = (stage, targetAt) => {
+    if (onlineRevealTimelineTimer !== null && onlineRevealTimelineStage === stage) return;
+    if (onlineRevealTimelineTimer !== null) clearTimeout(onlineRevealTimelineTimer);
+    onlineRevealTimelineStage = stage;
+    onlineRevealTimelineTimer = window.setTimeout(() => {
+      onlineRevealTimelineTimer = null;
+      onlineRevealTimelineStage = "";
+      if (timelineKey === onlineRevealTimelineKey) scheduleOnlineRevealVisualTimeline();
+    }, Math.max(0, targetAt - onlineServerNow()));
+  };
+
+  const now = onlineServerNow();
+  if (pickRevealPhase === "intro") {
+    const startAt = Number(reveal.introStartedAt) || now;
+    const duration = Math.max(0, Number(reveal.introDurationMs) || (reveal.type === "lottery" ? 1050 : 2000));
+    const revealAt = startAt + duration;
+    const card = $("pickRevealCard");
+    if (!card.classList.contains("is-visible")) {
+      if (now < startAt) {
+        scheduleAt("intro", startAt);
+        return;
+      }
+      card.classList.add("is-visible");
+      onlineRevealTimelineStage = "intro-shown";
+    }
+    if (reveal.type !== "lottery" && !$("pickRevealFlipCard").classList.contains("is-flipped")) {
+      if (now < revealAt) scheduleAt("member", revealAt);
+      else {
+        $("pickRevealFlipCard").classList.add("is-flipped");
+        $("pickRevealActionHint").textContent = "発表内容を表示中です。ホストの進行に同期しています。";
+        onlineRevealTimelineStage = "member-shown";
+      }
+    }
+    return;
+  }
+
+  if (reveal.type === "lottery" && reveal.opening && !reveal.winner) {
+    const openingAt = Number(reveal.openingAt) || now;
+    const outcomeAt = Number(reveal.winnerAt) || openingAt + (Number(reveal.openingDurationMs) || 560);
+    if (now < openingAt) {
+      scheduleAt("lottery-opening", openingAt);
+      return;
+    }
+    const winner = reveal.selections.get(Number(reveal.winningEnvelope));
+    if (!winner) return;
+    const buttons = $("lotteryTickets").querySelectorAll("[data-lottery-envelope]");
+    buttons.forEach(button => {
+      button.classList.add("is-opening");
+      button.disabled = true;
+    });
+    if (now < outcomeAt) {
+      scheduleAt("lottery-outcome", outcomeAt);
+      return;
+    }
+    applyOnlineLotteryOpeningVisual(reveal, true);
+    onlineRevealTimelineStage = "lottery-shown";
+    return;
+  }
+
+  clearOnlineRevealTimeline();
 }
 
 function clearOnlineGuestRebidFallback() {
@@ -3624,6 +3829,13 @@ function serializeOnlineReveal(reveal) {
     selections: reveal.selections ? [...reveal.selections.entries()] : [],
     opened: reveal.opened ? [...reveal.opened] : [],
     opening: Boolean(reveal.opening),
+    introStartedAt: Number(reveal.introStartedAt) || 0,
+    introDurationMs: Number(reveal.introDurationMs) || 0,
+    revealedAt: Number(reveal.revealedAt) || 0,
+    nextRevealAt: Number(reveal.nextRevealAt) || 0,
+    openingAt: Number(reveal.openingAt) || 0,
+    openingDurationMs: Number(reveal.openingDurationMs) || 0,
+    winnerAt: Number(reveal.winnerAt) || 0,
     revealing: Boolean(reveal.revealing),
     hostOpenConfirmed: Boolean(reveal.hostOpenConfirmed),
     winner: reveal.winner || null
@@ -3778,6 +3990,7 @@ function renderOnlinePickReveal() {
   const reveal = activePickReveal;
   if (!reveal) {
     onlineShownRevealKey = "";
+    clearOnlineRevealTimeline();
     $("pickRevealNext").hidden = false;
     $("pickReveal").hidden = true;
     return;
@@ -3809,30 +4022,53 @@ function renderOnlinePickReveal() {
   if (isNewReveal) {
     $("pickRevealFlipCard").classList.remove("is-flipped");
     card.classList.remove("is-visible");
-    void card.offsetWidth;
-    card.classList.add("is-visible");
+    if (activeMode === "online") {
+      onlineRevealTimelineStage = "";
+    } else {
+      void card.offsetWidth;
+      card.classList.add("is-visible");
+    }
   }
-  $("pickRevealFlipCard").classList.toggle("is-flipped", pickRevealPhase === "revealed");
+  const syncedMemberRevealDue = activeMode === "online" && pickRevealPhase === "intro" &&
+    reveal.type !== "lottery" && Number(reveal.introStartedAt) > 0 &&
+    onlineServerNow() >= Number(reveal.introStartedAt) + (Number(reveal.introDurationMs) || 2000);
+  $("pickRevealFlipCard").classList.toggle("is-flipped", pickRevealPhase === "revealed" || syncedMemberRevealDue);
 
   if (isLottery) {
-    renderLotteryTickets(reveal);
+    if (isNewReveal || $("lotteryTickets").querySelectorAll("[data-lottery-envelope]").length !== reveal.envelopes.length) {
+      renderLotteryTickets(reveal);
+    }
     reveal.selections.forEach((team, envelope) => {
       const button = [...$("lotteryTickets").querySelectorAll("[data-lottery-envelope]")]
         .find(item => Number(item.dataset.lotteryEnvelope) === Number(envelope));
       if (!button) return;
       button.classList.add("is-chosen", "is-selected");
       button.querySelector(".lottery-envelope-hint").textContent = "選択済み";
-      if (reveal.winner || reveal.opening) {
-        const won = Number(envelope) === Number(reveal.winningEnvelope);
-        const result = button.querySelector(".lottery-envelope-result");
+    });
+    const now = onlineServerNow();
+    const openingHasStarted = reveal.opening && (!Number(reveal.openingAt) || now >= Number(reveal.openingAt));
+    const syncedOutcomeDue = reveal.opening && Number(reveal.winnerAt) > 0 && now >= Number(reveal.winnerAt);
+    [...$("lotteryTickets").querySelectorAll("[data-lottery-envelope]")].forEach(button => {
+      const envelope = Number(button.dataset.lotteryEnvelope);
+      const team = reveal.selections.get(envelope);
+      const selected = Boolean(team);
+      const won = envelope === Number(reveal.winningEnvelope);
+      const outcomeVisible = Boolean(reveal.winner || syncedOutcomeDue);
+      const result = button.querySelector(".lottery-envelope-result");
+      button.classList.toggle("is-chosen", selected);
+      button.classList.toggle("is-selected", selected);
+      button.classList.toggle("is-opening", Boolean(openingHasStarted && !outcomeVisible));
+      button.classList.toggle("is-open", outcomeVisible);
+      button.classList.toggle("is-winner", Boolean(outcomeVisible && won));
+      button.classList.toggle("is-loser", Boolean(outcomeVisible && !won));
+      result.classList.toggle("is-winner", Boolean(outcomeVisible && won));
+      result.classList.toggle("is-loser", Boolean(outcomeVisible && !won));
+      button.querySelector(".lottery-envelope-hint").textContent = selected ? "選択済み" : "封筒を選ぶ";
+      if (selected) button.setAttribute("aria-label", `封筒 ${envelope + 1}は選択済み。開示まで結果は伏せられます`);
+      if (team && (reveal.winner || reveal.opening)) {
         result.querySelector("strong").textContent = displayTeamName(team);
         result.querySelector("small").textContent = won ? "交渉権獲得" : "再指名へ";
         button.style.setProperty("--lottery-team-color", teamColorPalette[Math.max(0, teamNames.indexOf(team)) % teamColorPalette.length]);
-        button.classList.add(reveal.opening ? "is-opening" : "is-open");
-        if (reveal.winner) {
-          button.classList.add(won ? "is-winner" : "is-loser");
-          result.classList.add(won ? "is-winner" : "is-loser");
-        }
       }
     });
     updateLotteryProgress();
@@ -3851,6 +4087,7 @@ function renderOnlinePickReveal() {
         : "指名の発表は全員の画面に同期されます。";
     updateOnlineRevealConfirmation();
   }
+  scheduleOnlineRevealVisualTimeline();
 }
 
 function applyOnlineGameState(state) {
@@ -3892,7 +4129,7 @@ function applyOnlineGameState(state) {
     renderNominations();
     renderOnlinePickReveal();
     renderDraft();
-    renderCandidates();
+    if ($("pickReveal").hidden) renderCandidates();
     renderOnlineSyncDebug();
     return;
   }
@@ -4014,7 +4251,7 @@ function applyOnlineGameState(state) {
     renderNominations();
     renderOnlinePickReveal();
     renderDraft();
-    renderCandidates();
+    if ($("pickReveal").hidden) renderCandidates();
     renderSucceeded = true;
     onlineLastRenderError = "";
     if (Number.isFinite(incomingRevision)) {
@@ -4053,17 +4290,27 @@ function resumeOnlineHostProgress() {
       scheduleRevealAutoAdvance(onlineRevealAutoAdvanceDelay(activePickReveal));
       return;
     }
-    if (activePickReveal.revealing || activePickReveal.opening) {
+    if (activePickReveal.opening) {
+      const winnerAt = Number(activePickReveal.winnerAt) || onlineServerNow() + 560;
+      pickRevealTimer = window.setTimeout(() => {
+        pickRevealTimer = null;
+        completeLotteryReveal(activePickReveal);
+      }, Math.max(0, winnerAt - onlineServerNow()));
+    } else if (activePickReveal.revealing) {
       pickRevealTimer = window.setTimeout(() => revealLotteryResults(activePickReveal), 350);
     } else if (pickRevealPhase === "intro") {
-      pickRevealTimer = window.setTimeout(revealPickCard, 450);
+      const introDeadline = (Number(activePickReveal.introStartedAt) || onlineServerNow()) +
+        (Number(activePickReveal.introDurationMs) || 1050);
+      pickRevealTimer = window.setTimeout(revealPickCard, Math.max(0, introDeadline - onlineServerNow()));
     } else {
       scheduleAINextLotteryEnvelope();
     }
     return;
   }
   if (pickRevealPhase === "intro") {
-    pickRevealTimer = window.setTimeout(revealPickCard, 2000);
+    const introDeadline = (Number(activePickReveal.introStartedAt) || onlineServerNow()) +
+      (Number(activePickReveal.introDurationMs) || 2000);
+    pickRevealTimer = window.setTimeout(revealPickCard, Math.max(0, introDeadline - onlineServerNow()));
   } else if (pickRevealPhase === "revealed") {
     if (activeMode === "online") {
       scheduleRevealAutoAdvance(onlineRevealAutoAdvanceDelay());
@@ -4084,7 +4331,7 @@ function submitOnlineConfirmation() {
   onlineActionPending = true;
   renderDraft();
   renderOnlinePickReveal();
-  renderCandidates();
+  if ($("pickReveal").hidden) renderCandidates();
 
   const confirmationRef = onlineRoomRef.child(`confirmations/${onlineUid}`);
   const confirmationId = confirmationRef.push().key;
@@ -5092,76 +5339,98 @@ function revealLotteryResults(reveal) {
   if (activeMode === "online" && (!onlineIsHost || !reveal.hostOpenConfirmed)) return;
   pickRevealTimer = null;
   reveal.opening = true;
+  const openingDelay = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 560;
+  if (activeMode === "online") {
+    reveal.openingAt = onlineServerNow() + ONLINE_REVEAL_SYNC_LEAD_MS;
+    reveal.openingDurationMs = openingDelay;
+    reveal.winnerAt = reveal.openingAt + openingDelay;
+  } else {
+    reveal.openingAt = 0;
+    reveal.openingDurationMs = openingDelay;
+    reveal.winnerAt = openingDelay;
+  }
   $("lotteryTurn").textContent = "全員の封筒を一斉に開封！";
   $("lotteryOutcome").textContent = "せーの…！";
 
-  reveal.envelopes.forEach(envelope => {
-    const button = [...$("lotteryTickets").querySelectorAll("[data-lottery-envelope]")]
-      .find(item => Number(item.dataset.lotteryEnvelope) === envelope);
-    const team = reveal.selections.get(envelope);
-    const won = envelope === reveal.winningEnvelope;
-    if (!button || !team) return;
-    const result = button.querySelector(".lottery-envelope-result");
-    result.querySelector("strong").textContent = displayTeamName(team);
-    result.querySelector("small").textContent = won ? "交渉権獲得" : "再指名へ";
-    const teamIndex = Math.max(0, teamNames.indexOf(team));
-    button.style.setProperty("--lottery-team-color", teamColorPalette[teamIndex % teamColorPalette.length]);
-    button.classList.add("is-opening");
-    button.disabled = true;
-  });
-  syncOnlineState();
-
-  const openingDelay = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 560;
-  pickRevealTimer = window.setTimeout(() => {
-    pickRevealTimer = null;
-    if (activePickReveal !== reveal) return;
-    const winner = reveal.selections.get(reveal.winningEnvelope);
-    if (!winner) return;
-
-    reveal.opening = false;
-    reveal.revealing = false;
-    reveal.opened = new Set(reveal.envelopes);
-    reveal.winner = winner;
+  if (activeMode !== "online") {
     reveal.envelopes.forEach(envelope => {
       const button = [...$("lotteryTickets").querySelectorAll("[data-lottery-envelope]")]
         .find(item => Number(item.dataset.lotteryEnvelope) === envelope);
       const team = reveal.selections.get(envelope);
       const won = envelope === reveal.winningEnvelope;
       if (!button || !team) return;
-      button.classList.remove("is-opening");
-      button.classList.add("is-open", won ? "is-winner" : "is-loser");
       const result = button.querySelector(".lottery-envelope-result");
-      result.classList.add(won ? "is-winner" : "is-loser");
-      button.setAttribute("aria-label", won
-        ? `${displayTeamName(team)}が交渉権を獲得`
-        : `${displayTeamName(team)}は再指名へ`);
+      result.querySelector("strong").textContent = displayTeamName(team);
+      result.querySelector("small").textContent = won ? "交渉権獲得" : "再指名へ";
+      const teamIndex = Math.max(0, teamNames.indexOf(team));
+      button.style.setProperty("--lottery-team-color", teamColorPalette[teamIndex % teamColorPalette.length]);
+      button.classList.add("is-opening");
+      button.disabled = true;
     });
+  }
+  syncOnlineState();
+  scheduleOnlineRevealVisualTimeline();
+  const waitForOutcome = activeMode === "online"
+    ? Math.max(0, Number(reveal.winnerAt) - onlineServerNow())
+    : openingDelay;
+  pickRevealTimer = window.setTimeout(() => {
+    pickRevealTimer = null;
+    completeLotteryReveal(reveal);
+  }, waitForOutcome);
+}
 
-    reveal.teams.forEach(losingTeam => {
-      if (losingTeam === winner) return;
-      if (!firstRoundLotteryLosses[losingTeam]) firstRoundLotteryLosses[losingTeam] = [];
-      firstRoundLotteryLosses[losingTeam].push({
-        name: reveal.idol.japaneseName,
-        group: reveal.idol.group,
-        agency: reveal.idol.agency
-      });
+function completeLotteryReveal(reveal) {
+  if (activePickReveal !== reveal || reveal.winner) return;
+  const winner = reveal.selections.get(Number(reveal.winningEnvelope));
+  if (!winner) return;
+
+  reveal.opening = false;
+  reveal.revealing = false;
+  reveal.opened = new Set(reveal.envelopes);
+  reveal.winner = winner;
+  if (activeMode === "online") {
+    reveal.revealedAt = Number(reveal.winnerAt) || onlineServerNow();
+    reveal.nextRevealAt = reveal.revealedAt + onlineRevealAutoAdvanceDelay(reveal);
+  }
+  reveal.opened.forEach(envelope => {
+    const button = [...$("lotteryTickets").querySelectorAll("[data-lottery-envelope]")]
+      .find(item => Number(item.dataset.lotteryEnvelope) === Number(envelope));
+    const team = reveal.selections.get(Number(envelope));
+    const won = Number(envelope) === Number(reveal.winningEnvelope);
+    if (!button || !team) return;
+    button.classList.remove("is-opening");
+    button.classList.add("is-open", won ? "is-winner" : "is-loser");
+    const result = button.querySelector(".lottery-envelope-result");
+    result.classList.add(won ? "is-winner" : "is-loser");
+    button.setAttribute("aria-label", won
+      ? `${displayTeamName(team)}が交渉権を獲得`
+      : `${displayTeamName(team)}は再指名へ`);
+  });
+
+  reveal.teams.forEach(losingTeam => {
+    if (losingTeam === winner) return;
+    if (!firstRoundLotteryLosses[losingTeam]) firstRoundLotteryLosses[losingTeam] = [];
+    firstRoundLotteryLosses[losingTeam].push({
+      name: reveal.idol.japaneseName,
+      group: reveal.idol.group,
+      agency: reveal.idol.agency
     });
-    picks[winner].push(pickRecord(reveal.idol, 1));
-    markPersonDrafted(reveal.idol);
-    if (pendingR1Resolution) {
-      pendingR1Resolution.waiting.delete(winner);
-      pendingR1Resolution.results.push(`${reveal.idol.japaneseName}：${displayTeamName(winner)}が交渉権を獲得`);
-    }
-    renderNominations();
-    renderDraft();
-    renderCandidates();
-    updateLotteryProgress();
-    syncOnlineState();
-    if (activeMode === "online") {
-      updateOnlineRevealConfirmation();
-      scheduleRevealAutoAdvance(onlineRevealAutoAdvanceDelay(reveal));
-    }
-  }, openingDelay);
+  });
+  picks[winner].push(pickRecord(reveal.idol, 1));
+  markPersonDrafted(reveal.idol);
+  if (pendingR1Resolution) {
+    pendingR1Resolution.waiting.delete(winner);
+    pendingR1Resolution.results.push(`${reveal.idol.japaneseName}：${displayTeamName(winner)}が交渉権を獲得`);
+  }
+  renderNominations();
+  renderDraft();
+  if ($("pickReveal").hidden) renderCandidates();
+  updateLotteryProgress();
+  syncOnlineState();
+  if (activeMode === "online") {
+    updateOnlineRevealConfirmation();
+    scheduleRevealAutoAdvance(onlineRevealAutoAdvanceDelay(reveal));
+  }
 }
 
 function skipCurrentPickReveal() {
@@ -5185,6 +5454,7 @@ function showNextPickReveal() {
 
   const reveal = pickRevealQueue.shift();
   if (!reveal) {
+    clearOnlineRevealTimeline();
     pickRevealPhase = "closed";
     activePickReveal = null;
     $("pickReveal").hidden = true;
@@ -5202,9 +5472,21 @@ function showNextPickReveal() {
   if (completedNomination) {
     renderNominations();
     renderDraft();
-    renderCandidates();
+    if ($("pickReveal").hidden) renderCandidates();
   }
   const isLottery = reveal.type === "lottery";
+  const introDelay = window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    ? 80
+    : isLottery ? 1050 : 2000;
+  if (activeMode === "online") {
+    reveal.introStartedAt = onlineServerNow() + ONLINE_REVEAL_SYNC_LEAD_MS;
+    reveal.introDurationMs = introDelay;
+    reveal.revealedAt = 0;
+    reveal.nextRevealAt = 0;
+    reveal.openingAt = 0;
+    reveal.openingDurationMs = 0;
+    reveal.winnerAt = 0;
+  }
   if (isLottery) {
     reveal.opened = new Set();
     reveal.selections = new Map();
@@ -5239,7 +5521,6 @@ function showNextPickReveal() {
   $("lotteryBoard").hidden = !isLottery;
   $("pickRevealNext").disabled = false;
   if (isLottery) {
-    renderLotteryTickets(reveal);
     $("lotteryOutcome").textContent = "全員が封筒を選ぶまで、結果は伏せられます。";
   } else {
     $("lotteryTickets").innerHTML = "";
@@ -5248,8 +5529,10 @@ function showNextPickReveal() {
   $("pickReveal").hidden = false;
   $("pickRevealFlipCard").classList.remove("is-flipped");
   card.classList.remove("is-visible");
-  void card.offsetWidth;
-  card.classList.add("is-visible");
+  if (activeMode !== "online") {
+    void card.offsetWidth;
+    card.classList.add("is-visible");
+  }
   pickRevealPhase = "intro";
   $("pickRevealNext").textContent = isLottery ? "抽選を開始" : "指名を発表";
   $("pickRevealSkip").textContent = "演出をスキップ";
@@ -5261,10 +5544,13 @@ function showNextPickReveal() {
     : "指名チームの発表後、約2秒でメンバーを開示します。内容を確認したら下のボタンで次へ進みます。";
   requestAnimationFrame(() => $("pickRevealNext").focus({ preventScroll: true }));
 
-  const introDelay = window.matchMedia("(prefers-reduced-motion: reduce)").matches
-    ? 80
-    : isLottery ? 1050 : 2000;
-  pickRevealTimer = window.setTimeout(revealPickCard, introDelay);
+  const introDeadline = activeMode === "online"
+    ? (Number(reveal.introStartedAt) || onlineServerNow()) + introDelay
+    : 0;
+  const waitForReveal = activeMode === "online"
+    ? Math.max(0, introDeadline - onlineServerNow())
+    : introDelay;
+  pickRevealTimer = window.setTimeout(revealPickCard, waitForReveal);
   renderOnlinePickReveal();
   syncOnlineState();
 }
@@ -5277,6 +5563,11 @@ function revealPickCard() {
   if (pickRevealPhase !== "intro") return;
 
   pickRevealPhase = "revealed";
+  if (activeMode === "online" && activePickReveal) {
+    activePickReveal.revealedAt = onlineServerNow();
+    const advanceDelay = onlineRevealAutoAdvanceDelay(activePickReveal);
+    activePickReveal.nextRevealAt = advanceDelay ? activePickReveal.revealedAt + advanceDelay : 0;
+  }
   $("pickRevealFlipCard").classList.add("is-flipped");
   $("pickRevealSkip").hidden = true;
   if (activePickReveal?.type === "lottery") {
@@ -6188,6 +6479,40 @@ document.querySelectorAll(".open-draft-history").forEach(button => {
   });
 });
 $("draftHistoryClose").addEventListener("click", () => draftHistoryDialog.close());
+$("draftHistoryList").addEventListener("click", event => {
+  const expandButton = event.target.closest(".draft-history-expand-button");
+  if (expandButton) {
+    const entry = expandButton.closest(".draft-history-entry");
+    if (!entry) return;
+    entry.open = true;
+    entry.classList.add("is-expanded");
+    draftHistoryDialog.classList.add("is-board-expanded");
+    requestAnimationFrame(() => entry.querySelector(".draft-history-return-button")?.focus({ preventScroll: true }));
+    return;
+  }
+
+  if (event.target.closest(".draft-history-return-button")) {
+    const entry = event.target.closest(".draft-history-entry");
+    draftHistoryDialog.classList.remove("is-board-expanded");
+    entry?.classList.remove("is-expanded");
+    requestAnimationFrame(() => entry?.querySelector("summary")?.focus({ preventScroll: true }));
+    return;
+  }
+
+  if (event.target.closest(".draft-history-fullscreen-close")) draftHistoryDialog.close();
+});
+draftHistoryDialog.addEventListener("cancel", event => {
+  const expandedEntry = draftHistoryDialog.querySelector(".draft-history-entry.is-expanded");
+  if (!expandedEntry) return;
+  event.preventDefault();
+  draftHistoryDialog.classList.remove("is-board-expanded");
+  expandedEntry.classList.remove("is-expanded");
+  requestAnimationFrame(() => expandedEntry.querySelector("summary")?.focus({ preventScroll: true }));
+});
+draftHistoryDialog.addEventListener("close", () => {
+  draftHistoryDialog.classList.remove("is-board-expanded");
+  draftHistoryDialog.querySelectorAll(".draft-history-entry.is-expanded").forEach(entry => entry.classList.remove("is-expanded"));
+});
 draftHistoryDialog.addEventListener("click", event => {
   if (event.target === draftHistoryDialog) draftHistoryDialog.close();
 });
