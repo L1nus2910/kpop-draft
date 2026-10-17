@@ -3332,6 +3332,10 @@ select {
   scroll-margin-top: 120px;
 }
 
+#modePanel {
+  scroll-margin-top: 120px;
+}
+
 .recommendation-guide summary::-webkit-details-marker {
   display: none;
 }
