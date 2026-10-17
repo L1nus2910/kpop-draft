@@ -18,9 +18,9 @@
   <meta property="og:description" content="推しでつくる、夢のドラフト。非公式ファン制作のK-POPドラフトゲーム。">
   <meta property="og:url" content="https://l1nus2910.github.io/kpop-draft/">
   <meta name="twitter:card" content="summary">
-  <link rel="stylesheet" href="style.css?v=20261017-draft-history-2">
+  <link rel="stylesheet" href="style.css?v=20261017-history-nav-1">
   <script src="firebase-config.js" defer></script>
-  <script src="app.js?v=20261017-draft-history-2" defer></script>
+  <script src="app.js?v=20261017-history-nav-1" defer></script>
 </head>
 <body>
   <header class="topbar">
@@ -31,6 +31,7 @@
     <nav>
       <a href="#draft">ドラフトルーム</a>
       <a href="#pool">候補一覧</a>
+      <button class="draft-history-nav-button open-draft-history" type="button" aria-haspopup="dialog" aria-controls="draftHistoryDialog">履歴</button>
       <button class="site-info-button" id="siteInfoOpen" type="button" aria-haspopup="dialog" aria-controls="siteInfoDialog">ⓘ サイト情報</button>
     </nav>
     <span class="live-badge"><i></i> DRAFT BOARD</span>
@@ -187,7 +188,6 @@
         </div>
         <div class="final-results-actions">
           <span class="final-results-status">指名完了</span>
-          <button class="button button-secondary open-draft-history" type="button">過去のドラフト履歴</button>
           <button class="button button-secondary" id="shareFinalResultsX" type="button" aria-label="ドラフト結果の画像とハッシュタグ、サイトリンクをXへ共有する">画像付きでX共有</button>
           <button class="button button-primary" id="restartOfflineDraft" type="button" aria-label="現在の設定で再ドラフトを始める" hidden>再ドラフト</button>
           <button class="button button-primary" id="restartOnlineGame" type="button" hidden>同じルームで再ドラフト</button>
@@ -261,7 +261,6 @@
             </div>
             <div class="draft-board-tools">
               <span class="draft-board-count" id="draftBoardCount">0人</span>
-              <button class="draft-board-history-button open-draft-history" type="button" aria-haspopup="dialog" aria-controls="draftHistoryDialog">履歴</button>
               <span class="draft-board-inline-hint">表を左右に動かして全チームを確認</span>
               <button class="draft-board-expand-button" id="draftBoardExpand" type="button" aria-expanded="false" aria-controls="draftBoard">
                 <span aria-hidden="true">⛶</span><span class="draft-board-expand-label">表を広げて見る</span>

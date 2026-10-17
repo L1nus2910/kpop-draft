@@ -5294,12 +5294,13 @@ body::before {
     width: 100%;
     min-width: 0;
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 4px;
     margin-left: 0;
   }
 
   .topbar nav a,
+  .topbar nav .draft-history-nav-button,
   .topbar nav .site-info-button {
     min-width: 0;
     min-height: 42px;
@@ -9588,24 +9589,6 @@ body::before { opacity: .045; }
   .button-secondary { transition-duration: .01ms; }
 }
 
-.draft-board-history-button {
-  min-height: 36px;
-  padding: 7px 11px;
-  border: 1px solid #d9cff3;
-  border-radius: 999px;
-  color: #6545bd;
-  background: linear-gradient(135deg, #fff, #f0f5ff);
-  font: inherit;
-  font-size: 11px;
-  font-weight: 800;
-  white-space: nowrap;
-  cursor: pointer;
-  touch-action: manipulation;
-  -webkit-tap-highlight-color: transparent;
-}
-
-.draft-board-history-button:active { transform: scale(.97); }
-
 .draft-history-dialog {
   width: min(1100px, calc(100vw - 24px));
   max-width: none;
@@ -9730,8 +9713,51 @@ body::before { opacity: .045; }
 .draft-history-results-table .draft-cell-card strong { font-size: 12px; }
 .draft-history-results-table .draft-cell-card > span { font-size: 9px; }
 
+.topbar nav .draft-history-nav-button {
+  min-height: 40px;
+  padding: 9px 13px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  color: #555b78;
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  white-space: nowrap;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transition: color 160ms ease, background 160ms ease;
+}
+
+.topbar nav .draft-history-nav-button:hover {
+  color: #5f3cc2;
+  background: #f0ebff;
+}
+
+@media (max-width: 700px) {
+  .topbar nav .draft-history-nav-button {
+    min-width: 0;
+    min-height: 42px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 7px 4px;
+    font-size: clamp(10px, 2.8vw, 12px);
+    line-height: 1.25;
+    text-align: center;
+  }
+}
+
+@media (max-width: 900px) and (orientation: landscape) and (max-height: 540px) {
+  .topbar nav .draft-history-nav-button {
+    min-height: 36px;
+    padding: 6px 7px;
+    font-size: 11px;
+  }
+}
+
 @media (max-width: 520px) {
-  .draft-board-history-button { min-height: 34px; padding: 6px 9px; font-size: 10px; }
   .draft-history-entry > summary { min-height: 52px; padding: 9px 12px; }
   .draft-history-table-scroll { max-height: 60dvh; }
   .draft-history-results-table th,
