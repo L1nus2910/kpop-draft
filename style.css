@@ -9640,6 +9640,112 @@ body::before { opacity: .045; }
   .button-secondary { transition-duration: .01ms; }
 }
 
+/* App-like surface pass: retain KDraft's violet, pink, and blue palette while
+   using compact proportions, quieter depth, and a light CSS-only paper grain. */
+body {
+  background:
+    radial-gradient(ellipse at 8% 0%, rgba(237, 115, 204, .105), transparent 34rem),
+    radial-gradient(ellipse at 94% 12rem, rgba(72, 168, 229, .105), transparent 36rem),
+    linear-gradient(180deg, #f8f7fc 0%, #f0f1f8 56rem, #f7f7fb 100%);
+}
+
+body::before {
+  background-image: radial-gradient(rgba(102, 79, 164, .1) .65px, transparent .65px);
+  background-size: 20px 20px;
+  opacity: .055;
+}
+
+.page {
+  max-width: 1360px;
+}
+
+.hero.hero-banner {
+  overflow: hidden;
+  border: 1px solid rgba(117, 83, 193, .2);
+  border-radius: clamp(18px, 2vw, 26px);
+  background: linear-gradient(115deg, #f8efff, #eaf5ff);
+  box-shadow: 0 12px 28px rgba(58, 48, 111, .12), 0 2px 5px rgba(58, 48, 111, .06);
+}
+
+.hero-banner-image {
+  width: 100%;
+  height: clamp(170px, 28vw, 390px);
+  border: 0;
+  border-radius: inherit;
+  object-fit: cover;
+  object-position: center 50%;
+  filter: none;
+  box-shadow: none;
+}
+
+.mode-panel.panel,
+.draft-panel.panel,
+.pool-panel.panel,
+.final-results.panel {
+  border-color: #d9d9ec;
+  border-radius: 20px;
+  background: linear-gradient(160deg, rgba(255, 255, 255, .98), rgba(250, 250, 255, .97));
+  box-shadow: 0 10px 26px rgba(43, 39, 90, .065), 0 1px 3px rgba(43, 39, 90, .045);
+  backdrop-filter: none;
+}
+
+.mode-panel.panel {
+  border-top: 3px solid #8154db;
+  background: linear-gradient(160deg, #fff 0%, #fcfbff 72%, #f6faff 100%);
+}
+
+.mode-intro {
+  min-height: clamp(150px, 18vw, 220px);
+  border-color: rgba(255, 255, 255, .28);
+  background:
+    radial-gradient(ellipse at 86% 12%, rgba(91, 191, 241, .28), transparent 32%),
+    radial-gradient(ellipse at 7% 100%, rgba(226, 102, 199, .2), transparent 42%),
+    linear-gradient(118deg, #30265e 0%, #5540a4 54%, #246c9f 100%);
+  box-shadow: 0 8px 20px rgba(54, 43, 117, .12);
+}
+
+.mode-controls,
+.candidate-filter-panel,
+.team-name-settings,
+.online-lobby {
+  border-color: #deddec;
+  background: linear-gradient(145deg, #faf9fe 0%, #f3f4fa 58%, #eef6fb 100%);
+  box-shadow: inset 0 1px rgba(255, 255, 255, .8), 0 4px 12px rgba(50, 47, 98, .035);
+  backdrop-filter: none;
+}
+
+.candidate-toolbar,
+.filter-options {
+  border-color: #e0deeb;
+  background: linear-gradient(145deg, #fff 0%, #fbfaff 100%);
+  box-shadow: 0 2px 8px rgba(50, 47, 98, .035);
+}
+
+.candidate-card {
+  border-color: #d9d9ec;
+  background: linear-gradient(145deg, #fff 0%, #fcfbff 72%, #f5f9ff 100%);
+  box-shadow: 0 4px 12px rgba(43, 39, 90, .055);
+}
+
+.candidate-card:hover {
+  box-shadow: 0 8px 18px rgba(76, 58, 143, .1);
+}
+
+.topbar {
+  background: rgba(253, 252, 255, .98);
+  box-shadow: 0 4px 14px rgba(42, 37, 87, .065);
+  backdrop-filter: none;
+}
+
+@media (max-width: 760px) {
+  .hero-banner-image { height: clamp(150px, 38vw, 230px); }
+  .mode-intro { min-height: 150px; }
+}
+
+@media (max-width: 420px) {
+  .hero-banner-image { height: 150px; }
+}
+
 .draft-history-dialog {
   width: min(1100px, calc(100vw - 24px));
   max-width: none;
