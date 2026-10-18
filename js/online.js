@@ -129,7 +129,14 @@ export class Room {
     }
     if (statusSnap.val() !== "lobby") throw new Error("このルームはすでにドラフトが始まっています。");
     const room = new Room(normalized, uid, false);
-    await room.ref.child(`joinRequests/${uid}`).set({ name: normalizeName(name), createdAt: Date.now() });
+    const requestRef = room.ref.child(`joinRequests/${uid}`);
+    // 前回の申請（満員・締め切りの返事など）が残っていると新しく出せないので、先に消す
+    if ((await requestRef.once("value").catch(() => null))?.exists()) await requestRef.remove().catch(() => {});
+    await requestRef.set({ name: normalizeName(name), createdAt: Date.now() }).catch(error => {
+      throw new Error(String(error?.code || error?.message || "").includes("PERMISSION")
+        ? "このルームには参加できませんでした。ドラフトが始まったか、ルームが終了した可能性があります。"
+        : (error?.message || "参加できませんでした。"));
+    });
     return { room, rejoined: false };
   }
 
@@ -311,15 +318,30 @@ export class Room {
 /** 公開中のルーム一覧を見る。戻り値は購読をやめる関数 */
 export async function watchPublicRooms(onList, onError) {
   await identity();
-  const ref = window.firebase.database().ref("lobby");
-  const cb = snap => {
+  const db = window.firebase.database();
+  const ref = db.ref("lobby");
+  const statusCache = new Map(); // code -> { status, at }
+  let latest = 0;
+  // ルームが本当に参加者を待っているか確かめる。消えたルームの掲載は片付ける
+  const roomStatus = async code => {
+    const cached = statusCache.get(code);
+    if (cached && Date.now() - cached.at < 20000) return cached.status;
+    const status = (await db.ref(`rooms/${code}/status`).once("value").catch(() => null))?.val() ?? null;
+    statusCache.set(code, { status, at: Date.now() });
+    if (status === null) db.ref(`lobby/${code}`).remove().catch(() => {});
+    return status;
+  };
+  const cb = async snap => {
+    const run = ++latest;
     const now = Date.now();
-    const list = Object.entries(snap.val() || {})
+    const candidates = Object.entries(snap.val() || {})
       .map(([code, room]) => ({ code, ...room }))
       .filter(room => /^[A-Z0-9]{8}$/.test(room.code) && now - (Number(room.updatedAt) || 0) < 3 * 60 * 60 * 1000)
       .sort((a, b) => (Number(b.createdAt) || 0) - (Number(a.createdAt) || 0))
       .slice(0, 30);
-    onList(list);
+    const statuses = await Promise.all(candidates.map(room => roomStatus(room.code)));
+    if (run !== latest) return;
+    onList(candidates.filter((room, i) => statuses[i] === "lobby"));
   };
   ref.on("value", cb, error => onError?.(error));
   return () => ref.off("value", cb);
