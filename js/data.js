@@ -860,6 +860,19 @@ function normalizeSearchText(value) {
     );
 }
 
+/**
+ * 表記ゆれをならした検索用の文字（伸ばし棒・小さい文字・「ッ」・ヴ を区別しない）
+ * 例：ベービーモンスター／ベイビーモンスター／ベビーモンスター → 同じ文字になる
+ */
+function looseSearchText(value) {
+  return normalizeSearchText(value)
+    .replace(/[ー〜~'’:!*()・]/g, "")
+    .replace(/ゔぁ/g, "ば").replace(/ゔぃ/g, "び").replace(/ゔぇ/g, "べ").replace(/ゔぉ/g, "ぼ").replace(/ゔ/g, "ぶ")
+    .replace(/[ぁぃぅぇぉゃゅょゎ]/g, c => ({ ぁ: "あ", ぃ: "い", ぅ: "う", ぇ: "え", ぉ: "お", ゃ: "や", ゅ: "ゆ", ょ: "よ", ゎ: "わ" })[c])
+    .replace(/っ/g, "")
+    .replace(/([えけげせぜてでねへべぺめれ])い/g, "$1"); // ベイビー／ベビー、エイ／エー をならす
+}
+
 const agencyByGroup = {
   "Girls' Generation": "SM Entertainment",
   BLACKPINK: "YG Entertainment",
@@ -1149,6 +1162,76 @@ const groupAliases = {
   "A2O LITE": "エーツーオーライト 에이투오라이트"
 };
 
+// 世間でよく使われる呼び方を足す（略称・表記ゆれ・漢字の読み）
+const extraGroupAliases = {
+  "Girls' Generation": "ソシ 소시 SNSD",
+  "BLACKPINK": "ブラピン 블핑",
+  "TWICE": "トワイス トゥワイス",
+  "Red Velvet": "レドベ レッベル レッドベルベット",
+  "I.O.I": "アイオーアイ IOI",
+  "ITZY": "イッチ イッジ",
+  "aespa": "エスパ エスパー",
+  "IVE": "アイヴ アイブ",
+  "LE SSERAFIM": "ルセラフィム ルセラ 르세라 LESSERAFIM",
+  "IZ*ONE": "アイズワン アイズ",
+  "ILLIT": "アイリット イリット 아일릿",
+  "KISS OF LIFE": "キスオブライフ キオプ KIOF",
+  "Apink": "エーピンク エイピンク",
+  "MAMAMOO": "ママム ママムー",
+  "GFRIEND": "ヨチン ジーフレンド ヨジャチング",
+  "OH MY GIRL": "オーマイガール オマイガール オマゴル OMG",
+  "WJSN": "宇宙少女 うちゅうしょうじょ ウジュソニョ ウチュソニョ",
+  "Dreamcatcher": "ドリームキャッチャー ドリキャ",
+  "VIVIZ": "ビビジ ヴィヴィズ",
+  "STAYC": "ステイシー ステシ",
+  "i-dle": "アイドゥル ジーアイドゥル ヨジャアイドゥル アイドル 여자아이들 GIDLE",
+  "NMIXX": "エンミックス エンミク",
+  "Kep1er": "ケプラー ケプ",
+  "NiziU": "ニジュー ニジユー",
+  "XG": "エックスジー",
+  "QWER": "キューダブリューイーアール クワー",
+  "ARTMS": "アルテミス",
+  "tripleS": "トリプルエス トリエス",
+  "YOUNG POSSE": "ヤングポッセ ヨンパシ",
+  "KATSEYE": "キャッツアイ キャツアイ",
+  "BABYMONSTER": "ベビーモンスター ベイビーモンスター ベービーモンスター ベビモン ベモン",
+  "UNIS": "ユニス",
+  "RESCENE": "リセンヌ リセン",
+  "MEOVV": "ミヤオ ミャオ",
+  "izna": "イズナ",
+  "SAY MY NAME": "セイマイネーム セマネ",
+  "Hearts2Hearts": "ハーツトゥハーツ ハツハツ ハーツツーハーツ",
+  "KiiiKiii": "キキ キーキー",
+  "2NE1": "トゥエニーワン トゥエニワン",
+  "Wonder Girls": "ワンダーガールズ ワンガ",
+  "SISTAR": "シスター",
+  "T-ARA": "ティアラ ティーアラ",
+  "f(x)": "エフエックス",
+  "4Minute": "フォーミニッツ フォーミニット ポミニッ",
+  "Girl's Day": "ガールズデイ ガールズデー",
+  "Brown Eyed Girls": "ブラウンアイドガールズ ブアゴ",
+  "Miss A": "ミスエー ミスA",
+  "LOONA": "今月の少女 こんげつのしょうじょ イダレソニョ ルーナ ルナ",
+  "Weki Meki": "ウィキミキ",
+  "FIFTY FIFTY": "フィフティフィフティ フィフティ",
+  "NewJeans": "ニュージーンズ ニュジ ニュジンス 뉴진스",
+  "fromis_9": "プロミスナイン プロミス",
+  "Baby DONT Cry": "ベイビードントクライ ベビドン",
+  "After School": "アフタースクール アフスク",
+  "Lovelyz": "ラブリーズ ラブリズ",
+  "MOMOLAND": "モモランド",
+  "EVERGLOW": "エバーグロウ エバグロ エバーグロー",
+  "Weeekly": "ウィークリー",
+  "Billlie": "ビリー",
+  "H1-KEY": "ハイキー",
+  "PURPLE KISS": "パープルキス パプキス",
+  "CLASS:y": "クラッシー クラシー"
+};
+Object.entries(extraGroupAliases).forEach(([group, text]) => {
+  const merged = new Set(`${groupAliases[group] || ""} ${text}`.split(" ").filter(Boolean));
+  groupAliases[group] = [...merged].join(" ");
+});
+
 // 検索用の文字列（ひらがな・カタカナ・英字・ハングルを正規化済み）
 // name … メンバー名（部分一致）／ other … グループ・事務所・国籍（グループの別表記は前方一致）
 const PREFIX_ONLY = "\u0001";
@@ -1158,7 +1241,10 @@ const candidateSearchTextById = new Map(idols.map(idol => [idol.id, {
   other: [
     ...[idol.group, idol.nationality, idol.agency, agencyFilterName(idol.agency)].map(normalizeSearchText),
     ...String(groupAliases[idol.group] || "").split(" ").filter(Boolean).map(alias => PREFIX_ONLY + normalizeSearchText(alias))
-  ]
+  ],
+  // 表記ゆれ用（メンバー名・グループの別表記）
+  looseName: [idol.japaneseName, idol.japaneseSearchName].filter(Boolean).map(looseSearchText),
+  looseGroup: [idol.group, ...String(groupAliases[idol.group] || "").split(" ").filter(Boolean)].map(looseSearchText)
 }]));
 
 /** 検索の当てはまり具合：0 名前の先頭一致／1 名前の部分一致／2 グループなど／-1 当てはまらない */
@@ -1168,6 +1254,12 @@ function searchRank(idolId, query) {
   if (text.name.some(v => v.startsWith(query))) return 0;
   if (text.name.some(v => v.includes(query))) return 1;
   if (text.other.some(v => v.startsWith(PREFIX_ONLY) ? v.slice(1).startsWith(query) : v.includes(query))) return 2;
+  // 表記ゆれ（ベービーモンスター・アイリト など）。短すぎる入力は誤ヒットが多いので2文字から
+  const loose = looseSearchText(query);
+  if (loose.length >= 2) {
+    if (text.looseName.some(v => v.startsWith(loose))) return 1;
+    if (text.looseGroup.some(v => v.startsWith(loose))) return 2;
+  }
   return -1;
 }
 
@@ -1731,5 +1823,5 @@ idols.forEach(idol => {
 export {
   groups, idols, normalizeSearchText, agencyFilterName, fullAgencyName,
   shortAgencyName, memberAffiliationLabel, memberAffiliationTitle,
-  candidateSearchTextById, searchRank, popularityRankingSources
+  candidateSearchTextById, searchRank, popularityRankingSources, groupAliases, looseSearchText
 };

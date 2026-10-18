@@ -5,7 +5,7 @@
 // polls/total/{kind}/{period}        … 総投票数
 //   kind   … "g"（グループ）/ "m"（メンバー）
 //   period … "d{日}"・"w{週}"・"m{月}"・"all"（日・週・月は日本時間で数える）
-import { groups, idols, normalizeSearchText, searchRank, agencyFilterName, shortAgencyName, fullAgencyName } from "./data.js";
+import { groups, idols, normalizeSearchText, searchRank, shortAgencyName, fullAgencyName, groupAliases, looseSearchText, agencyFilterName } from "./data.js";
 import { identity, onlineConfigured } from "./online.js";
 import { $, esc, icon, toast } from "./ui.js";
 
@@ -50,8 +50,16 @@ const groupItems = groups.map(group => {
   return {
     key: encodeKey(group.name),
     name: group.name,
+    f: {
+      generation: [group.generation].filter(Boolean),
+      agency: [agencyFilterName(fullAgencyName(group.name, members[0]?.agency))].filter(v => v && v !== "未確認"),
+      nationality: [...new Set(members.flatMap(m => String(m.nationality || "").split("・")))].filter(v => v && v !== "未公表")
+    },
     sub: [agency, group.generation].filter(Boolean).join("・"),
-    search: normalizeSearchText([group.name, agency, ...members.map(m => m.japaneseName)].join(" ")),
+    // 0：グループ名・別表記（カタカナ・ひらがな・ハングル）／1：事務所・メンバー名
+    names: [group.name, ...String(groupAliases[group.name] || "").split(" ").filter(Boolean)].map(normalizeSearchText),
+    loose: [group.name, ...String(groupAliases[group.name] || "").split(" ").filter(Boolean)].map(looseSearchText),
+    others: [agency, fullAgencyName(group.name, members[0]?.agency), ...members.flatMap(m => [m.name, m.japaneseName, m.koreanName])].filter(Boolean).map(normalizeSearchText),
     order: -Math.max(0, ...members.map(m => m.popularitySortScore || 0)) // 票が同じ時は人気の目安順
   };
 });
@@ -65,6 +73,12 @@ const memberItems = (() => {
   });
   return [...byPerson.values()].map(({ idol, groups: list }) => ({
     key: encodeKey(idol.personKey),
+    f: {
+      generation: [idol.generation].filter(Boolean),
+      nationality: String(idol.nationality || "").split("・").filter(v => v && v !== "未公表"),
+      agency: [agencyFilterName(fullAgencyName(idol.group, idol.agency))].filter(v => v && v !== "未確認"),
+      group: [...new Set(list)]
+    },
     id: idol.id,
     name: idol.japaneseName,
     sub: [...new Set(list)].join("・"),
@@ -74,11 +88,21 @@ const memberItems = (() => {
 })();
 const ITEMS = { g: groupItems, m: memberItems };
 
+// 絞り込みの項目（メンバーとグループで使える項目が違う）
+const FILTER_DEFS = {
+  m: [["generation", "世代"], ["nationality", "国籍"], ["agency", "事務所"], ["group", "グループ"]],
+  g: [["generation", "世代"], ["agency", "事務所"]]
+};
+const emptyFilters = () => ({ generation: "", nationality: "", agency: "", group: "" });
+const matchesFilters = (item, filters, ignore = "") =>
+  Object.entries(filters).every(([key, value]) => key === ignore || !value || (item.f[key] || []).includes(value));
+
 // ---------------------------------------------------------------- 状態
 const P = {
   kind: "m",
   period: "d",
   query: "",
+  filters: emptyFilters(),
   limit: 30,
   tally: {},      // item -> 票数（表示中の kind・期間）
   total: 0,
@@ -191,7 +215,7 @@ async function vote(kind, itemKey) {
 
 // ---------------------------------------------------------------- 画面
 function filteredItems() {
-  const items = ITEMS[P.kind];
+  const items = ITEMS[P.kind].filter(item => matchesFilters(item, P.filters));
   const q = normalizeSearchText(P.query.trim());
   let list = items;
   if (q) {
@@ -201,7 +225,18 @@ function filteredItems() {
       list.sort((a, b) => (rank.get(a.key) - rank.get(b.key)) || ((Number(P.tally[b.key]) || 0) - (Number(P.tally[a.key]) || 0)));
       return list;
     }
-    list = items.filter(item => item.search.includes(q));
+    const rank = new Map();
+    list = items.filter(item => {
+      const lq = looseSearchText(q);
+      const r = item.names.some(v => v.startsWith(q)) ? 0
+        : (lq.length >= 2 && item.loose.some(v => v.startsWith(lq))) ? 0
+        : item.names.some(v => v.includes(q)) ? 1
+        : item.others.some(v => v.includes(q)) ? 2 : -1;
+      if (r < 0) return false;
+      rank.set(item.key, r);
+      return true;
+    });
+    return list.sort((a, b) => (rank.get(a.key) - rank.get(b.key)) || ((Number(P.tally[b.key]) || 0) - (Number(P.tally[a.key]) || 0)) || (a.order - b.order));
   }
   return list.slice().sort((a, b) => ((Number(P.tally[b.key]) || 0) - (Number(P.tally[a.key]) || 0)) || (a.order - b.order) || a.name.localeCompare(b.name, "ja"));
 }
@@ -227,13 +262,34 @@ function draw() {
       </div>
       <div class="poll-head" id="pollHead"></div>
       <label class="search poll-search">${icon("search")}<span class="sr-only">探す</span>
-        <input class="input" type="search" id="pollSearch" value="${esc(P.query)}" placeholder="${P.kind === "m" ? "メンバー名・グループで探す（例：ウォニョン）" : "グループ名で探す（例：IVE）"}" autocomplete="off" enterkeyhint="search">
+        <input class="input" type="search" id="pollSearch" value="${esc(P.query)}" placeholder="${P.kind === "m" ? "メンバー名・グループで探す（例：ウォニョン）" : "グループ名で探す（例：アイヴ／IVE／아이브）"}" autocomplete="off" enterkeyhint="search">
       </label>
+      <div class="filter-grid poll-filters" role="group" aria-label="絞り込み" id="pollFilters"></div>
       <ol class="poll-list" id="pollList"></ol>
       <div class="poll-more" id="pollMore"></div>
     </div>`;
   drawHead(info);
+  drawFilters();
   drawList();
+}
+
+/** 絞り込みの選択肢（ほかの条件で絞った中にある値だけ・人数つき） */
+function drawFilters() {
+  const box = viewEl?.querySelector("#pollFilters");
+  if (!box) return;
+  const defs = FILTER_DEFS[P.kind];
+  box.style.gridTemplateColumns = `repeat(${defs.length}, minmax(0, 1fr))`;
+  box.innerHTML = defs.map(([key, label]) => {
+    const counts = new Map();
+    ITEMS[P.kind].filter(item => matchesFilters(item, P.filters, key)).forEach(item => (item.f[key] || []).forEach(v => counts.set(v, (counts.get(v) || 0) + 1)));
+    const values = [...counts.keys()].sort((a, b) => (key === "generation" ? a.localeCompare(b, "ja") : (counts.get(b) - counts.get(a)) || a.localeCompare(b, "ja")));
+    const current = P.filters[key];
+    if (current && !values.includes(current)) values.unshift(current);
+    const show = v => (key === "agency" ? shortAgencyName(v) || v : v);
+    return `<label class="filter-chip"><span class="sr-only">${label}</span><select data-poll-filter="${key}" class="${current ? "is-set" : ""}">
+      <option value="">${label}：すべて</option>${values.map(v => `<option value="${esc(v)}" ${v === current ? "selected" : ""}>${esc(show(v))}（${counts.get(v) || 0}）</option>`).join("")}
+    </select></label>`;
+  }).join("") + (Object.values(P.filters).some(Boolean) ? `<button type="button" class="btn btn-ghost btn-sm poll-filter-clear" data-poll-clear>条件をクリア</button>` : "");
 }
 
 function drawHead(info = periodInfo(serverNow())) {
@@ -252,7 +308,8 @@ function drawList() {
   drawHead();
   if (!P.ready && !P.error) { list.innerHTML = `<li class="poll-empty">読み込んでいます…</li>`; viewEl.querySelector("#pollMore").innerHTML = ""; return; }
   const items = filteredItems();
-  const shown = P.query.trim() ? items : items.slice(0, P.limit);
+  const narrowed = P.query.trim() || Object.values(P.filters).some(Boolean);
+  const shown = narrowed ? items : items.slice(0, P.limit);
   const max = Math.max(1, ...items.map(item => Number(P.tally[item.key]) || 0));
   const left = remaining(P.kind);
   let rank = 0, prevVotes = null, index = 0;
@@ -291,7 +348,7 @@ export function onVoteClick(event) {
   const seg = event.target.closest("[data-poll-seg] button[data-value]");
   if (seg) {
     const name = seg.closest("[data-poll-seg]").dataset.pollSeg;
-    if (name === "kind") { P.kind = seg.dataset.value; P.query = ""; P.limit = 30; }
+    if (name === "kind") { P.kind = seg.dataset.value; P.query = ""; P.filters = emptyFilters(); P.limit = 30; }
     else P.period = seg.dataset.value;
     draw();
     subscribe();
@@ -304,7 +361,17 @@ export function onVoteClick(event) {
     return true;
   }
   if (event.target.closest("[data-poll-more]")) { P.limit += 30; drawList(); return true; }
+  if (event.target.closest("[data-poll-clear]")) { P.filters = emptyFilters(); P.limit = 30; drawFilters(); drawList(); return true; }
   return false;
+}
+export function onVoteChange(event) {
+  const key = event.target.dataset?.pollFilter;
+  if (!key) return false;
+  P.filters[key] = event.target.value;
+  P.limit = 30;
+  drawFilters();
+  drawList();
+  return true;
 }
 export function onVoteInput(event) {
   if (event.target.id !== "pollSearch") return false;
