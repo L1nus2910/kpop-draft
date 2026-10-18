@@ -1,5 +1,5 @@
 // KDraft — 画面と進行
-import { idols, normalizeSearchText, agencyFilterName, searchRank, popularityRankingSources } from "./data.js";
+import { idols, normalizeSearchText, agencyFilterName, searchRank, popularityRankingSources, shortAgencyName } from "./data.js";
 import * as E from "./engine.js";
 import { chooseAIIdol, preferredPersonCandidates } from "./ai.js";
 import { store, HISTORY_LIMIT } from "./store.js";
@@ -43,8 +43,10 @@ const S = {
     ...DEFAULT_SETUP,
     ...(prefs.setup || {}),
     playerName: prefs.playerName || "あなた",
-    teamNames: Array.isArray(prefs.teamNames) ? prefs.teamNames : LOCAL_TEAM_NAMES.slice()
+    teamNames: Array.isArray(prefs.teamNames) ? prefs.teamNames : LOCAL_TEAM_NAMES.slice(),
+    limits: E.normalizeLimits(prefs.setup?.limits)
   },
+  limitsOpen: "",
   speed: prefs.speed === "fast" ? "fast" : "normal",
   online: null, // { room, rev, acks, pending, hostRev, status, players, settings, joinState, error }
   lastSeq: 0,
@@ -58,10 +60,12 @@ function savePrefs() {
     playerName: S.setup.playerName,
     teamNames: S.setup.teamNames,
     onlineName: S.onlineName || prefs.onlineName || "",
-    setup: { aiCount: S.setup.aiCount, localCount: S.setup.localCount, pickLimit: S.setup.pickLimit, orderMode: S.setup.orderMode, startOrder: S.setup.startOrder }
+    roomPublic: Boolean(S.roomPublic),
+    setup: { aiCount: S.setup.aiCount, localCount: S.setup.localCount, pickLimit: S.setup.pickLimit, orderMode: S.setup.orderMode, startOrder: S.setup.startOrder, limits: S.setup.limits }
   });
 }
 S.onlineName = prefs.onlineName || "";
+S.roomPublic = prefs.roomPublic === true;
 
 const now = () => (S.online?.room ? S.online.room.now() : Date.now());
 const isOnline = () => S.draft?.mode === "online";
@@ -130,6 +134,7 @@ function onRoute() {
   if (changed && !["history", "about"].includes(S.route.name)) S.returnTo = location.hash && S.route.name ? `${S.route.name}${S.route.param ? `/${S.route.param}` : ""}` : "";
   if (changed) $$('#toasts [data-slot="pick"]').forEach(el => el.remove());
   S.route = route;
+  if (!(route.name === "setup" && route.param === "online")) stopPublicRooms();
   document.body.dataset.view = route.name;
   if (route.name !== "draft") { $("#dockMount").innerHTML = ""; document.body.classList.remove("has-dock"); }
   closeBoardFull();
@@ -329,6 +334,49 @@ function rulesFields(settings, { disabled = false } = {}) {
       ${segmented("orderMode", [["snake", "ウェーバー", "前の巡の逆順"], ["fixed", "毎巡同じ順番", "チーム順で固定"]], settings.orderMode, { disabled, label: "2巡目以降の指名順" })}</div>`;
 }
 
+// ---------------------------------------------------------------- 縛り（候補の条件）
+const LIMIT_GROUPS = (() => {
+  const count = (fn) => {
+    const map = new Map();
+    idols.forEach(idol => fn(idol).forEach(value => { if (value && value !== "未公表" && value !== "未確認") map.set(value, (map.get(value) || 0) + 1); }));
+    return [...map.entries()];
+  };
+  const generations = count(i => [i.generation]).sort((a, b) => a[0].localeCompare(b[0], "ja"));
+  const nationalities = count(i => String(i.nationality || "").split("・")).sort((a, b) => b[1] - a[1]);
+  const agencies = count(i => [agencyFilterName(i.agency)]).sort((a, b) => b[1] - a[1]);
+  return [
+    { key: "generations", label: "世代", items: generations, show: 99 },
+    { key: "nationalities", label: "国籍", items: nationalities, show: 8 },
+    { key: "agencies", label: "事務所", items: agencies, show: 12 }
+  ];
+})();
+
+function limitsFields(limits, { disabled = false, teamCount = 0, pickLimit = 5 } = {}) {
+  const total = E.eligibleCount(limits);
+  const need = teamCount * pickLimit;
+  const short = teamCount > 0 && total < need;
+  const any = E.hasLimits(limits);
+  return `<div class="limits ${disabled ? "is-disabled" : ""}">
+    <p class="field-hint">選ぶと、その条件に合うメンバーだけが候補になります。何も選ばなければ全員が候補です。同じ項目の中で複数選ぶと「どれか」に合う人が対象です。</p>
+    ${LIMIT_GROUPS.map(group => {
+      const selected = new Set(limits?.[group.key] || []);
+      const open = S.limitsOpen === group.key;
+      const items = open ? group.items : group.items.filter(([value], i) => i < group.show || selected.has(value));
+      const hidden = group.items.length - items.length;
+      return `<div class="limit-group"><span class="field-label">${esc(group.label)}${selected.size ? `<b>${selected.size}件</b>` : ""}</span>
+        <div class="limit-chips">${items.map(([value, n]) => `<button type="button" class="limit-chip" data-action="toggle-limit" data-key="${group.key}" data-value="${esc(value)}" aria-pressed="${selected.has(value)}" ${disabled ? "disabled" : ""}>${esc(group.key === "agencies" ? shortAgencyName(value) : value)}<small>${n}</small></button>`).join("")}
+          ${hidden > 0 ? `<button type="button" class="limit-more" data-action="limits-more" data-key="${group.key}">ほか${hidden}件を表示</button>` : open && group.items.length > group.show ? `<button type="button" class="limit-more" data-action="limits-more" data-key="">たたむ</button>` : ""}
+        </div></div>`;
+    }).join("")}
+    <div class="limit-summary ${short ? "is-short" : ""}">
+      <span>${any ? `縛り：<strong>${esc(E.limitsLabel(limits))}</strong>` : "縛りなし（全員が候補）"}</span>
+      <span>候補 <strong>${total}</strong>人${teamCount ? `／必要 ${need}人` : ""}</span>
+      ${any && !disabled ? `<button type="button" class="btn btn-ghost btn-sm" data-action="limits-clear">縛りを外す</button>` : ""}
+    </div>
+    ${short ? `<p class="notice notice-warn">候補が足りません。${need}人（${teamCount}チーム×${pickLimit}人）以上になるよう、条件を増やすか指名人数を減らしてください。</p>` : ""}
+  </div>`;
+}
+
 const SETUP_COPY = {
   ai: {
     title: "AIとドラフト",
@@ -365,6 +413,7 @@ function renderSetup() {
           <p class="field-hint">合計 ${st.aiCount + 1} チームでドラフトします。</p>
         </div>
         <div class="setup-section"><h2>ルール</h2>${rulesFields(st)}</div>
+        <div class="setup-section"><h2>縛り<small>任意</small></h2>${limitsFields(st.limits, { teamCount: st.aiCount + 1, pickLimit: st.pickLimit })}</div>
         <div class="setup-section"><h2>演出</h2>
           <div class="field"><span class="field-label">発表のテンポ</span>${segmented("speed", [["normal", "じっくり"], ["fast", "テンポよく"]], S.speed, { label: "発表のテンポ" })}</div>
         </div>
@@ -386,6 +435,7 @@ function renderSetup() {
           </div>
         </div>
         <div class="setup-section"><h2>ルール</h2>${rulesFields(st)}</div>
+        <div class="setup-section"><h2>縛り<small>任意</small></h2>${limitsFields(st.limits, { teamCount: st.localCount, pickLimit: st.pickLimit })}</div>
         <div class="setup-section"><h2>演出</h2>
           <div class="field"><span class="field-label">発表のテンポ</span>${segmented("speed", [["normal", "じっくり"], ["fast", "テンポよく"]], S.speed, { label: "発表のテンポ" })}</div>
         </div>
@@ -407,6 +457,7 @@ function renderSetup() {
         <div class="online-choice">
           <div class="panel" ${invite ? 'style="order:2"' : ""}>
             <div><h2 class="panel-title">ルームを作る</h2><p class="panel-sub">あなたがホストになります。ルールはルームで決められます。</p></div>
+            <label class="check-row"><input type="checkbox" id="roomPublic" ${S.roomPublic ? "checked" : ""}><span><strong>ルーム一覧に公開する</strong><small>オフなら招待リンクを知っている人だけが参加できます</small></span></label>
             <button class="btn btn-primary" data-action="create-room" ${configured ? "" : "disabled"}>${icon("globe")}ルームを作る</button>
           </div>
           <div class="panel">
@@ -416,6 +467,10 @@ function renderSetup() {
           </div>
         </div>
         <p class="status-line ${err ? "is-error" : ""}" id="onlineStatus" role="status">${esc(err || S.online?.message || "")}</p>
+        ${configured ? `<section class="panel public-rooms" aria-labelledby="publicRoomsTitle">
+          <div class="public-head"><h2 class="panel-title" id="publicRoomsTitle">公開中のルーム</h2><span class="panel-sub">参加すると、上の表示名で入ります</span></div>
+          <div id="publicRooms"></div>
+        </section>` : ""}
       </div>`;
   }
   $("#view-setup").innerHTML = `
@@ -428,6 +483,7 @@ function renderSetup() {
       </aside>
       ${form}
     </div>`;
+  if (mode === "online") { renderPublicRooms(); startPublicRooms(); }
 }
 
 async function startLocalDraft() {
@@ -441,8 +497,12 @@ async function startLocalDraft() {
   const teams = mode === "ai"
     ? [{ name: (st.playerName || "").trim() || "あなた", kind: "human" }, ...Array.from({ length: st.aiCount }, (_, i) => ({ name: `AI${i + 1}`, kind: "ai" }))]
     : Array.from({ length: st.localCount }, (_, i) => ({ name: (st.teamNames[i] || "").trim() || LOCAL_TEAM_NAMES[i], kind: "human" }));
+  if (E.eligibleCount(st.limits) < teams.length * st.pickLimit) {
+    toast("縛りの候補が足りません。条件を増やすか、指名人数を減らしてください。");
+    return;
+  }
   savePrefs();
-  beginDraft(E.createDraft({ mode, teams, settings: { pickLimit: st.pickLimit, orderMode: st.orderMode, startOrder: st.startOrder } }));
+  beginDraft(E.createDraft({ mode, teams, settings: { pickLimit: st.pickLimit, orderMode: st.orderMode, startOrder: st.startOrder, limits: st.limits } }));
 }
 
 function beginDraft(state) {
@@ -594,6 +654,7 @@ function saveHistory(s) {
     completedAt: Date.now(),
     mode: s.mode,
     pickLimit: s.settings.pickLimit,
+    limitsLabel: E.limitsLabel(s.settings.limits),
     teams: s.teams.map(team => ({
       name: E.teamLabel(s, team.id),
       isMe: team.id === myTeamId(),
@@ -785,7 +846,9 @@ function candidates(ignore = "", dedupe = true) {
   const query = normalizeSearchText(p.query.trim());
   const drafted = draftedKeys();
   const ranks = new Map();
+  const limits = S.draft?.settings?.limits;
   const list = idols.filter(idol => {
+    if (limits && !E.inLimits(limits, idol)) return false;
     if (!query) return true;
     const rank = searchRank(idol.id, query);
     if (rank < 0) return false;
@@ -818,7 +881,9 @@ function renderPoolTools() {
   if (!box) return;
   const p = S.pool;
   const presetNames = Object.keys(S.presets);
+  const limits = S.draft?.settings?.limits;
   box.innerHTML = `
+    ${E.hasLimits(limits) ? `<p class="pool-limits"><b>縛り</b>${esc(E.limitsLabel(limits))}</p>` : ""}
     <label class="search">${icon("search")}<span class="sr-only">名前やグループで検索</span>
       <input class="input" type="search" id="poolSearch" value="${esc(p.query)}" placeholder="名前・グループ・事務所で検索（例：モモ／Momo／모모）" autocomplete="off" enterkeyhint="search">
       <button class="search-clear" type="button" data-action="clear-search" aria-label="検索をクリア" ${p.query ? "" : "hidden"}>×</button>
@@ -1304,6 +1369,7 @@ function renderResults() {
         <small>ドラフト会議 終了</small>
         <h1>${finished ? "最終ドラフト結果" : "ここまでのドラフト結果"}</h1>
         <p>${esc(MODE_LABEL[s.mode])}・${s.teams.length}チーム・各${s.settings.pickLimit}人・${esc(formatDate(Date.now()))}</p>
+        ${E.hasLimits(s.settings.limits) ? `<p class="results-limits">縛り：${esc(E.limitsLabel(s.settings.limits))}</p>` : ""}
       </div>
       <div class="results-actions">
         <button class="btn btn-light" data-action="share-image">${icon("image")}画像で共有</button>
@@ -1404,7 +1470,7 @@ function renderHistory() {
     ${list.length ? `<div class="history-list">${list.map((entry, index) => `
       <details class="history-entry" ${index === 0 ? "open" : ""}>
         <summary><div><strong>${esc(formatDate(entry.completedAt))}</strong>
-          <span>${esc(MODE_LABEL[entry.mode] || "ドラフト")}・${(entry.teams || []).length}チーム・各${entry.pickLimit || "?"}人</span></div></summary>
+          <span>${esc(MODE_LABEL[entry.mode] || "ドラフト")}・${(entry.teams || []).length}チーム・各${entry.pickLimit || "?"}人${entry.limitsLabel ? `・縛り：${esc(entry.limitsLabel)}` : ""}</span></div></summary>
         <div class="history-body">
           <div class="board-box">${boardTableHTML(boardModelFromHistory(entry))}</div>
           <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-secondary btn-sm" data-action="board-full" data-history="${esc(entry.id)}">${icon("expand")}表を広げて見る</button><button class="btn btn-ghost btn-sm" data-action="delete-history" data-id="${esc(entry.id)}">この記録を消す</button></div>
@@ -1468,7 +1534,7 @@ function renderAbout() {
       </section>
       <section class="panel about-wide"><h2>プライバシー・オンラインドラフト</h2>
         <p>メールアドレスやパスワードによるアカウント登録はありません。除外したメンバー、気になるリスト、保存した条件、途中のドラフト、過去の結果（最大${HISTORY_LIMIT}件）は、利用中のブラウザー内にだけ保存されます。</p>
-        <p>オンラインドラフトでは、Firebaseの匿名認証とRealtime Databaseを使用します。匿名の識別子のほか、入力した表示名、ルームコード、参加者、ドラフト設定、指名・抽選を含むゲーム進行情報を同期します。同じルームの参加者には表示名とドラフト結果が表示されます。表示名には本名、住所、学校名、連絡先などを使わず、招待リンクやコードは参加してほしい相手だけに共有してください。</p>
+        <p>オンラインドラフトでは、Firebaseの匿名認証とRealtime Databaseを使用します。匿名の識別子のほか、入力した表示名、ルームコード、参加者、ドラフト設定、指名・抽選を含むゲーム進行情報を同期します。同じルームの参加者には表示名とドラフト結果が表示されます。ホストが「ルーム一覧に公開」を選んだ場合は、ホストの表示名・人数・ルール・縛りが、サイトを開いた人全員に表示され、誰でも参加できるようになります。表示名には本名、住所、学校名、連絡先などを使わず、招待リンクやコードは参加してほしい相手だけに共有してください。</p>
         <p>Realtime Databaseはシンガポール（asia-southeast1）に設定されています。Googleの案内ではFirebase Authenticationは米国内のデータセンターで運用され、サービス提供のためIPアドレスやブラウザー情報等が処理される場合があります。詳しくは <a href="https://firebase.google.com/support/privacy" target="_blank" rel="noopener noreferrer">Firebaseのプライバシー案内</a> をご確認ください。ルーム情報は、ホストが「ルームを終了」を実行するまで残ります。サイトの配信元である <a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement" target="_blank" rel="noopener noreferrer">GitHubのプライバシー説明</a> もご確認ください。</p>
       </section>
     </div>
@@ -1492,7 +1558,9 @@ async function createRoom() {
   savePrefs();
   try {
     onlineMessage("ルームを作っています…");
-    const settings = { pickLimit: S.setup.pickLimit, orderMode: S.setup.orderMode, startOrder: S.setup.startOrder };
+    S.roomPublic = Boolean($("#roomPublic")?.checked);
+    savePrefs();
+    const settings = { pickLimit: S.setup.pickLimit, orderMode: S.setup.orderMode, startOrder: S.setup.startOrder, limits: S.setup.limits, public: S.roomPublic };
     const { Room } = await loadOnline();
     const room = await Room.create({ name: S.onlineName, settings });
     attachRoom(room);
@@ -1531,6 +1599,61 @@ async function joinRoom(codeValue) {
   }
 }
 
+/** ホスト：「ルーム一覧に公開」の内容をルームの状態に合わせる */
+function syncLobby() {
+  const o = S.online;
+  const room = o?.room;
+  if (!room?.isHost) return;
+  const active = Object.values(o.players || {}).filter(p => !p.departed);
+  const settings = o.settings || {};
+  const listed = settings.public === true && o.status === "lobby" && active.length < MAX_PLAYERS;
+  const task = listed
+    ? room.publish({ host: o.players?.[room.uid]?.teamName || S.onlineName, count: active.length, pickLimit: settings.pickLimit, limits: E.limitsLabel(settings.limits) })
+    : room.unpublish();
+  task.catch(error => {
+    console.warn("lobby", error);
+    if (listed && !o.lobbyWarned) { o.lobbyWarned = true; toast("ルーム一覧に載せられませんでした。招待リンクでは参加できます。"); }
+  });
+}
+
+// 公開中のルーム一覧（オンラインの設定画面）
+let publicRoomsOff = null;
+let publicRooms = null;
+async function startPublicRooms() {
+  if (publicRoomsOff || !onlineConfigured()) return;
+  publicRoomsOff = () => {};
+  try {
+    const { watchPublicRooms } = await loadOnline();
+    const off = await watchPublicRooms(list => { publicRooms = list; renderPublicRooms(); }, () => { publicRooms = "error"; renderPublicRooms(); });
+    if (S.route.name === "setup" && S.route.param === "online") publicRoomsOff = off;
+    else { off(); publicRoomsOff = null; }
+  } catch {
+    publicRooms = "error";
+    publicRoomsOff = null;
+    renderPublicRooms();
+  }
+}
+function stopPublicRooms() {
+  if (publicRoomsOff) { publicRoomsOff(); publicRoomsOff = null; }
+}
+function renderPublicRooms() {
+  const box = $("#publicRooms");
+  if (!box) return;
+  if (publicRooms === null) { box.innerHTML = `<p class="public-empty">読み込んでいます…</p>`; return; }
+  if (publicRooms === "error") { box.innerHTML = `<p class="public-empty">ルーム一覧を読み込めませんでした。招待コードでは参加できます。</p>`; return; }
+  if (!publicRooms.length) { box.innerHTML = `<p class="public-empty">いま公開中のルームはありません。ルームを作るときに「一覧に公開する」を選ぶと、ここに表示されます。</p>`; return; }
+  box.innerHTML = `<ul class="public-list">${publicRooms.map(r => {
+    const full = Number(r.count) >= Number(r.max || MAX_PLAYERS);
+    return `<li class="public-room">
+      <div class="public-room-main">
+        <strong>${esc(r.host)}のルーム</strong>
+        <span>${esc(`${r.count}/${r.max || MAX_PLAYERS}人・各${r.pickLimit}人指名`)}${r.limits ? `・縛り：${esc(r.limits)}` : ""}</span>
+      </div>
+      <button class="btn btn-sm ${full ? "btn-ghost" : "btn-primary"}" data-action="join-public" data-code="${esc(r.code)}" ${full ? "disabled" : ""}>${full ? "満員" : "参加する"}</button>
+    </li>`;
+  }).join("")}</ul>`;
+}
+
 function attachRoom(room) {
   S.online = { room, rev: -1, hostRev: 0, acks: {}, pending: null, players: {}, status: "lobby", settings: null, joinState: room.isHost ? "joined" : "joined", message: "", error: "", actionQueue: Promise.resolve(), handled: new Set() };
   store.saveRoom({ code: room.code });
@@ -1538,13 +1661,14 @@ function attachRoom(room) {
   url.searchParams.set("room", room.code);
   history.replaceState(null, "", url);
   room.watchBasics({
-    onPlayers: players => { S.online.players = players; if (S.route.name === "room") renderRoom(); if (S.route.name === "draft") renderBoardPanel(); },
+    onPlayers: players => { S.online.players = players; syncLobby(); if (S.route.name === "room") renderRoom(); if (S.route.name === "draft") renderBoardPanel(); },
     onStatus: (status, exists) => {
       S.online.status = status;
       if (!exists) { leaveRoomLocally("ルームが終了しました。"); return; }
+      syncLobby();
       if (S.route.name === "room") renderRoom();
     },
-    onSettings: settings => { S.online.settings = settings; if (S.route.name === "room") renderRoom(); },
+    onSettings: settings => { S.online.settings = settings; syncLobby(); if (S.route.name === "room") renderRoom(); },
     onError: error => console.warn("room listener", error)
   });
   if (room.isHost) {
@@ -1722,7 +1846,14 @@ function renderRoom() {
         </section>
         <section class="panel setup-form">
           <div><h2 class="panel-title">ルール</h2><p class="panel-sub">${host ? "ホストが決めます。" : "ホストが決めたルールです。"}</p></div>
+          <div class="field"><span class="field-label">ルーム一覧</span>
+            ${host && !playing
+              ? segmented("roomPublic", [["private", "招待した人だけ"], ["public", "一覧に公開"]], settings.public ? "public" : "private", { label: "ルーム一覧への公開" })
+              : `<p class="limit-readonly">${settings.public ? "一覧に公開中（誰でも参加できます）" : "招待した人だけが参加できます"}</p>`}</div>
           ${rulesFields(settings, { disabled: !host || playing })}
+          <div class="field"><span class="field-label">縛り${host ? "（任意）" : ""}</span>${host && !playing
+            ? limitsFields(E.normalizeLimits(settings.limits), { teamCount: active.length, pickLimit: settings.pickLimit })
+            : `<p class="limit-readonly">${E.hasLimits(settings.limits) ? esc(E.limitsLabel(settings.limits)) : "縛りなし（全員が候補）"}</p>`}</div>
         </section>
         <div class="room-actions">
           ${host
@@ -1741,6 +1872,10 @@ async function startOnline() {
   const active = room.activePlayers();
   if (active.length < 2) { toast("2人以上そろうと始められます"); return; }
   const settings = o.settings || { pickLimit: 5, orderMode: "snake", startOrder: "random" };
+  if (E.eligibleCount(settings.limits) < active.length * (Number(settings.pickLimit) || 5)) {
+    toast("縛りの候補が足りません。条件を増やすか、指名人数を減らしてください。");
+    return;
+  }
   const draft = E.createDraft({
     mode: "online",
     teams: active.map(([uid, p]) => ({ name: p.teamName || p.name, kind: "human", uid })),
@@ -1912,6 +2047,15 @@ document.addEventListener("click", async event => {
       renderCards(); updateFilterOptions();
       break;
     }
+    case "join-public": {
+      const code = target.dataset.code;
+      if ($("#roomCode")) $("#roomCode").value = code;
+      joinRoom(code);
+      break;
+    }
+    case "toggle-limit": toggleLimit(target.dataset.key, target.dataset.value); break;
+    case "limits-clear": setLimits({ generations: [], nationalities: [], agencies: [] }); break;
+    case "limits-more": S.limitsOpen = target.dataset.key || ""; S.route.name === "room" ? renderRoom() : renderSetup(); break;
     case "toggle-shortlist-only": S.pool.onlyShortlist = !S.pool.onlyShortlist; S.pool.limit = PAGE(); renderPoolTools(); renderCards(); break;
     case "toggle-hide-drafted": S.pool.hideDrafted = !S.pool.hideDrafted; renderPoolTools(); renderCards(); break;
     case "toggle-show-excluded": S.pool.showExcluded = !S.pool.showExcluded; renderPoolTools(); renderCards(); break;
@@ -2014,11 +2158,43 @@ document.addEventListener("click", async event => {
   }
 });
 
+function setLimits(limits) {
+  const next = E.normalizeLimits(limits);
+  if (S.route.name === "room") {
+    if (!isHost() || S.online?.status === "playing") return;
+    const settings = { ...(S.online.settings || {}), limits: next };
+    S.online.room.setSettings(settings);
+    S.online.settings = settings;
+    renderRoom();
+    return;
+  }
+  S.setup.limits = next;
+  savePrefs();
+  renderSetup();
+}
+function toggleLimit(key, value) {
+  const current = E.normalizeLimits(S.route.name === "room" ? S.online?.settings?.limits : S.setup.limits);
+  if (!current[key]) return;
+  const set = new Set(current[key]);
+  if (set.has(value)) set.delete(value); else set.add(value);
+  setLimits({ ...current, [key]: [...set] });
+}
+
 function onSegment(name, value) {
   if (name === "tab") { S.tab = value; renderDraft(); window.scrollTo({ top: 0 }); return; }
   if (name === "boardMode") { S.boardMode = value; renderBoardPanel(); return; }
   if (name === "resultsMode") { S.resultsMode = value; renderResults(); return; }
   if (name === "speed") { S.speed = value; savePrefs(); renderSetup(); return; }
+  if (name === "roomPublic") {
+    if (!isHost() || S.route.name !== "room") return;
+    const next = { ...(S.online.settings || {}), public: value === "public" };
+    S.online.room.setSettings(next);
+    S.online.settings = next;
+    syncLobby();
+    renderRoom();
+    if (value === "public") toast("ルーム一覧に公開しました。誰でも参加できます");
+    return;
+  }
   if (["startOrder", "orderMode"].includes(name)) {
     if (S.route.name === "room") {
       if (!isHost()) return;
