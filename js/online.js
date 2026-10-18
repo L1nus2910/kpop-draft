@@ -133,6 +133,14 @@ export class Room {
     return { room, rejoined: false };
   }
 
+  /** 自分がこのルームのメンバーなら、その記録（host など）を返す */
+  static async memberInfo(code) {
+    const uid = await identity();
+    const snap = await window.firebase.database().ref(`rooms/${normalizeCode(code)}/players/${uid}`).once("value");
+    const member = snap.val();
+    return member && !member.departed && !member.kickedByHost ? member : null;
+  }
+
   /** 申請を出さずに、まだこのルームのメンバーか確かめる */
   static async isMember(code) {
     const uid = await identity();
