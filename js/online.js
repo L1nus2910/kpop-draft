@@ -21,15 +21,15 @@ let sdkPromise = null;
 function loadSdk() {
   if (window.firebase?.auth && window.firebase?.database) return Promise.resolve();
   if (sdkPromise) return sdkPromise;
-  sdkPromise = SDK.reduce((chain, src) => chain.then(() => new Promise((resolve, reject) => {
-    if (document.querySelector(`script[src="${src}"]`) && window.firebase) { resolve(); return; }
+  // 3つを同時にダウンロードし、順番どおりに実行する（async = false）
+  sdkPromise = Promise.all(SDK.map(src => new Promise((resolve, reject) => {
     const script = document.createElement("script");
     script.src = src;
-    script.async = true;
+    script.async = false;
     script.onload = resolve;
     script.onerror = () => reject(new Error("オンライン機能を読み込めませんでした。通信状態を確認してください。"));
     document.head.append(script);
-  })), Promise.resolve()).catch(error => { sdkPromise = null; throw error; });
+  }))).catch(error => { sdkPromise = null; throw error; });
   return sdkPromise;
 }
 
