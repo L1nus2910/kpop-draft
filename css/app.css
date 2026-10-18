@@ -1032,3 +1032,42 @@ a, button, select, summary, label { touch-action: manipulation; }
 .page-head > div p { max-width: 60ch; }
 .results-room { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .results-room span { flex: 1; min-width: 220px; }
+
+/* ------------------------------------------------------------- 修正（2026-10-18） */
+/* iPhone Safari：画面切り替えの動きが固定表示（指名確認バー）をずらさないよう、不透明度だけで切り替える */
+.view.is-entering { animation: view-fade 260ms ease backwards; }
+@keyframes view-fade { from { opacity: 0; } }
+/* Safari でタップが効かなくなることがある content-visibility は使わない */
+.card { content-visibility: visible; contain-intrinsic-size: none; }
+
+/* 頭文字アイコンなし */
+.card-main { grid-template-columns: minmax(0, 1fr); grid-template-areas: "group" "name" "meta" "foot"; row-gap: 2px; }
+.card-name { font-size: 20px; }
+.dock { grid-template-columns: minmax(0, 1fr) auto; }
+.result-team li { grid-template-columns: 40px minmax(0, 1fr); }
+.result-team li span small, .team-card li span small { display: block; }
+@media (max-width: 720px) {
+  .card-main { padding: 12px 12px 6px; }
+  .card-name { font-size: 17px; }
+  .dock { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* 指名発表：事務所・グループを縦に */
+.nameplate-meta { flex-direction: column; align-items: center; gap: 2px; }
+.nameplate-meta span + span::before { content: none; }
+.nameplate-meta span:first-child { font-size: 15px; color: #4a4560; }
+.nameplate-meta span:last-child { font-size: 17px; color: var(--stage); }
+
+/* 抽選外れ：名前・事務所・グループを縦に、薄く */
+.pick-loss { display: grid; gap: 0; margin: 0 0 6px; padding: 4px 6px; text-align: center; text-decoration: none; color: var(--faint); border-radius: 8px; background: var(--surface-2); }
+.pick-loss b { font-size: 12px; font-weight: 700; text-decoration: line-through; text-decoration-color: rgba(169, 164, 189, 0.7); }
+.pick-loss small { font-size: 11px; line-height: 1.35; }
+.pick-slot small { display: block; }
+.lost { display: grid; margin-bottom: 6px; padding: 4px 8px; color: var(--faint); border-left: 2px solid var(--line-2); }
+.lost em { font-style: normal; font-size: 11px; font-weight: 700; }
+.lost b { font-size: 13px; text-decoration: line-through; text-decoration-color: rgba(169, 164, 189, 0.7); }
+.lost small { font-size: 11px; color: var(--faint) !important; }
+@media (max-width: 720px) {
+  body.has-dock .toasts { bottom: calc(max(10px, env(safe-area-inset-bottom)) + 170px); }
+  .dock-actions .btn-hot { white-space: nowrap; font-size: 15px; padding: 0 14px; }
+}

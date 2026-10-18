@@ -121,6 +121,7 @@ function onRoute() {
   if (changed) $$('#toasts [data-slot="pick"]').forEach(el => el.remove());
   S.route = route;
   document.body.dataset.view = route.name;
+  if (route.name !== "draft") { $("#dockMount").innerHTML = ""; document.body.classList.remove("has-dock"); }
   VIEWS.forEach(name => { $(`#view-${name}`).hidden = name !== route.name; });
   $$(".appbar-nav a").forEach(link => {
     if (link.dataset.nav === route.name) link.setAttribute("aria-current", "page");
@@ -600,8 +601,7 @@ function renderDraft() {
           <div class="card-grid" id="cardGrid"></div>
         </section>
         <aside class="board-panel" aria-label="指名ボード" id="boardPanel"></aside>
-      </div>
-      <div id="dockMount"></div>`;
+      </div>`;
     renderPoolTools();
     S.cardsKey = "";
   }
@@ -745,7 +745,7 @@ function renderPoolTools() {
   box.innerHTML = `
     <label class="search">${icon("search")}<span class="sr-only">名前やグループで検索</span>
       <input class="input" type="search" id="poolSearch" value="${esc(p.query)}" placeholder="名前・グループ・事務所で検索（例：モモ／Momo／모모）" autocomplete="off" enterkeyhint="search">
-      ${p.query ? `<button class="search-clear" type="button" data-action="clear-search" aria-label="検索をクリア">×</button>` : ""}
+      <button class="search-clear" type="button" data-action="clear-search" aria-label="検索をクリア" ${p.query ? "" : "hidden"}>×</button>
     </label>
     <div class="filter-bar" role="group" aria-label="絞り込み">
       ${FILTERS.map(([key, label]) => `<label class="filter-chip"><span class="sr-only">${label}</span><select data-filter="${key}" class="${p[key] ? "is-set" : ""}"></select></label>`).join("")}
@@ -789,7 +789,6 @@ function cardHTML(idol, drafted) {
     ${isDrafted ? `<span class="card-state chip chip-dark">指名済み</span>` : ""}
     <button class="card-main" type="button" data-action="select" data-id="${idol.id}" aria-pressed="${selected}" ${isDrafted ? "disabled" : ""}
       aria-label="${esc(`${idol.japaneseName}（${idol.group}）`)}">
-      ${monogram(idol)}
       <span class="card-group">${esc(idol.group)}</span>
       <span class="card-name">${esc(idol.japaneseName)}</span>
       <span class="card-meta"><span class="chip">${esc(idol.generation)}</span><span class="chip">${esc(idol.nationality)}</span></span>
@@ -864,7 +863,6 @@ function renderDock() {
   }
   mount.innerHTML = `
     <div class="dock" role="region" aria-label="選んだメンバー">
-      ${monogram(idol)}
       <div class="dock-copy">
         <small>${esc(can ? who : "選択中のメンバー")}</small>
         <strong>${esc(idol.japaneseName)}</strong>
@@ -908,10 +906,11 @@ function boardModelFromState(s) {
       const cells = [];
       for (let round = 1; round <= s.settings.pickLimit; round += 1) {
         const pick = (s.picks[team.id] || []).find(p => p.round === round);
-        const losses = round === 1 ? (s.losses[team.id] || []).map(id => E.idolById.get(id)?.japaneseName).filter(Boolean) : [];
+        const losses = round === 1 ? (s.losses[team.id] || []).map(id => E.idolById.get(id)).filter(Boolean)
+          .map(l => ({ name: l.japaneseName, agency: agencyShort(l), group: l.group })) : [];
         if (pick) {
           const idol = E.idolById.get(pick.idolId);
-          cells.push({ kind: "filled", name: idol?.japaneseName, sub: [agencyShort(idol), idol?.group].filter(Boolean).join(" · "), losses, isNew: s.log.at(-1)?.idolId === pick.idolId && s.log.at(-1)?.teamId === team.id });
+          cells.push({ kind: "filled", name: idol?.japaneseName, agency: agencyShort(idol), group: idol?.group, losses, isNew: s.log.at(-1)?.idolId === pick.idolId && s.log.at(-1)?.teamId === team.id });
           continue;
         }
         if (team.departed) { cells.push({ kind: "empty", text: round === 1 || cells.some(c => c.kind === "filled") ? "退出" : "—", losses }); continue; }
@@ -960,9 +959,9 @@ function boardModelFromHistory(entry) {
       count: (team.picks || []).length,
       cells: Array.from({ length: pickLimit }, (_, i) => {
         const pick = (team.picks || []).find(p => Number(p.round) === i + 1);
-        const losses = i === 0 ? (team.losses || []).map(l => l.name) : [];
+        const losses = i === 0 ? (team.losses || []).map(l => ({ name: l.name, agency: agencyShort(l), group: l.group })) : [];
         return pick
-          ? { kind: "filled", name: pick.name, sub: [agencyShort(pick), pick.group].filter(Boolean).join(" · "), losses }
+          ? { kind: "filled", name: pick.name, agency: agencyShort(pick), group: pick.group, losses }
           : { kind: "empty", text: "—", losses };
       })
     }))
@@ -976,8 +975,8 @@ function boardTableHTML(model) {
         <strong>${esc(t.label)}</strong>${t.sublabel ? `<em>${esc(t.sublabel)}</em>` : ""}<small>${t.departed ? "退出" : `${t.count}/${model.pickLimit}人`}</small></th>`).join("")}</tr></thead>
     <tbody>${Array.from({ length: model.pickLimit }, (_, r) => `<tr><th class="round-col" scope="row">${r + 1}</th>${model.teams.map(t => {
       const c = t.cells[r];
-      const losses = c.losses?.length ? c.losses.map(n => `<span class="pick-loss" title="抽選外れ">${esc(n)}</span>`).join("") : "";
-      if (c.kind === "filled") return `<td>${losses}<div class="pick-slot is-filled ${c.isNew ? "is-new" : ""}"><strong>${esc(c.name)}</strong><small>${esc(c.sub)}</small></div></td>`;
+      const losses = c.losses?.length ? c.losses.map(l => `<span class="pick-loss" title="抽選外れ"><b>${esc(l.name)}</b>${l.agency ? `<small>${esc(l.agency)}</small>` : ""}<small>${esc(l.group || "")}</small></span>`).join("") : "";
+      if (c.kind === "filled") return `<td>${losses}<div class="pick-slot is-filled ${c.isNew ? "is-new" : ""}"><strong>${esc(c.name)}</strong>${c.agency ? `<small>${esc(c.agency)}</small>` : ""}<small>${esc(c.group || "")}</small></div></td>`;
       return `<td>${losses}<div class="pick-slot is-${c.kind}">${esc(c.text || "—")}</div></td>`;
     }).join("")}</tr>`).join("")}</tbody></table>`;
 }
@@ -986,9 +985,9 @@ function teamStackHTML(model) {
   return `<div class="team-stack">${model.teams.map(t => `
     <section class="team-card" style="--team-color:${t.color}">
       <header class="team-card-head"><strong>${esc(t.label)}${t.sublabel ? `<small style="margin-left:6px">${esc(t.sublabel)}</small>` : ""}${t.isMe && t.label !== "あなた" ? ' <span class="chip chip-hot">あなた</span>' : ""}</strong><small>${t.departed ? "退出" : `${t.count}/${model.pickLimit}人`}</small></header>
-      <ol>${t.cells.map((c, i) => `<li class="${c.kind === "filled" ? "" : "is-empty"}"><b>${i + 1}巡</b><span>${c.kind === "filled"
-        ? `<strong>${esc(c.name)}</strong><small>${esc(c.sub)}${c.losses?.length ? `　抽選外れ：${esc(c.losses.join("、"))}` : ""}</small>`
-        : `${esc(c.text || "—")}${c.losses?.length ? `<small>抽選外れ：${esc(c.losses.join("、"))}</small>` : ""}`}</span></li>`).join("")}</ol>
+      <ol>${t.cells.map((c, i) => `<li class="${c.kind === "filled" ? "" : "is-empty"}"><b>${i + 1}巡</b><span>${(c.losses || []).map(l => `<span class="lost"><em>抽選外れ</em><b>${esc(l.name)}</b><small>${esc(l.agency || "")}</small><small>${esc(l.group || "")}</small></span>`).join("")}${c.kind === "filled"
+        ? `<strong>${esc(c.name)}</strong><small>${esc(c.agency || "")}</small><small>${esc(c.group || "")}</small>`
+        : esc(c.text || "—")}</span></li>`).join("")}</ol>
     </section>`).join("")}</div>`;
 }
 
@@ -1072,8 +1071,7 @@ function renderReveal() {
             <div class="nameplate-face nameplate-front">
               <small>${r.type === "nomination" ? "第1回選択希望" : `第${r.round}巡選択`}</small>
               <p class="nameplate-name">${esc(idol?.japaneseName)}</p>
-              <p class="nameplate-meta"><span>${esc(idol?.group)}</span><span>${esc(agencyShort(idol))}</span><span>${esc(idol?.generation)}</span></p>
-              <p>${stars(idol?.popularityStars)}</p>
+              <p class="nameplate-meta"><span>${esc(agencyFull(idol))}</span><span>${esc(idol?.group)}</span></p>
             </div>
           </div></div>
           <div class="stage-foot"><p class="stage-hint" id="stageHint"></p><div class="stage-actions" id="stageActions"></div></div>
@@ -1250,10 +1248,11 @@ function renderResults() {
           <ol>${Array.from({ length: s.settings.pickLimit }, (_, i) => {
             const pick = (s.picks[team.id] || []).find(p => p.round === i + 1);
             const idol = pick && E.idolById.get(pick.idolId);
-            const losses = i === 0 ? (s.losses[team.id] || []).map(id => E.idolById.get(id)?.japaneseName).filter(Boolean) : [];
-            return `<li><b>${i + 1}巡</b>${idol ? monogram(idol) : '<span></span>'}<span>${idol
-              ? `<strong>${esc(idol.japaneseName)}</strong><small>${esc([idol.group, agencyShort(idol)].filter(Boolean).join("・"))}</small>`
-              : `<strong style="color:var(--faint)">—</strong>`}${losses.length ? `<span class="lost">抽選外れ：${esc(losses.join("、"))}</span>` : ""}</span></li>`;
+            const losses = i === 0 ? (s.losses[team.id] || []).map(id => E.idolById.get(id)).filter(Boolean) : [];
+            const lossHtml = losses.map(l => `<span class="lost"><em>抽選外れ</em><b>${esc(l.japaneseName)}</b><small>${esc(agencyShort(l))}</small><small>${esc(l.group)}</small></span>`).join("");
+            return `<li><b>${i + 1}巡</b><span>${lossHtml}${idol
+              ? `<strong>${esc(idol.japaneseName)}</strong><small>${esc(agencyShort(idol))}</small><small>${esc(idol.group)}</small>`
+              : `<strong style="color:var(--faint)">—</strong>`}</span></li>`;
           }).join("")}</ol>
           <div class="result-team-stats">${teamStats(s, team.id).map(t => `<span class="chip">${esc(t)}</span>`).join("")}</div>
         </article>`).join("")}</div>`}
@@ -1769,7 +1768,14 @@ document.addEventListener("click", async event => {
       toast(S.excluded.has(id) ? "候補から除外しました（AIも選びません）" : "除外をやめました");
       break;
     case "load-more": S.pool.limit += PAGE(); renderCards(); break;
-    case "clear-search": S.pool.query = ""; renderPoolTools(); renderCards(); $("#poolSearch")?.focus(); break;
+    case "clear-search": {
+      S.pool.query = "";
+      const input = $("#poolSearch");
+      if (input) { input.value = ""; input.focus(); }
+      target.hidden = true;
+      renderCards(); updateFilterOptions();
+      break;
+    }
     case "toggle-shortlist-only": S.pool.onlyShortlist = !S.pool.onlyShortlist; S.pool.limit = PAGE(); renderPoolTools(); renderCards(); break;
     case "toggle-hide-drafted": S.pool.hideDrafted = !S.pool.hideDrafted; renderPoolTools(); renderCards(); break;
     case "toggle-show-excluded": S.pool.showExcluded = !S.pool.showExcluded; renderPoolTools(); renderCards(); break;
@@ -1903,17 +1909,23 @@ document.addEventListener("input", event => {
     S.pool.query = el.value;
     S.pool.limit = PAGE();
     clearTimeout(el._t);
-    el._t = setTimeout(() => {
-      renderCards();
-      updateFilterOptions();
-      const clear = $(".search-clear");
-      if (!clear && S.pool.query) { const pos = el.selectionStart; renderPoolTools(); const input = $("#poolSearch"); input.focus(); input.setSelectionRange(pos, pos); }
-      else if (clear && !S.pool.query) clear.remove();
-    }, 90);
+    // 入力欄そのものは描き直さない（描き直すと入力中の文字や日本語変換が消える）
+    const clear = $(".search-clear");
+    if (clear) clear.hidden = !S.pool.query;
+    if (event.isComposing) return;
+    el._t = setTimeout(() => { renderCards(); updateFilterOptions(); }, 120);
   } else if (el.dataset.setup === "playerName") { S.setup.playerName = el.value; savePrefs(); }
   else if (el.dataset.teamName != null) { S.setup.teamNames[Number(el.dataset.teamName)] = el.value; savePrefs(); }
   else if (el.id === "onlineName") { S.onlineName = el.value; }
   else if (el.id === "roomCode") { const pos = el.selectionStart; el.value = el.value.toUpperCase(); el.setSelectionRange(pos, pos); }
+});
+
+// 日本語変換の確定時に検索を反映
+document.addEventListener("compositionend", event => {
+  if (event.target.id !== "poolSearch") return;
+  S.pool.query = event.target.value;
+  clearTimeout(event.target._t);
+  event.target._t = setTimeout(() => { renderCards(); updateFilterOptions(); }, 60);
 });
 
 document.addEventListener("change", event => {
