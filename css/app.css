@@ -1071,3 +1071,129 @@ a, button, select, summary, label { touch-action: manipulation; }
   body.has-dock .toasts { bottom: calc(max(10px, env(safe-area-inset-bottom)) + 170px); }
   .dock-actions .btn-hot { white-space: nowrap; font-size: 15px; padding: 0 14px; }
 }
+
+/* 指名一覧表を全画面で見る */
+.board-expand-row { display: flex; justify-content: flex-end; margin: -6px 0 10px; }
+.board-head .icon-btn { color: var(--ink-2); }
+.board-full {
+  position: fixed; inset: 0; z-index: 250;
+  display: flex; flex-direction: column;
+  background: rgba(245, 243, 249, 0.98);
+  animation: fade-in 180ms ease both;
+}
+.board-full-bar {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: max(10px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) 10px max(16px, env(safe-area-inset-left));
+  color: #fff; background: linear-gradient(110deg, var(--stage), var(--stage-2));
+}
+.board-full-bar strong { font-size: 15px; font-weight: 900; }
+.board-full-hint { font-size: 12px; color: rgba(255, 255, 255, 0.6); }
+.board-full-bar .btn-light { color: var(--stage); background: #fff; }
+.board-full-bar .btn-ghost { color: rgba(255, 255, 255, 0.85); border: 1px solid rgba(255, 255, 255, 0.25); }
+.board-full-scroll { flex: 1; min-height: 0; overflow: auto; padding: 12px; padding-bottom: max(12px, env(safe-area-inset-bottom)); overscroll-behavior: contain; }
+.board-full-stage { margin: 0 auto; }
+.board-full-stage .board-table { transform-origin: 0 0; width: max-content; min-width: calc(56px + var(--teams, 4) * 150px); background: var(--surface); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+@media (orientation: portrait) and (max-width: 720px) { .board-full-hint { display: inline; } }
+@media (orientation: landscape), (min-width: 721px) { .board-full-hint { display: none; } }
+
+/* ------------------------------------------------------------- 改善（2026-10-18 夕） */
+/* 1. 絞り込み：4項目は2列（PCは4列）、切り替えは折り返して並べる */
+.filter-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.filter-grid .filter-chip select { width: 100%; max-width: none; min-height: 42px; }
+.toggle-row { display: flex; flex-wrap: wrap; gap: 6px 8px; }
+.toggle-row .filter-chip select { min-height: 38px; }
+@media (max-width: 720px) {
+  .filter-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .toggle-chip { min-height: 36px; padding: 0 12px; font-size: 12px; }
+}
+
+/* 6. さらに表示 */
+.load-more { display: inline-flex; flex-direction: column; gap: 2px; min-width: 240px; min-height: 52px; }
+.load-more small { font-size: 11px; font-weight: 700; color: var(--muted); }
+
+/* 7. 指名順（画面上部に固定） */
+.order-strip {
+  position: sticky; top: var(--appbar-h); z-index: 25;
+  display: flex; align-items: center; gap: 10px;
+  margin: 0 0 14px; padding: 8px 12px;
+  border: 1px solid var(--line); border-radius: 16px;
+  background: #fff;
+  box-shadow: var(--sh-1);
+  overflow-x: auto; scrollbar-width: none;
+}
+.order-strip::-webkit-scrollbar { display: none; }
+.order-label { flex: none; font-size: 12px; font-weight: 900; color: var(--muted); }
+.order-list { display: flex; align-items: center; gap: 4px; margin: 0; padding: 0; list-style: none; flex: none; }
+.order-item { display: inline-flex; align-items: center; gap: 5px; min-height: 30px; padding: 0 10px; font-size: 13px; font-weight: 700; color: var(--ink-2); white-space: nowrap; border-radius: 999px; background: var(--bg-2); }
+.order-item i { width: 8px; height: 8px; border-radius: 3px; background: var(--team-color); }
+.order-item b { font-size: 11px; color: var(--ok); }
+.order-item.is-done { opacity: 0.55; }
+.order-item.is-now { color: #fff; background: var(--team-color); box-shadow: 0 0 0 3px color-mix(in srgb, var(--team-color) 30%, transparent); }
+.order-item.is-now i { background: #fff; }
+.order-item.is-me span::after { content: "（あなた）"; font-size: 11px; }
+.order-arrow { flex: none; color: var(--faint); font-weight: 900; font-size: 13px; }
+.order-note { flex: none; font-size: 11px; font-weight: 700; color: var(--faint); }
+.pool-tools { top: calc(var(--appbar-h) + 56px); }
+@media (max-width: 720px) { .order-strip { margin: 0 0 10px; padding: 6px 10px; border-radius: 14px; } }
+
+/* 8. ホストが押すボタンを目立たせる */
+.btn-attention { position: relative; animation: attn-ring 1.6s ease-out infinite; font-weight: 900; }
+.btn-attention::after {
+  content: "▼"; position: absolute; left: 50%; top: -22px; transform: translateX(-50%);
+  font-size: 13px; color: var(--gold); animation: attn-bob 1s ease-in-out infinite;
+}
+@keyframes attn-ring { 0% { box-shadow: 0 0 0 0 rgba(214, 176, 98, 0.75); } 70% { box-shadow: 0 0 0 14px rgba(214, 176, 98, 0); } 100% { box-shadow: 0 0 0 0 rgba(214, 176, 98, 0); } }
+@keyframes attn-bob { 50% { transform: translate(-50%, 4px); } }
+.turn-banner.is-host-action { background: var(--grain), linear-gradient(110deg, #3b2a05 0%, #8a6416 100%); background-size: 160px 160px, auto; }
+.turn-banner.is-host-action::before { background: var(--gold); }
+.turn-banner .btn-attention { min-height: 50px; padding: 0 22px; font-size: 16px; }
+.host-callout { display: block; width: 100%; margin-bottom: 18px; color: var(--gold); font-size: 13px; font-weight: 900; letter-spacing: 0.08em; }
+.stage-hint.is-attention { color: var(--gold); font-weight: 900; font-size: 15px; }
+@media (max-width: 720px) {
+  .turn-banner.is-host-action .turn-side { display: flex; }
+  .turn-banner .btn-attention { width: 100%; margin-top: 16px; }
+}
+
+/* 5. 戻るボタン */
+.back-link-strong { padding: 8px 14px 8px 12px; margin-bottom: 16px; border: 1px solid var(--line-2); border-radius: 999px; background: var(--surface); box-shadow: var(--sh-1); }
+.back-link-strong:hover { border-color: rgba(91, 63, 224, 0.4); }
+
+/* 9. ホームの最初の画面をコンパクトに（スマホ） */
+@media (max-width: 720px) {
+  .home-hero { position: relative; display: block; padding: 22px 20px 20px; border-radius: 24px; }
+  .photocard-stack { position: absolute; top: 14px; right: 10px; width: 92px; height: 104px; margin: 0; order: 0; }
+  .photocard { width: 56px; border-radius: 8px; box-shadow: 0 12px 24px -10px rgba(0, 0, 0, 0.55); }
+  .photocard-front img { border-radius: 10px; width: 80%; }
+  .photocard-pattern { inset: 6px; border-radius: 6px; }
+  .home-hero-copy { gap: 10px; }
+  .home-hero-kicker { font-size: 11px; padding-right: 92px; }
+  .home-hero h1 { font-size: clamp(26px, 7.6vw, 32px); padding-right: 70px; }
+  .home-hero-lead { font-size: 13px; line-height: 1.7; }
+  .home-hero-actions { flex-direction: row; gap: 8px; margin-top: 2px; }
+  .home-hero-actions .btn { flex: 1; min-height: 48px; padding: 0 10px; font-size: 14px; border-radius: 14px; }
+  .home-hero-actions .btn .icon { width: 16px; height: 16px; }
+  .section { margin-top: 26px; }
+  .section-head { margin-bottom: 10px; }
+  .mode-grid { gap: 10px; }
+  .mode-tile { grid-template-columns: 44px minmax(0, 1fr); grid-template-rows: auto auto auto; column-gap: 14px; row-gap: 4px; padding: 16px; border-radius: 20px; }
+  .mode-tile-icon { grid-row: span 2; width: 44px; height: 44px; border-radius: 14px; }
+  .mode-tile-icon .icon { width: 22px; height: 22px; }
+  .mode-tile h3 { font-size: 17px; align-self: end; }
+  .mode-tile p { grid-column: 2; font-size: 13px; line-height: 1.6; }
+  .mode-tile-foot { grid-column: 1 / -1; margin-top: 4px; }
+}
+.order-item.is-me span::after { content: none; }
+.order-item small { font-size: 11px; }
+.order-label { position: sticky; left: -12px; z-index: 1; padding: 0 8px 0 2px; background: inherit; background: rgba(255, 255, 255, 0.97); }
+@media (max-width: 1100px) { .draft-tabs { top: calc(var(--appbar-h) + 54px); } }
+@media (max-width: 720px) {
+  .draft-tabs { top: calc(var(--appbar-h) + 50px); }
+  .home-hero-lead { display: none; }
+}
+.board-full { background: var(--bg); }
+@media (max-width: 720px) {
+  .board-full-bar { gap: 8px; }
+  .board-full-bar strong { flex: 1 1 100%; }
+  .board-full-hint { flex: 1; }
+  .board-full-bar > span[style] { display: none; }
+}
