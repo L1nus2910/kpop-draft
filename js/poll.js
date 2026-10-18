@@ -5,7 +5,7 @@
 // polls/total/{kind}/{period}        … 総投票数
 //   kind   … "g"（グループ）/ "m"（メンバー）
 //   period … "d{日}"・"w{週}"・"m{月}"・"all"（日・週・月は日本時間で数える）
-import { groups, idols, normalizeSearchText, searchRank, shortAgencyName, fullAgencyName, groupAliases } from "./data.js";
+import { groups, idols, normalizeSearchText, searchRank, shortAgencyName, fullAgencyName, groupAliases, looseSearchText } from "./data.js";
 import { identity, onlineConfigured } from "./online.js";
 import { $, esc, icon, toast } from "./ui.js";
 
@@ -53,6 +53,7 @@ const groupItems = groups.map(group => {
     sub: [agency, group.generation].filter(Boolean).join("・"),
     // 0：グループ名・別表記（カタカナ・ひらがな・ハングル）／1：事務所・メンバー名
     names: [group.name, ...String(groupAliases[group.name] || "").split(" ").filter(Boolean)].map(normalizeSearchText),
+    loose: [group.name, ...String(groupAliases[group.name] || "").split(" ").filter(Boolean)].map(looseSearchText),
     others: [agency, fullAgencyName(group.name, members[0]?.agency), ...members.flatMap(m => [m.name, m.japaneseName, m.koreanName])].filter(Boolean).map(normalizeSearchText),
     order: -Math.max(0, ...members.map(m => m.popularitySortScore || 0)) // 票が同じ時は人気の目安順
   };
@@ -205,7 +206,11 @@ function filteredItems() {
     }
     const rank = new Map();
     list = items.filter(item => {
-      const r = item.names.some(v => v.startsWith(q)) ? 0 : item.names.some(v => v.includes(q)) ? 1 : item.others.some(v => v.includes(q)) ? 2 : -1;
+      const lq = looseSearchText(q);
+      const r = item.names.some(v => v.startsWith(q)) ? 0
+        : (lq.length >= 2 && item.loose.some(v => v.startsWith(lq))) ? 0
+        : item.names.some(v => v.includes(q)) ? 1
+        : item.others.some(v => v.includes(q)) ? 2 : -1;
       if (r < 0) return false;
       rank.set(item.key, r);
       return true;
