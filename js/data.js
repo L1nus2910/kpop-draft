@@ -1731,5 +1731,5 @@ idols.forEach(idol => {
 export {
   groups, idols, normalizeSearchText, agencyFilterName, fullAgencyName,
   shortAgencyName, memberAffiliationLabel, memberAffiliationTitle,
-  candidateSearchTextById, searchRank, popularityRankingSources
+  candidateSearchTextById, searchRank, popularityRankingSources, groupAliases
 };

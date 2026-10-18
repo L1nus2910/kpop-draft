@@ -5,7 +5,7 @@
 // polls/total/{kind}/{period}        … 総投票数
 //   kind   … "g"（グループ）/ "m"（メンバー）
 //   period … "d{日}"・"w{週}"・"m{月}"・"all"（日・週・月は日本時間で数える）
-import { groups, idols, normalizeSearchText, searchRank, agencyFilterName, shortAgencyName, fullAgencyName } from "./data.js";
+import { groups, idols, normalizeSearchText, searchRank, shortAgencyName, fullAgencyName, groupAliases } from "./data.js";
 import { identity, onlineConfigured } from "./online.js";
 import { $, esc, icon, toast } from "./ui.js";
 
@@ -51,7 +51,9 @@ const groupItems = groups.map(group => {
     key: encodeKey(group.name),
     name: group.name,
     sub: [agency, group.generation].filter(Boolean).join("・"),
-    search: normalizeSearchText([group.name, agency, ...members.map(m => m.japaneseName)].join(" ")),
+    // 0：グループ名・別表記（カタカナ・ひらがな・ハングル）／1：事務所・メンバー名
+    names: [group.name, ...String(groupAliases[group.name] || "").split(" ").filter(Boolean)].map(normalizeSearchText),
+    others: [agency, fullAgencyName(group.name, members[0]?.agency), ...members.flatMap(m => [m.name, m.japaneseName, m.koreanName])].filter(Boolean).map(normalizeSearchText),
     order: -Math.max(0, ...members.map(m => m.popularitySortScore || 0)) // 票が同じ時は人気の目安順
   };
 });
@@ -201,7 +203,14 @@ function filteredItems() {
       list.sort((a, b) => (rank.get(a.key) - rank.get(b.key)) || ((Number(P.tally[b.key]) || 0) - (Number(P.tally[a.key]) || 0)));
       return list;
     }
-    list = items.filter(item => item.search.includes(q));
+    const rank = new Map();
+    list = items.filter(item => {
+      const r = item.names.some(v => v.startsWith(q)) ? 0 : item.names.some(v => v.includes(q)) ? 1 : item.others.some(v => v.includes(q)) ? 2 : -1;
+      if (r < 0) return false;
+      rank.set(item.key, r);
+      return true;
+    });
+    return list.sort((a, b) => (rank.get(a.key) - rank.get(b.key)) || ((Number(P.tally[b.key]) || 0) - (Number(P.tally[a.key]) || 0)) || (a.order - b.order));
   }
   return list.slice().sort((a, b) => ((Number(P.tally[b.key]) || 0) - (Number(P.tally[a.key]) || 0)) || (a.order - b.order) || a.name.localeCompare(b.name, "ja"));
 }
@@ -227,7 +236,7 @@ function draw() {
       </div>
       <div class="poll-head" id="pollHead"></div>
       <label class="search poll-search">${icon("search")}<span class="sr-only">探す</span>
-        <input class="input" type="search" id="pollSearch" value="${esc(P.query)}" placeholder="${P.kind === "m" ? "メンバー名・グループで探す（例：ウォニョン）" : "グループ名で探す（例：IVE）"}" autocomplete="off" enterkeyhint="search">
+        <input class="input" type="search" id="pollSearch" value="${esc(P.query)}" placeholder="${P.kind === "m" ? "メンバー名・グループで探す（例：ウォニョン）" : "グループ名で探す（例：アイヴ／IVE／아이브）"}" autocomplete="off" enterkeyhint="search">
       </label>
       <ol class="poll-list" id="pollList"></ol>
       <div class="poll-more" id="pollMore"></div>
