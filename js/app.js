@@ -2390,6 +2390,7 @@ document.addEventListener("compositionend", event => {
 
 document.addEventListener("change", event => {
   const el = event.target;
+  if (S.route.name === "vote" && pollModule?.onVoteChange(event)) return;
   if (el.id === "roomNameEdit" && isHost() && S.route.name === "room") {
     const next = { ...(S.online.settings || {}), roomName: normalizeRoomName(el.value) };
     S.online.room.setSettings(next);

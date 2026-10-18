@@ -1392,3 +1392,6 @@ body[data-view="draft"] .appbar-install, body[data-view="results"] .appbar-insta
   .poll-votes { grid-area: votes; text-align: center; }
   .poll-row .btn { grid-area: btn; }
 }
+.poll-filters { position: relative; }
+.poll-filter-clear { grid-column: 1 / -1; justify-self: end; }
+@media (max-width: 720px) { .poll-filters { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; } }
