@@ -10168,3 +10168,362 @@ body::before {
     line-height: 1.1;
   }
 }
+
+/* Compact, app-like layout for smaller screens. Keep all controls visible and
+   reduce the first candidate batch so the page stays quick to open and scan. */
+@media (max-width: 760px) {
+  .topbar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    row-gap: 4px;
+    column-gap: 8px;
+  }
+
+  .topbar .brand {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .topbar .live-badge {
+    grid-column: 2;
+    grid-row: 1;
+    justify-self: end;
+  }
+
+  .topbar nav {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
+  .page {
+    margin-top: 9px;
+    margin-bottom: 22px;
+  }
+
+  .hero-banner-image {
+    height: clamp(132px, 25vw, 185px);
+  }
+
+  .mode-panel.panel,
+  .draft-panel.panel,
+  .pool-panel.panel {
+    padding: 12px;
+  }
+
+  .mode-intro {
+    min-height: 112px;
+    margin-bottom: 9px;
+    padding: 14px;
+  }
+
+  .mode-intro-copy .mode-copy {
+    margin-top: 6px;
+    line-height: 1.45;
+  }
+
+  .mode-controls {
+    gap: 9px;
+    padding: 11px;
+  }
+
+  .mode-controls .mode-field--play select {
+    min-height: 48px;
+  }
+
+  .stats {
+    gap: 7px;
+    margin: 9px 0;
+  }
+
+  .stat-card {
+    min-height: 58px;
+    padding: 8px 10px;
+  }
+
+  .workspace {
+    gap: 9px;
+  }
+
+  .draft-panel > .section-heading {
+    margin-bottom: 5px;
+  }
+
+  .draft-hint {
+    margin-bottom: 10px;
+    line-height: 1.5;
+  }
+
+  .pool-hero {
+    min-height: 118px;
+    margin-bottom: 9px;
+    padding: 14px;
+  }
+
+  .pool-heading-copy {
+    margin-top: 5px;
+    line-height: 1.4;
+  }
+
+  .pool-search-row {
+    margin-bottom: 9px;
+  }
+
+  .candidate-filter-panel {
+    padding: 8px;
+  }
+
+  .filter-grid {
+    gap: 6px;
+  }
+
+  .filter-grid .filter-card {
+    min-height: 58px;
+    padding: 6px 8px;
+  }
+
+  .filter-options {
+    gap: 3px 6px;
+    margin-top: 7px;
+    padding: 6px;
+  }
+
+  .candidate-toolbar {
+    flex-wrap: nowrap;
+    gap: 4px;
+    margin-top: 8px;
+    padding: 4px;
+  }
+
+  .candidate-sort-tabs {
+    order: 0;
+    flex-basis: auto;
+  }
+
+  .candidate-sort-tabs button {
+    min-height: 40px;
+    padding-inline: 8px;
+  }
+
+  .pool-result-count {
+    margin-left: 0;
+    padding: 6px 8px;
+    white-space: nowrap;
+  }
+
+  .recommendation-guide {
+    margin-top: 7px;
+  }
+
+  .candidate-list {
+    gap: 7px;
+    margin-top: 8px;
+  }
+
+  .candidate-card {
+    min-height: 184px;
+    padding: 9px;
+    border-radius: 14px;
+    contain-intrinsic-size: auto 184px;
+  }
+
+  .candidate-agency {
+    margin-top: 4px;
+  }
+
+  .candidate-rank-details {
+    margin-top: 4px;
+  }
+
+  .candidate-card .tags {
+    margin-top: 6px;
+  }
+
+  .candidate-select-hint {
+    min-height: 40px;
+  }
+}
+
+@media (max-width: 650px) {
+  /* The compact header already carries the KDraft brand on phones. */
+  .hero.hero-banner {
+    display: none;
+  }
+
+  .topbar {
+    gap: 5px;
+    padding-bottom: 5px;
+  }
+
+  .topbar .brand-mark {
+    width: 36px;
+    height: 36px;
+    flex-basis: 36px;
+  }
+
+  .topbar .brand {
+    gap: 7px;
+    font-size: 13px;
+  }
+
+  .topbar .brand small {
+    margin-top: 1px;
+    font-size: 7px;
+  }
+
+  .topbar .live-badge {
+    display: none;
+  }
+
+  .mode-intro {
+    grid-template-columns: minmax(0, 1fr);
+    min-height: 0;
+    padding: 13px 14px;
+  }
+
+  .mode-intro-art {
+    display: none;
+  }
+
+  .mode-intro-copy .eyebrow {
+    margin-bottom: 3px;
+    font-size: 7px;
+  }
+
+  .mode-intro-copy h2 {
+    font-size: 25px;
+  }
+
+  .mode-intro-copy .mode-copy {
+    max-width: 40ch;
+    margin-top: 4px;
+    font-size: 11px;
+  }
+
+  .mode-controls {
+    gap: 7px;
+    padding: 9px;
+    border-radius: 17px;
+  }
+
+  .mode-control-heading {
+    gap: 7px;
+    font-size: 14px;
+  }
+
+  .mode-control-mark {
+    width: 30px;
+    height: 30px;
+  }
+
+  .mode-control-en {
+    padding: 5px 7px;
+    font-size: 6px;
+  }
+
+  .stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .stat-card {
+    min-height: 52px;
+    padding: 7px 9px;
+  }
+
+  .stat-card span {
+    font-size: 10px;
+  }
+
+  .stat-card strong {
+    font-size: 17px;
+  }
+
+  .pool-hero {
+    min-height: 104px;
+  }
+
+  .pool-hero h2 {
+    font-size: clamp(24px, 6.5vw, 31px);
+  }
+
+  .pool-heading-copy {
+    max-width: 28ch;
+    font-size: 10px;
+  }
+
+  .pool-hero-art {
+    top: -48px;
+    right: -55px;
+    width: 145px;
+    height: 145px;
+  }
+
+  .pool-search-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .candidate-toolbar {
+    min-width: 0;
+  }
+
+  .candidate-sort-tabs button {
+    font-size: 9px;
+  }
+
+  .pool-result-count {
+    font-size: 8px;
+  }
+
+  .pool-result-count strong {
+    font-size: 11px;
+  }
+
+  .candidate-card {
+    min-height: 172px;
+  }
+}
+
+@media (max-width: 370px) {
+  .pool-search-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .pool-random-button {
+    width: 100%;
+  }
+
+  .candidate-card {
+    min-height: 184px;
+  }
+
+  .candidate-sort-tabs button {
+    padding-inline: 6px;
+    font-size: 8px;
+  }
+}
+
+@media (min-width: 761px) and (max-width: 1000px) and (orientation: landscape) {
+  .workspace {
+    grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr);
+    align-items: start;
+    gap: 12px;
+  }
+
+  .draft-panel {
+    order: 0;
+  }
+
+  .draft-panel.panel,
+  .pool-panel.panel {
+    padding: 14px;
+  }
+
+  .candidate-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .candidate-card {
+    min-height: 190px;
+    padding: 11px;
+  }
+}
