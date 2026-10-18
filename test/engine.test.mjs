@@ -182,5 +182,41 @@ test("AIの戦略はチーム順に割り当て", () => {
   assert.equal(E.teamLabel(s, "t1"), "AI1（同世代型）");
 });
 
+test("毎巡入札：毎巡重なったら抽選し、外れたチームはその巡で再入札", () => {
+  E.setRandom(seeded(7));
+  for (const mode of ["online", "local"]) {
+    const s = E.createDraft({ mode, teams: [{ name: "A" }, { name: "B" }, { name: "C" }], settings: { pickLimit: 3, orderMode: "snake", startOrder: "fixed", pickMode: "bid" } });
+    const pool = idols.filter(i => i.activity === "活動中");
+    let guard = 0;
+    while (!E.isFinished(s) && guard++ < 400) {
+      if (s.reveal) { drainReveals(s); continue; }
+      if (s.r1.awaitingOpen) { E.openBids(s); continue; }
+      assert.equal(s.r1.started, false, "最後まで入札フェーズ");
+      // 全チームが同じ人に入札（=毎回抽選）
+      const target = pool.find(i => E.idolAvailable(s, i.id));
+      for (const id of s.r1.order.slice()) {
+        if (E.canAct(s, id)) assert.ok(E.submitPick(s, id, target.id).ok);
+      }
+    }
+    assert.ok(E.isFinished(s), "終了する");
+    for (const t of s.teams) {
+      assert.deepEqual(s.picks[t.id].map(p => p.round).sort(), [1, 2, 3]);
+    }
+    const lost2 = s.teams.reduce((n, t) => n + E.lossesFor(s, t.id, 2).length, 0);
+    assert.ok(lost2 >= 2, "2巡目にも外れがある");
+    assert.equal(new Set(s.drafted).size, 9);
+  }
+  E.setRandom(null);
+});
+
+test("毎巡入札：AIだけでも最後まで進む", () => {
+  E.setRandom(seeded(11));
+  const s = E.createDraft({ mode: "ai", teams: [{ name: "A", kind: "ai" }, { name: "B", kind: "ai" }, { name: "C", kind: "ai" }, { name: "D", kind: "ai" }], settings: { pickLimit: 5, orderMode: "fixed", startOrder: "random", pickMode: "bid" } });
+  runAI(s);
+  assert.ok(E.isFinished(s));
+  s.teams.forEach(t => assert.equal(s.picks[t.id].length, 5));
+  E.setRandom(null);
+});
+
 console.log(failures ? `\n${failures} failed` : "\nall passed");
 process.exit(failures ? 1 : 0);
