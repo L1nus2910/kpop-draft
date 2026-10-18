@@ -5,7 +5,7 @@
  * ふだんの更新ではこのファイルを書き換える必要はありません。
  * キャッシュの作り方そのものを変えたときだけ SW_VERSION を上げてください。
  */
-const SW_VERSION = "kdraft-sw-1";
+const SW_VERSION = "kdraft-sw-2";
 const PAGE_CACHE = `${SW_VERSION}-pages`;
 const ASSET_CACHE = `${SW_VERSION}-assets`;
 const SDK_CACHE = `${SW_VERSION}-sdk`;
@@ -16,7 +16,6 @@ const NETWORK_TIMEOUT_MS = 3500;
 const CORE_ASSETS = [
   "manifest.webmanifest",
   "firebase-config.js",
-  "app-shell.js",
   "assets/kdraft-48.png",
   "assets/kdraft-192-v3.png",
   "assets/kdraft-512-v4.png",
@@ -27,10 +26,11 @@ const CORE_ASSETS = [
 
 function localReferences(html) {
   const refs = new Set();
-  const pattern = /(?:src|href|srcset)="([^"]+)"/g;
+  // 属性（src/href/srcset）と import map 内のバージョン付きURLの両方を拾う
+  const pattern = /(?:src|href|srcset)="([^"]+)"|"(\.\/[^"]+\?v=[^"]+)"/g;
   let match;
   while ((match = pattern.exec(html))) {
-    match[1].split(",").forEach(part => {
+    (match[1] || match[2]).split(",").forEach(part => {
       const raw = part.trim().split(/\s+/)[0];
       if (!raw || raw.startsWith("#") || raw.startsWith("data:") || raw.startsWith("mailto:")) return;
       const url = new URL(raw, SCOPE);
