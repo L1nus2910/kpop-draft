@@ -9,6 +9,9 @@
 //   joinRequests/{uid} … 参加申請 { name, createdAt } / ホストの返事 { status: "full" | "closed" | "kicked" }
 //   actions/{id}  … 参加者の操作 { uid, kind: "pick"|"envelope"|"leave", ... } をホストが処理して消す
 //   state         … ホストが書く共有状態 { rev, json（エンジン状態のJSON文字列）, acks }
+//
+// lobby/{code}    … 「ルーム一覧に公開」にしたルームだけ。ホストが書く
+//   { host, count, max, pickLimit, limits, createdAt, updatedAt }
 
 const SDK_VERSION = "12.19.0";
 const SDK = ["app", "auth", "database"].map(name => `https://www.gstatic.com/firebasejs/${SDK_VERSION}/firebase-${name}-compat.js`);
@@ -219,7 +222,50 @@ export class Room {
   }
   async close() {
     this.detach();
+    await this.unpublish().catch(() => {});
     await this.ref.remove();
+  }
+
+  // ------------------------------------------------------------ ルーム一覧（公開）
+  lobbyRef() { return window.firebase.database().ref(`lobby/${this.code}`); }
+  /** 一覧に載せる・内容を更新する。通信が切れたら自動で消え、つながり直したら載せ直す */
+  async publish(info) {
+    const entry = {
+      host: normalizeName(info.host, "ホスト"),
+      count: Math.max(0, Number(info.count) || 0),
+      max: MAX_PLAYERS,
+      pickLimit: Number(info.pickLimit) || 5,
+      limits: String(info.limits || "").slice(0, 120),
+      createdAt: this.publishedAt || (this.publishedAt = this.now()),
+      updatedAt: this.now()
+    };
+    const key = JSON.stringify({ ...entry, updatedAt: 0 });
+    if (key === this.publishedKey) return;
+    this.publishedKey = key;
+    this.publishedEntry = entry;
+    const ref = this.lobbyRef();
+    if (!this.lobbyDisconnectSet) {
+      this.lobbyDisconnectSet = true;
+      ref.onDisconnect?.().remove();
+      const connectedRef = window.firebase.database().ref(".info/connected");
+      const cb = snap => {
+        if (snap.val() === true && this.publishedEntry) {
+          ref.onDisconnect?.().remove();
+          ref.set({ ...this.publishedEntry, updatedAt: this.now() }).catch(() => {});
+        }
+      };
+      connectedRef.on("value", cb);
+      this.offs.push(() => connectedRef.off("value", cb));
+    }
+    await ref.set(entry);
+  }
+  async unpublish() {
+    if (!this.publishedEntry && !this.publishedKey) return;
+    this.publishedEntry = null;
+    this.publishedKey = "";
+    const ref = this.lobbyRef();
+    try { ref.onDisconnect?.().cancel(); } catch { /* ignore */ }
+    await ref.remove();
   }
 
   // ------------------------------------------------------------ 参加者
@@ -252,6 +298,23 @@ export class Room {
     url.searchParams.set("room", this.code);
     return url.toString();
   }
+}
+
+/** 公開中のルーム一覧を見る。戻り値は購読をやめる関数 */
+export async function watchPublicRooms(onList, onError) {
+  await identity();
+  const ref = window.firebase.database().ref("lobby");
+  const cb = snap => {
+    const now = Date.now();
+    const list = Object.entries(snap.val() || {})
+      .map(([code, room]) => ({ code, ...room }))
+      .filter(room => /^[A-Z0-9]{8}$/.test(room.code) && now - (Number(room.updatedAt) || 0) < 3 * 60 * 60 * 1000)
+      .sort((a, b) => (Number(b.createdAt) || 0) - (Number(a.createdAt) || 0))
+      .slice(0, 30);
+    onList(list);
+  };
+  ref.on("value", cb, error => onError?.(error));
+  return () => ref.off("value", cb);
 }
 
 /** オンライン画面を開いた時点で接続の準備をしておく（ルーム作成・参加を速くする） */

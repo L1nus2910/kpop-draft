@@ -11,9 +11,39 @@
 //   以降、ウェーバーは毎巡逆順に、固定は毎巡チーム順。
 // - 指名人数に達したチーム（とオンラインで退出したチーム）は飛ばす。
 
-import { idols } from "./data.js";
+import { idols, agencyFilterName } from "./data.js";
 
 export const idolById = new Map(idols.map(idol => [idol.id, idol]));
+
+// ---------------------------------------------------------------- 縛り（候補の条件）
+// limits: { generations: ["4世代"], nationalities: ["日本"], agencies: ["HYBE"] }（空なら条件なし）
+const LIMIT_KEYS = ["generations", "nationalities", "agencies"];
+const listOf = value => (Array.isArray(value) ? value : value && typeof value === "object" ? Object.values(value) : [])
+  .map(item => String(item || "").slice(0, 60)).filter(Boolean);
+export function normalizeLimits(limits) {
+  const result = {};
+  LIMIT_KEYS.forEach(key => { result[key] = [...new Set(listOf(limits?.[key]))].slice(0, 80); });
+  return result;
+}
+export function hasLimits(limits) {
+  return LIMIT_KEYS.some(key => listOf(limits?.[key]).length);
+}
+export function inLimits(limits, idol) {
+  if (!limits || !idol) return true;
+  const g = listOf(limits.generations), n = listOf(limits.nationalities), a = listOf(limits.agencies);
+  if (g.length && !g.includes(idol.generation)) return false;
+  if (n.length && !String(idol.nationality || "").split("・").some(item => n.includes(item))) return false;
+  if (a.length && !a.includes(agencyFilterName(idol.agency))) return false;
+  return true;
+}
+export function limitsLabel(limits) {
+  const parts = LIMIT_KEYS.map(key => listOf(limits?.[key]).join("・")).filter(Boolean);
+  return parts.join("／");
+}
+/** 縛りの中で指名できる人数（同じ人は1人として数える） */
+export function eligibleCount(limits) {
+  return new Set(idols.filter(idol => inLimits(limits, idol)).map(idol => idol.personKey || idol.id)).size;
+}
 
 let rng = Math.random;
 export function setRandom(fn) { rng = fn || Math.random; }
@@ -45,7 +75,7 @@ export function strategyLabel(style) {
 /**
  * 新しいドラフトを作る。
  * teams: [{ name, kind: "human"|"ai", uid? }]（設定順）
- * settings: { pickLimit, orderMode: "snake"|"fixed", startOrder: "random"|"fixed" }
+ * settings: { pickLimit, orderMode: "snake"|"fixed", startOrder: "random"|"fixed", limits? }
  */
 export function createDraft({ mode, teams, settings }) {
   let aiIndex = 0;
@@ -70,7 +100,8 @@ export function createDraft({ mode, teams, settings }) {
     settings: {
       pickLimit: Number(settings.pickLimit) || 5,
       orderMode: settings.orderMode === "fixed" ? "fixed" : "snake",
-      startOrder: settings.startOrder === "fixed" ? "fixed" : "random"
+      startOrder: settings.startOrder === "fixed" ? "fixed" : "random",
+      limits: normalizeLimits(settings.limits)
     },
     teams: ordered,
     picks: Object.fromEntries(order.map(id => [id, []])),
@@ -175,7 +206,7 @@ export function canAct(state, teamId) {
 
 export function idolAvailable(state, idolId) {
   const idol = idolById.get(String(idolId));
-  return Boolean(idol && !personDrafted(state, idol));
+  return Boolean(idol && !personDrafted(state, idol) && inLimits(state.settings.limits, idol));
 }
 
 export function totalPicks(state) {
@@ -371,6 +402,7 @@ export function advanceReveal(state, now = Date.now()) {
 export function submitBid(state, teamId, idolId, now = Date.now()) {
   if (!canAct(state, teamId)) return { ok: false, reason: "いまは入札できません。" };
   const id = idolId == null ? "" : String(idolId);
+  if (id && idolById.has(id) && !inLimits(state.settings.limits, idolById.get(id))) return { ok: false, reason: "今回の縛りの対象外のメンバーです。" };
   if (id && !idolAvailable(state, id)) return { ok: false, reason: "このメンバーはすでに指名されています。" };
   state.r1.bids[teamId] = id;
   pushLog(state, { kind: "bid", teamId });
@@ -435,6 +467,7 @@ export function submitPick(state, teamId, idolId, now = Date.now()) {
   if (!canAct(state, teamId)) return { ok: false, reason: "いまはこのチームの指名番ではありません。" };
   const idol = idolById.get(String(idolId));
   if (!idol || personDrafted(state, idol)) return { ok: false, reason: "このメンバーはすでに指名されています。" };
+  if (!inLimits(state.settings.limits, idol)) return { ok: false, reason: "今回の縛りの対象外のメンバーです。" };
   const round = state.round;
   recordPick(state, teamId, idol, round);
   pushLog(state, { kind: "pick", teamId, idolId: idol.id, round });

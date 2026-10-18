@@ -1,5 +1,5 @@
 // 結果画像（SNS共有用）とテキスト
-import { idolById, teamLabel, isDeparted } from "./engine.js";
+import { idolById, teamLabel, isDeparted, limitsLabel } from "./engine.js";
 import { agencyShort, teamColor } from "./ui.js";
 
 const SITE_URL = "https://l1nus2910.github.io/kpop-draft/";
@@ -77,7 +77,8 @@ export async function createResultImage(state) {
   fitText(ctx, "KDRAFT  ドラフト結果", pad, pad + 24, tableW, 20, { color: "#d6b062", weight: 700 });
   const total = teams.reduce((sum, t) => sum + (state.picks[t.id] || []).length, 0);
   fitText(ctx, "最終ドラフト結果", pad, pad + 84, tableW, 52, { color: "#ffffff", weight: 400, family: DISPLAY });
-  fitText(ctx, `${cols}チーム・${rounds}巡・合計${total}人`, pad, pad + 136, tableW, 20, { color: "rgba(255,255,255,0.7)", weight: 700 });
+  const limits = limitsLabel(state.settings.limits);
+  fitText(ctx, `${cols}チーム・${rounds}巡・合計${total}人${limits ? `・縛り：${limits}` : ""}`, pad, pad + 136, tableW, 20, { color: "rgba(255,255,255,0.7)", weight: 700 });
 
   const tx = pad;
   const ty = pad + titleH;

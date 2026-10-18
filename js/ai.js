@@ -2,7 +2,7 @@
 // 戦略ごとにチーム構成の点数をつけ、人気（星）も少し加味し、乱数を足した上位3人から選ぶ。
 
 import { idols, agencyFilterName, normalizeSearchText } from "./data.js";
-import { idolById, personDrafted, random, team } from "./engine.js";
+import { idolById, personDrafted, random, team, inLimits } from "./engine.js";
 
 /** 同じ人が複数グループにいる場合は 1人にまとめる（活動中のグループを優先） */
 export function preferredPersonCandidates(candidates, query = "") {
@@ -19,7 +19,7 @@ export function preferredPersonCandidates(candidates, query = "") {
 
 export function chooseAIIdol(state, teamId, excluded = new Set()) {
   const available = preferredPersonCandidates(
-    idols.filter(idol => !personDrafted(state, idol) && !excluded.has(idol.id))
+    idols.filter(idol => !personDrafted(state, idol) && !excluded.has(idol.id) && inLimits(state.settings.limits, idol))
   );
   if (!available.length) return null;
   const style = team(state, teamId)?.strategy || "generationFocus";
