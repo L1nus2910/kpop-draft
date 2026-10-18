@@ -1578,12 +1578,71 @@ function onlineMessage(message, isError = false) {
   if (line) { line.textContent = message; line.classList.toggle("is-error", isError); }
 }
 
+/** この端末（ブラウザ）で開いたままのルーム。{ code, host, attached } か null */
+async function existingRoom() {
+  if (S.online?.room) return { code: S.online.room.code, host: S.online.room.isHost, attached: true };
+  const saved = store.room();
+  if (!saved?.code) return null;
+  try {
+    const { Room } = await loadOnline();
+    const member = await Room.memberInfo(saved.code);
+    if (member) return { code: saved.code, host: Boolean(member.host), attached: false };
+  } catch { /* つながらない時は確認できないので作成に進む */ }
+  store.saveRoom(null);
+  return null;
+}
+
+/** 前のルームが残っていたら、戻るか終了・退出するかを選んでもらう。新しく作ってよければ true */
+async function settlePreviousRoom() {
+  onlineMessage("前のルームを確認しています…");
+  const prev = await existingRoom();
+  onlineMessage("");
+  if (!prev) return true;
+  const choice = await menuDialog({
+    title: prev.host ? `ルーム ${prev.code} がまだ開いています` : `ルーム ${prev.code} に参加中です`,
+    items: [
+      { value: "back", label: "そのルームに戻る", icon: "play" },
+      { value: "end", label: prev.host ? "そのルームを終了して、新しく作る" : "そのルームから退出して、新しく作る", icon: "close", danger: true }
+    ]
+  });
+  if (choice === "back") {
+    if (prev.attached) go(S.draft?.mode === "online" && S.online?.status === "playing" ? (E.isFinished(S.draft) ? "results" : "draft") : "room");
+    else joinRoom(prev.code);
+    return false;
+  }
+  if (choice !== "end") return false;
+  try {
+    onlineMessage(prev.host ? "前のルームを終了しています…" : "前のルームから退出しています…");
+    let room = S.online?.room;
+    if (!room) {
+      const { Room } = await loadOnline();
+      room = (await Room.join({ code: prev.code, name: S.onlineName })).room;
+    }
+    if (prev.host) {
+      stopDirector();
+      await room.close();
+    } else if (S.online?.status === "playing" || (await room.ref.child("status").once("value")).val() === "playing") {
+      await room.sendAction({ kind: "leave" }).done.catch(() => {});
+      room.detach();
+    } else {
+      await room.leaveLobby();
+    }
+    leaveRoomLocally("", true);
+    return true;
+  } catch (error) {
+    onlineMessage(error.message || "前のルームを閉じられませんでした。", true);
+    return false;
+  }
+}
+
 async function createRoom() {
   S.onlineName = normalizeName($("#onlineName")?.value || S.onlineName, "ホスト");
   savePrefs();
+  const publicChecked = Boolean($("#roomPublic")?.checked);
+  if (!(await settlePreviousRoom())) return;
   try {
     onlineMessage("ルームを作っています…");
-    S.roomPublic = Boolean($("#roomPublic")?.checked);
+    S.roomPublic = publicChecked;
     savePrefs();
     const settings = { pickLimit: S.setup.pickLimit, orderMode: S.setup.orderMode, startOrder: S.setup.startOrder, pickMode: S.setup.pickMode, limits: S.setup.limits, limitsOn: S.setup.limitsOn, public: S.roomPublic };
     const { Room } = await loadOnline();
@@ -1595,10 +1654,13 @@ async function createRoom() {
   }
 }
 
-async function joinRoom(codeValue) {
+async function joinRoom(codeValue, { userAction = false } = {}) {
   const code = normalizeCode(codeValue ?? $("#roomCode")?.value);
   S.onlineName = normalizeName($("#onlineName")?.value || S.onlineName);
   savePrefs();
+  // 別のルームを開いたまま参加しようとした時は、先に片付けてもらう
+  const other = S.online?.room?.code || store.room()?.code || "";
+  if (userAction && other && other !== code && !(await settlePreviousRoom())) return;
   try {
     onlineMessage("ルームに接続しています…");
     const { Room } = await loadOnline();
@@ -2075,7 +2137,7 @@ document.addEventListener("click", async event => {
     case "join-public": {
       const code = target.dataset.code;
       if ($("#roomCode")) $("#roomCode").value = code;
-      joinRoom(code);
+      joinRoom(code, { userAction: true });
       break;
     }
     case "toggle-limit": toggleLimit(target.dataset.key, target.dataset.value); break;
@@ -2162,7 +2224,7 @@ document.addEventListener("click", async event => {
       renderHistory();
       break;
     case "create-room": createRoom(); break;
-    case "join-room": joinRoom(); break;
+    case "join-room": joinRoom(undefined, { userAction: true }); break;
     case "copy-invite": copyInvite(); break;
     case "share-invite": shareInvite(); break;
     case "start-online": startOnline(); break;
@@ -2311,7 +2373,7 @@ document.addEventListener("keydown", event => {
   } else if (event.key === "Escape" && S.selectedId && S.route.name === "draft" && !$("#modal").open) {
     const previous = S.selectedId; S.selectedId = null; refreshCardSelection(previous); renderDock();
   } else if (event.key === "Enter" && event.target.id === "roomCode") {
-    joinRoom();
+    joinRoom(undefined, { userAction: true });
   }
 });
 
