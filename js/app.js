@@ -481,7 +481,7 @@ function renderSetup() {
           <div class="panel" ${invite ? 'style="order:2"' : ""}>
             <div><h2 class="panel-title">ルームを作る</h2><p class="panel-sub">あなたがホストになります。ルールはルームで決められます。</p></div>
             <label class="field"><span class="field-label">ルーム名（任意）</span>
-              <input class="input" id="roomName" maxlength="20" value="${esc(S.roomName || "")}" placeholder="例：4世代縛りで遊ぼう" autocomplete="off"></label>
+              <input class="input" id="roomName" maxlength="20" value="${esc(S.roomName || "")}" placeholder="例：○○縛り" autocomplete="off"></label>
             <label class="check-row"><input type="checkbox" id="roomPublic" ${S.roomPublic ? "checked" : ""}><span><strong>ルーム一覧に公開する</strong><small>オフなら招待リンクを知っている人だけが参加できます</small></span></label>
             <button class="btn btn-primary" data-action="create-room" ${configured ? "" : "disabled"}>${icon("globe")}ルームを作る</button>
           </div>
@@ -1950,7 +1950,7 @@ function renderRoom() {
         <section class="panel setup-form">
           <div><h2 class="panel-title">ルール</h2><p class="panel-sub">${host ? "ホストが決めます。" : "ホストが決めたルールです。"}</p></div>
           ${host && !playing ? `<label class="field"><span class="field-label">ルーム名（任意）</span>
-            <input class="input" id="roomNameEdit" maxlength="20" value="${esc(settings.roomName || "")}" placeholder="例：4世代縛りで遊ぼう" autocomplete="off"></label>` : ""}
+            <input class="input" id="roomNameEdit" maxlength="20" value="${esc(settings.roomName || "")}" placeholder="例：○○縛り" autocomplete="off"></label>` : ""}
           <div class="field"><span class="field-label">ルーム一覧</span>
             ${host && !playing
               ? segmented("roomPublic", [["private", "招待した人だけ"], ["public", "一覧に公開"]], settings.public ? "public" : "private", { label: "ルーム一覧への公開" })
