@@ -1072,7 +1072,6 @@ function renderReveal() {
               <small>${r.type === "nomination" ? "第1回選択希望" : `第${r.round}巡選択`}</small>
               <p class="nameplate-name">${esc(idol?.japaneseName)}</p>
               <p class="nameplate-meta"><span>${esc(agencyFull(idol))}</span><span>${esc(idol?.group)}</span></p>
-              <p>${stars(idol?.popularityStars)}</p>
             </div>
           </div></div>
           <div class="stage-foot"><p class="stage-hint" id="stageHint"></p><div class="stage-actions" id="stageActions"></div></div>
