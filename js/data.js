@@ -770,51 +770,84 @@ const koreanNameOverrides = {
   cl: "씨엘", vv: "브이브이"
 };
 
-const koreanRomanSyllables = {
-  yeong: "영", young: "영", yeon: "연", hyeong: "형", hyung: "형", hyeon: "현", hyun: "현",
-  seung: "승", hee: "희", hwi: "휘", soo: "수", gyu: "규", gyung: "경", yoon: "윤",
-  yun: "윤", chan: "찬", joo: "주", eo: "어", seol: "설", yeol: "열", eul: "을",
-  eung: "응", eun: "은", seong: "성", sung: "성", seon: "선", jeong: "정", jung: "정",
-  jong: "종", chae: "채", choi: "최", cheo: "처", hye: "혜", yeo: "여", seo: "서",
-  sye: "셰", syo: "쇼", shi: "시", sh: "시", ch: "치", ts: "츠", ae: "애", oe: "외",
-  ui: "의", eu: "으", oo: "우", woo: "우", yoo: "유", yu: "유", yae: "얘", ya: "야",
-  ye: "예", yo: "요", wa: "와", wae: "왜", we: "웨", wi: "위", wo: "워", hyo: "효",
-  hyu: "휴", hwa: "화", hyeo: "혀", kye: "계", kyu: "규", ryu: "류", ry: "리",
-  ga: "가", gi: "기", gu: "구", ge: "게", go: "고", ka: "카", ki: "키", ku: "쿠",
-  ke: "케", ko: "코", na: "나", ni: "니", nu: "누", ne: "네", no: "노", da: "다",
-  di: "디", du: "두", de: "데", do: "도", ta: "타", ti: "티", tu: "투", te: "테",
-  to: "토", tae: "태", sa: "사", si: "시", su: "수", se: "세", so: "소", ja: "자",
-  ji: "지", ju: "주", je: "제", jo: "조", cha: "차", chi: "치", chu: "추", che: "체",
-  cho: "초", ha: "하", hi: "히", hu: "후", he: "헤", ho: "호", ma: "마", mi: "미",
-  mu: "무", me: "메", mo: "모", ra: "라", ri: "리", ru: "루", re: "레", ro: "로",
-  ba: "바", bi: "비", bu: "부", be: "베", bo: "보", pa: "파", pi: "피", pu: "푸",
-  pe: "페", po: "포", la: "라", li: "리", lu: "루", le: "레", lo: "로", a: "아",
-  i: "이", u: "우", e: "에", o: "오", won: "원", sul: "설", seul: "슬", ning: "닝",
-  bin: "빈", min: "민", jin: "진", rin: "린", ram: "람", lim: "림", in: "인", an: "안",
-  on: "온", un: "운", ing: "잉", ong: "옹", ang: "앙", eng: "엥", oh: "오"
-};
-const koreanSyllableKeys = Object.keys(koreanRomanSyllables)
-  .sort((a, b) => b.length - a.length);
+// 自動変換では正しくならない名前のハングル表記
+Object.assign(koreanNameOverrides, {
+  "solar": "솔라", "sinb": "신비", "umji": "엄지", "exy": "엑시", "dayoung": "다영", "monday": "먼데이", "jaehee": "재희", "yuqi": "우기",
+  "sheon": "션", "sullyoon": "설윤", "bae": "배이", "kyujin": "규진", "dayeon": "다연", "heejin": "희진", "jinsoul": "진솔", "choerry": "최리",
+  "kaede": "카에데", "xinyu": "신위", "mayu": "마유", "hayeon": "하연", "sophia": "소피아", "gehlee": "겔리", "elisia": "엘리시아", "liv": "리브",
+  "may": "메이", "kanny": "카니", "stella": "스텔라", "ye-on": "예온", "sui": "수이", "katelyn": "케이틀린", "sasha": "사샤", "seohee": "서희",
+  "elena": "엘레나", "heekie": "히키", "evon": "이본", "ayne": "에인", "liuyin": "리우인", "sunye": "선예", "sohee": "소희", "hyolyn": "효린",
+  "soyou": "소유", "qri": "큐리", "victoria": "빅토리아", "amber": "엠버", "krystal": "크리스탈", "gayoon": "가윤", "narsha": "나르샤", "le": "엘리",
+  "sorn": "손", "elkie": "엘키", "yves": "이브", "chuu": "츄", "lucy": "루시", "athena": "아테나", "hanni": "하니", "jisun": "지선",
+  "yihyun": "이현", "kylie": "카일리", "soee": "소이", "chloe young": "클로이영", "kahi": "가희", "kaeun": "가은", "e-young": "이영", "keumjo": "금조",
+  "somyi": "소미", "rachel": "레이첼", "baby soul": "베이비소울", "yeonwoo": "연우", "jane": "제인", "nayun": "나윤", "daisy": "데이지", "jooe": "주이",
+  "nancy": "낸시", "youkyung": "유경", "lime": "라임", "geumhee": "금희", "nayu": "나유", "seonyou": "선유", "jackie": "재키", "joonie": "주니",
+  "dosie": "도시", "youi": "유이", "sriya": "스리야", "nvee": "엔비", "lexi": "렉시", "camila": "카밀라", "ayane": "아야네", "tsuzumi": "츠즈미",
+  "merci": "메르시", "ayune": "아윤", "jenny": "제니", "carmen": "카르멘", "megan": "메건", "daniela": "다니엘라", "minah": "민아", "shuie": "슈이",
+  "suzu": "스즈", "manon": "마농", "ahin": "아인", "swan": "스완", "seola": "설아", "woni": "원이", "rahee": "라희", "dohee": "도희",
+  "aisha": "아이샤", "do-a": "도아", "sunhye": "선혜", "sunhwa": "선화", "yiren": "이런", "jaehee": "재희", "sullin": "설린", "leesol": "이솔",
+  "aurora": "오로라", "sulli": "설리", "julia": "줄리아", "songsun": "송선", "savanna": "사바나", "seungjoo": "승주"
+});
+
+// ローマ字の芸名からハングルを組み立てる（初声＋中声＋終声）。
+// 外国人メンバーや読みが特殊な名前は koreanNameOverrides で正しい表記を指定する。
+const HANGUL_INITIALS = [
+  ["kk", 1], ["gg", 1], ["tt", 4], ["pp", 8], ["ss", 10], ["jj", 13], ["ch", 14], ["sh", 9],
+  ["g", 0], ["k", 15], ["n", 2], ["d", 3], ["t", 16], ["r", 5], ["l", 5], ["m", 6], ["b", 7],
+  ["p", 17], ["f", 17], ["v", 7], ["s", 9], ["x", 9], ["z", 12], ["j", 12], ["c", 15], ["q", 15], ["h", 18]
+];
+const HANGUL_VOWELS = [
+  ["yeo", 6], ["yae", 3], ["wae", 10], ["eui", 19], ["yoo", 17], ["woo", 13], ["wee", 16],
+  ["ae", 1], ["ya", 2], ["eo", 4], ["ye", 7], ["wa", 9], ["oe", 11], ["yo", 12], ["wo", 14], ["we", 15],
+  ["wi", 16], ["yu", 17], ["eu", 18], ["ui", 19], ["oo", 13], ["ee", 20], ["ou", 13], ["ay", 1], ["ey", 5],
+  ["a", 0], ["e", 5], ["o", 8], ["u", 13], ["i", 20], ["y", 20]
+];
+const HANGUL_FINALS = [["ng", 21], ["k", 1], ["g", 1], ["n", 4], ["l", 8], ["r", 8], ["m", 16], ["p", 17], ["b", 17], ["t", 19], ["s", 19]];
+// 韓国語ローマ字表記のゆれをそろえる（young→yeong, hyun→hyeon, kyung→gyeong など）
+function normalizeRomanization(word) {
+  return word.toLowerCase().replace(/[^a-z]/g, "")
+    .replace(/(?:k|g)y(?:u|ou|eo)ng/g, "gyeong")
+    .replace(/young|yung/g, "yeong")
+    .replace(/hyun/g, "hyeon")
+    .replace(/sung/g, "seong")
+    .replace(/jung/g, "jeong")
+    .replace(/([aeiou])(?=eu)/g, "$1|")
+    .replace(/oeu/g, "o|eu");
+}
+const startsWithVowel = text => HANGUL_VOWELS.some(([v]) => text.startsWith(v)) && !/^y[^aeiou]/.test(text);
+
+function romanToHangul(word) {
+  return normalizeRomanization(word).split("|").map(romanPartToHangul).join("");
+}
+
+function romanPartToHangul(part) {
+  let source = part;
+  let out = "";
+  while (source) {
+    let initial = 11;
+    for (const [r, index] of HANGUL_INITIALS) {
+      if (source.startsWith(r) && startsWithVowel(source.slice(r.length))) { initial = index; source = source.slice(r.length); break; }
+    }
+    // シ・ショなど：sh + i/y 系
+    const vowel = HANGUL_VOWELS.find(([v]) => source.startsWith(v));
+    if (!vowel) { source = source.slice(1); continue; }
+    source = source.slice(vowel[0].length);
+    let final = 0;
+    for (const [r, index] of HANGUL_FINALS) {
+      if (!source.startsWith(r)) continue;
+      const rest = source.slice(r.length);
+      if (/^h/.test(rest) && /[sctkp]$/.test(r)) continue; // sh, ch, th などは次の音の頭
+      if (r === "ng" || !rest || !startsWithVowel(rest)) { final = index; source = rest; break; }
+    }
+    out += String.fromCharCode(0xac00 + (initial * 21 + vowel[1]) * 28 + final);
+  }
+  return out;
+}
 
 function toKoreanMemberName(name) {
   const normalized = String(name).trim().toLowerCase().replace(/\s+/g, " ");
   if (koreanNameOverrides[normalized]) return koreanNameOverrides[normalized];
-
-  return String(name).toLowerCase().split(/(\s+|-)/).map(part => {
-    if (/^\s+$/.test(part) || part === "-") return " ";
-    let source = part.replace(/[^a-z]/g, "");
-    let result = "";
-    while (source) {
-      const match = koreanSyllableKeys.find(syllable => source.startsWith(syllable));
-      if (!match) {
-        source = source.slice(1);
-        continue;
-      }
-      result += koreanRomanSyllables[match];
-      source = source.slice(match.length);
-    }
-    return result;
-  }).join("").trim();
+  return String(name).split(/[\s-]+/).map(romanToHangul).join(" ").trim();
 }
 
 function normalizeSearchText(value) {
@@ -1017,12 +1050,126 @@ function agencyFilterName(agency) {
   return agencyParentDisplayNames[value] || value;
 }
 
-const candidateSearchTextById = new Map(idols.map(idol => [
-  idol.id,
-  [idol.name, idol.japaneseName, idol.japaneseSearchName, idol.koreanName,
-    idol.group, idol.nationality, idol.agency, agencyFilterName(idol.agency)]
-    .map(normalizeSearchText)
-]));
+// グループ名のカタカナ・ハングル表記（検索用）
+const groupAliases = {
+  "Girls' Generation": "少女時代 しょうじょじだい 소녀시대 SNSD",
+  "BLACKPINK": "ブラックピンク ブルピン 블랙핑크 블핑",
+  "TWICE": "トゥワイス 트와이스",
+  "Red Velvet": "レッドベルベット レドベル 레드벨벳",
+  "I.O.I": "アイオーアイ 아이오아이",
+  "ITZY": "イッジ 있지",
+  "aespa": "エスパ 에스파",
+  "IVE": "アイヴ アイブ 아이브",
+  "LE SSERAFIM": "ルセラフィム ルセラ 르세라핌",
+  "IZ*ONE": "アイズワン 아이즈원 IZONE",
+  "ILLIT": "アイリット 아일릿",
+  "KISS OF LIFE": "キスオブライフ キスオブ 키스오브라이프 키오프",
+  "Apink": "エーピンク 에이핑크",
+  "KARA": "カラ 카라",
+  "MAMAMOO": "ママム 마마무",
+  "GFRIEND": "ヨジャチング ジーフレンド 여자친구 여친",
+  "OH MY GIRL": "オーマイガール オマゴル 오마이걸",
+  "WJSN": "宇宙少女 ウジュソニョ 우주소녀 Cosmic Girls",
+  "Dreamcatcher": "ドリームキャッチャー ドリキャ 드림캐쳐",
+  "VIVIZ": "ビビジ 비비지",
+  "Weeekly": "ウィークリー 위클리",
+  "STAYC": "ステイシー 스테이씨",
+  "i-dle": "アイドゥル ジーアイドゥル 아이들 여자아이들 (G)I-DLE GIDLE",
+  "Billlie": "ビリー 빌리",
+  "H1-KEY": "ハイキー 하이키",
+  "NMIXX": "エンミックス 엔믹스",
+  "Kep1er": "ケプラー 케플러",
+  "NiziU": "ニジュー 니쥬",
+  "XG": "エックスジー 엑스지",
+  "QWER": "キューダブリューイーアール 큐더블유이알",
+  "ARTMS": "アルテミス 아르테미스",
+  "tripleS": "トリプルエス 트리플에스",
+  "YOUNG POSSE": "ヤングポッセ 영파씨",
+  "KATSEYE": "キャッツアイ 캣츠아이",
+  "BABYMONSTER": "ベビーモンスター ベビモン 베이비몬스터 베몬",
+  "UNIS": "ユニス 유니스",
+  "RESCENE": "リセンヌ 리센느",
+  "MEOVV": "ミヤオ 미야오",
+  "izna": "イズナ 이즈나",
+  "SAY MY NAME": "セイマイネーム 세이마이네임",
+  "Hearts2Hearts": "ハーツトゥハーツ 하츠투하츠",
+  "KiiiKiii": "キキ 키키",
+  "AtHeart": "アットハート 앳하트",
+  "ifeye": "イフアイ 이프아이",
+  "TUIDE": "トゥイード 튜이드",
+  "UNCHILD": "アンチャイルド 언차일드",
+  "Heart of Woman": "ハートオブウーマン 하트오브우먼",
+  "2NE1": "トゥエニーワン 투애니원",
+  "Wonder Girls": "ワンダーガールズ 원더걸스",
+  "SISTAR": "シスター 씨스타",
+  "T-ARA": "ティアラ 티아라",
+  "f(x)": "エフエックス 에프엑스",
+  "4Minute": "フォーミニッツ 포미닛",
+  "Girl's Day": "ガールズデイ 걸스데이",
+  "Brown Eyed Girls": "ブラウンアイドガールズ 브라운아이드걸스",
+  "Miss A": "ミスエー 미쓰에이",
+  "EXID": "イーエックスアイディー 이엑스아이디",
+  "CLC": "シーエルシー 씨엘씨",
+  "LOONA": "今月の少女 イダレソニョ ルーナ 이달의소녀",
+  "Weki Meki": "ウィキミキ 위키미키",
+  "FIFTY FIFTY": "フィフティフィフティ 피프티피프티",
+  "NewJeans": "ニュージーンズ 뉴진스",
+  "fromis_9": "プロミスナイン 프로미스나인",
+  "Baby DONT Cry": "ベイビードントクライ 베이비돈크라이",
+  "KIIRAS": "キラス 키라스",
+  "USPEER": "ユースピア 유스피어",
+  "Candy Shop": "キャンディショップ 캔디샵",
+  "BADVILLAIN": "バッドヴィラン 배드빌런",
+  "After School": "アフタースクール 애프터스쿨",
+  "SECRET": "シークレット 시크릿",
+  "9MUSES": "ナインミュージス 나인뮤지스",
+  "gugudan": "ググダン 구구단",
+  "DIA": "ダイア 다이아",
+  "APRIL": "エイプリル 에이프릴",
+  "Lovelyz": "ラブリーズ 러블리즈",
+  "MOMOLAND": "モモランド 모모랜드",
+  "AOA": "エーオーエー 에이오에이",
+  "HELLOVENUS": "ハローヴィーナス 헬로비너스",
+  "ALICE (ELRIS)": "アリス エルリス 앨리스 엘리스",
+  "LIGHTSUM": "ライトサム 라잇썸",
+  "woo!ah!": "ウアー 우아",
+  "EVERGLOW": "エバーグロウ 에버글로우",
+  "CSR": "シーエスアール 첫사랑",
+  "ILY:1": "アイリーワン 아일리원",
+  "CLASS:y": "クラッシー 클라씨",
+  "ICHILLIN'": "アイチリン 아이칠린",
+  "PURPLE KISS": "パープルキス 퍼플키스",
+  "DreamNote": "ドリームノート 드림노트",
+  "BLACK SWAN": "ブラックスワン 블랙스완",
+  "TRI.BE": "トライビー 트라이비",
+  "GIRLSET (VCHA)": "ガールセット ビチャ 걸셋 비춰",
+  "ME:I": "ミーアイ 미아이",
+  "IS:SUE": "イッシュ 이슈",
+  "HITGS": "ヒッツ 히츠",
+  "A2O LITE": "エーツーオーライト 에이투오라이트"
+};
+
+// 検索用の文字列（ひらがな・カタカナ・英字・ハングルを正規化済み）
+// name … メンバー名（部分一致）／ other … グループ・事務所・国籍（グループの別表記は前方一致）
+const PREFIX_ONLY = "\u0001";
+const candidateSearchTextById = new Map(idols.map(idol => [idol.id, {
+  name: [idol.name, idol.japaneseName, idol.japaneseSearchName, idol.koreanName]
+    .filter(Boolean).map(normalizeSearchText),
+  other: [
+    ...[idol.group, idol.nationality, idol.agency, agencyFilterName(idol.agency)].map(normalizeSearchText),
+    ...String(groupAliases[idol.group] || "").split(" ").filter(Boolean).map(alias => PREFIX_ONLY + normalizeSearchText(alias))
+  ]
+}]));
+
+/** 検索の当てはまり具合：0 名前の先頭一致／1 名前の部分一致／2 グループなど／-1 当てはまらない */
+function searchRank(idolId, query) {
+  if (!query) return 0;
+  const text = candidateSearchTextById.get(idolId);
+  if (text.name.some(v => v.startsWith(query))) return 0;
+  if (text.name.some(v => v.includes(query))) return 1;
+  if (text.other.some(v => v.startsWith(PREFIX_ONLY) ? v.slice(1).startsWith(query) : v.includes(query))) return 2;
+  return -1;
+}
 
 function fullAgencyName(group, agency = "") {
   const value = String(agency || "").trim();
@@ -1584,5 +1731,5 @@ idols.forEach(idol => {
 export {
   groups, idols, normalizeSearchText, agencyFilterName, fullAgencyName,
   shortAgencyName, memberAffiliationLabel, memberAffiliationTitle,
-  candidateSearchTextById, popularityRankingSources
+  candidateSearchTextById, searchRank, popularityRankingSources
 };

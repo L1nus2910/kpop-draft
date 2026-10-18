@@ -1,5 +1,5 @@
 // KDraft — 画面と進行
-import { idols, normalizeSearchText, agencyFilterName, candidateSearchTextById, popularityRankingSources } from "./data.js";
+import { idols, normalizeSearchText, agencyFilterName, searchRank, popularityRankingSources } from "./data.js";
 import * as E from "./engine.js";
 import { chooseAIIdol, preferredPersonCandidates } from "./ai.js";
 import { store, HISTORY_LIMIT } from "./store.js";
@@ -717,8 +717,14 @@ function candidates(ignore = "", dedupe = true) {
   const p = S.pool;
   const query = normalizeSearchText(p.query.trim());
   const drafted = draftedKeys();
-  const list = idols.filter(idol =>
-    (!query || candidateSearchTextById.get(idol.id).some(value => value.includes(query))) &&
+  const ranks = new Map();
+  const list = idols.filter(idol => {
+    if (!query) return true;
+    const rank = searchRank(idol.id, query);
+    if (rank < 0) return false;
+    ranks.set(idol.id, rank);
+    return true;
+  }).filter(idol =>
     (ignore === "generation" || !p.generation || idol.generation === p.generation) &&
     (ignore === "nationality" || !p.nationality || idol.nationality === p.nationality) &&
     (ignore === "agency" || !p.agency || agencyFilterName(idol.agency) === p.agency) &&
@@ -727,7 +733,10 @@ function candidates(ignore = "", dedupe = true) {
     (p.showExcluded || !S.excluded.has(idol.id)) &&
     (!p.onlyShortlist || S.shortlist.has(idol.id))
   );
-  return dedupe ? preferredPersonCandidates(list, query).sort(compareCandidates) : list;
+  if (!dedupe) return list;
+  // 検索中は「名前が当てはまる人」を先に、その中はいつもの並び順
+  return preferredPersonCandidates(list, query).sort((a, b) =>
+    (query ? (ranks.get(a.id) ?? 2) - (ranks.get(b.id) ?? 2) : 0) || compareCandidates(a, b));
 }
 
 const FILTERS = [
@@ -1254,7 +1263,6 @@ function renderResults() {
               ? `<strong>${esc(idol.japaneseName)}</strong><small>${esc(agencyShort(idol))}</small><small>${esc(idol.group)}</small>`
               : `<strong style="color:var(--faint)">—</strong>`}</span></li>`;
           }).join("")}</ol>
-          <div class="result-team-stats">${teamStats(s, team.id).map(t => `<span class="chip">${esc(t)}</span>`).join("")}</div>
         </article>`).join("")}</div>`}
     ${isOnline() && S.online?.room ? `<div class="notice results-room" style="margin-top:16px">
         <span>${isHost() ? "「再ドラフト」で、同じルームのまま次のドラフトを始められます。遊び終わったらルームを終了してください（参加者名や結果が削除されます）。" : "ホストが再ドラフトを始めると、自動でドラフト画面に移ります。"}</span>
