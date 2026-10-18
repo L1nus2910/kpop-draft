@@ -9,7 +9,7 @@ import { groups, idols, normalizeSearchText, searchRank, shortAgencyName, fullAg
 import { identity, onlineConfigured } from "./online.js";
 import { $, esc, icon, toast } from "./ui.js";
 
-export const VOTES_PER_DAY = 5;
+export const VOTES_PER_DAY = 3;
 const DAY = 86400000;
 const JST = 9 * 3600000;
 
