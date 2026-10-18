@@ -1307,9 +1307,9 @@ function renderResults() {
       </div>
       <div class="results-actions">
         <button class="btn btn-light" data-action="share-image">${icon("image")}画像で共有</button>
-        <button class="btn btn-ghost" data-action="copy-result">${icon("copy")}テキストをコピー</button>
         ${canRestart ? `<button class="btn btn-ghost" data-action="restart">${icon("refresh")}再ドラフト</button>` : ""}
         <a class="btn btn-ghost" href="#/" data-action="${isOnline() ? "" : "finish-home"}">${icon("home")}ホームへ</a>
+        ${isOnline() && S.online?.room ? `<button class="btn btn-ghost btn-room-exit" data-action="${isHost() ? "close-room" : "leave-room"}">${icon("close")}${isHost() ? "ルームを終了する" : "ルームから退出する"}</button>` : ""}
       </div>
     </section>
     ${S.shareStatus ? `<p class="share-status" role="status">${esc(S.shareStatus)}</p>` : ""}
@@ -1331,8 +1331,7 @@ function renderResults() {
           }).join("")}</ol>
         </article>`).join("")}</div>`}
     ${isOnline() && S.online?.room ? `<div class="notice results-room" style="margin-top:16px">
-        <span>${isHost() ? "「再ドラフト」で、同じルームのまま次のドラフトを始められます。遊び終わったらルームを終了してください（参加者名や結果が削除されます）。" : "ホストが再ドラフトを始めると、自動でドラフト画面に移ります。"}</span>
-        <button class="btn btn-sm ${isHost() ? "btn-danger" : "btn-secondary"}" data-action="${isHost() ? "close-room" : "leave-room"}">${isHost() ? "ルームを終了する" : "ルームから退出する"}</button>
+        <span>${isHost() ? "「再ドラフト」で、同じルームのまま次のドラフトを始められます。遊び終わったら「ルームを終了する」を押してください（参加者名や結果が削除されます）。" : "ホストが再ドラフトを始めると、自動でドラフト画面に移ります。"}</span>
       </div>` : ""}`;
 }
 

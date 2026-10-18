@@ -1333,3 +1333,5 @@ a, button, select, summary, label { touch-action: manipulation; }
 .install-steps li::before { content: counter(st); position: absolute; left: 14px; top: 12px; width: 24px; height: 24px; display: grid; place-items: center; border-radius: 50%; background: var(--brand); color: #fff; font-size: 12px; font-weight: 900; }
 .install-steps .icon { width: 18px; height: 18px; vertical-align: -4px; margin: 0 2px; color: var(--brand); }
 body[data-view="draft"] .appbar-install, body[data-view="results"] .appbar-install, body[data-view="room"] .appbar-install { display: none; }
+.results-actions .btn-room-exit { color: #ffb3c4; border-color: rgba(255, 140, 170, 0.5); background: rgba(240, 57, 110, 0.12); }
+.results-actions .btn-room-exit:hover { background: rgba(240, 57, 110, 0.24); color: #fff; }
