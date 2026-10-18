@@ -1322,3 +1322,73 @@ body[data-view="draft"] .appbar-install, body[data-view="results"] .appbar-insta
 .public-room .btn { flex: none; }
 .public-empty { margin: 0; padding: 14px; border-radius: 14px; background: var(--bg-2); color: var(--muted); font-size: 13px; line-height: 1.7; }
 .room-name { margin: 0 0 10px; font-size: 18px; font-weight: 900; color: #fff; line-height: 1.4; word-break: break-all; }
+
+/* ------------------------------------------------------------- 人気投票 */
+.poll-banner {
+  display: flex; align-items: center; gap: 14px; margin-top: 18px; padding: 16px 18px;
+  border-radius: 22px; color: var(--ink); text-decoration: none;
+  background: linear-gradient(120deg, #fff 0%, #fff4fa 55%, #f1ecff 100%);
+  border: 1px solid var(--line); box-shadow: var(--sh-2);
+  transition: transform 120ms ease, box-shadow 160ms ease;
+}
+.poll-banner:hover { box-shadow: var(--sh-3); }
+.poll-banner:active { transform: scale(0.985); }
+.poll-banner-mark { flex: none; width: 46px; height: 46px; display: grid; place-items: center; border-radius: 14px; font-size: 22px; color: #fff; background: linear-gradient(140deg, #ff6fa8, #8b5cf6); box-shadow: 0 10px 20px -10px rgba(240, 57, 127, 0.8); }
+.poll-banner-copy { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.poll-banner-copy strong { font-size: 17px; font-weight: 900; }
+.poll-banner-copy small { font-size: 12px; color: var(--muted); line-height: 1.5; }
+.poll-banner-go { flex: none; font-size: 13px; font-weight: 900; color: var(--hot); }
+.poll-banner-go::after { content: " ›"; }
+
+.poll { display: grid; gap: 14px; max-width: 860px; margin: 0 auto; }
+.poll-hero {
+  position: relative; overflow: hidden; padding: clamp(22px, 4vw, 34px); border-radius: 26px; color: #fff;
+  background: var(--grain), radial-gradient(40% 80% at 90% 10%, rgba(255, 150, 210, 0.45), transparent 70%), linear-gradient(120deg, #1a1450, #4a2fb0 60%, #b0458f);
+  background-size: 160px 160px, auto, auto;
+  box-shadow: var(--sh-3);
+}
+.poll-kicker { margin: 0 0 6px; font-size: 11px; font-weight: 700; letter-spacing: 0.24em; color: rgba(255, 220, 240, 0.85); }
+.poll-hero h1 { margin: 0 0 8px; font-size: clamp(26px, 5vw, 38px); font-weight: 900; }
+.poll-hero p { margin: 0; font-size: 14px; line-height: 1.8; color: rgba(255, 255, 255, 0.86); }
+.poll-hero b { color: #fff; }
+.poll-controls { display: grid; gap: 10px; }
+.poll-kind button small { font-weight: 700; }
+.poll-tabs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; padding: 4px; border-radius: 14px; background: var(--bg-2); }
+.poll-tabs button { min-height: 40px; font: inherit; font-size: 14px; font-weight: 700; color: var(--ink-2); background: none; border: 0; border-radius: 10px; cursor: pointer; transition: background-color 140ms ease, color 140ms ease, transform 100ms ease; }
+.poll-tabs button:active { transform: scale(0.96); }
+.poll-tabs button[aria-selected="true"] { color: var(--ink); background: var(--surface); box-shadow: var(--sh-1); font-weight: 900; }
+.poll-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 8px 14px; padding: 14px 16px; border-radius: 18px; background: var(--surface); border: 1px solid var(--line); box-shadow: var(--sh-1); }
+.poll-head small { display: block; font-size: 12px; font-weight: 700; color: var(--muted); }
+.poll-head strong { font-size: 16px; font-weight: 900; }
+.poll-head strong b { font-size: 26px; color: var(--brand-ink); margin: 0 2px; }
+.poll-left { font-size: 13px; font-weight: 700; color: var(--ink-2); padding: 6px 12px; border-radius: 999px; background: var(--hot-soft); }
+.poll-left b { color: var(--hot); font-size: 16px; }
+.poll-left.is-empty { background: var(--bg-2); color: var(--muted); }
+.poll-left.is-empty b { color: var(--muted); }
+.poll-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.poll-row { display: grid; grid-template-columns: 38px minmax(0, 1fr) auto auto; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 16px; background: var(--surface); border: 1px solid var(--line); }
+.poll-rank { text-align: center; font-family: var(--display); font-size: 18px; color: var(--faint); }
+.poll-row.is-top .poll-rank { color: #fff; width: 32px; height: 32px; line-height: 32px; border-radius: 50%; justify-self: center; font-size: 15px; }
+.poll-row.is-top1 .poll-rank { background: linear-gradient(140deg, #f5cf6b, #c7952b); }
+.poll-row.is-top2 .poll-rank { background: linear-gradient(140deg, #d9dde6, #9aa3b5); }
+.poll-row.is-top3 .poll-rank { background: linear-gradient(140deg, #f0b08a, #b8693f); }
+.poll-row.is-top1 { border-color: rgba(214, 176, 98, 0.6); box-shadow: 0 8px 20px -14px rgba(180, 130, 30, 0.6); }
+.poll-main { min-width: 0; display: grid; gap: 2px; }
+.poll-main strong { font-size: 15px; font-weight: 900; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.poll-main small { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.poll-bar { display: block; height: 4px; margin-top: 4px; border-radius: 4px; background: var(--bg-2); overflow: hidden; }
+.poll-bar i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #8b5cf6, #ff6fa8); transition: width 300ms ease; }
+.poll-votes { font-size: 12px; color: var(--muted); white-space: nowrap; text-align: right; }
+.poll-votes b { font-size: 17px; color: var(--ink); margin-right: 1px; }
+.poll-row .btn { min-width: 64px; }
+.poll-row .btn.is-voted { animation: vote-pop 360ms ease; }
+@keyframes vote-pop { 40% { transform: scale(1.12); } }
+.poll-empty { padding: 18px; text-align: center; color: var(--muted); font-size: 14px; border-radius: 16px; background: var(--bg-2); }
+.poll-more { text-align: center; }
+@media (max-width: 520px) {
+  .poll-row { grid-template-columns: 30px minmax(0, 1fr) auto; grid-template-areas: "rank main btn" "rank main votes"; row-gap: 2px; }
+  .poll-rank { grid-area: rank; }
+  .poll-main { grid-area: main; }
+  .poll-votes { grid-area: votes; text-align: center; }
+  .poll-row .btn { grid-area: btn; }
+}

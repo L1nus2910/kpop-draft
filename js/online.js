@@ -38,7 +38,7 @@ export function onlineConfigured() {
   return Boolean(config?.apiKey && config?.projectId && config?.databaseURL && !JSON.stringify(config).includes("YOUR_"));
 }
 
-async function identity() {
+export async function identity() {
   if (!onlineConfigured()) throw new Error("オンライン機能の設定（firebase-config.js）がありません。");
   if (!navigator.onLine) throw new Error("オフラインです。インターネットにつないでから試してください。");
   await loadSdk();
