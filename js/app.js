@@ -291,7 +291,7 @@ function renderHome() {
 
     <a class="poll-banner" href="#/vote">
       <span class="poll-banner-mark" aria-hidden="true">♡</span>
-      <span class="poll-banner-copy"><strong>人気投票</strong><small>好きなグループ・メンバーに1日5票ずつ。今日・今週・今月・累計のランキング</small></span>
+      <span class="poll-banner-copy"><strong>人気投票</strong><small>好きなグループ・メンバーに1日3票ずつ。今日・今週・今月・累計のランキング</small></span>
       <span class="poll-banner-go">投票する</span>
     </a>
 
