@@ -22,7 +22,9 @@ import {
 // ======================================================================
 // 状態
 // ======================================================================
-const DEFAULT_SETUP = { aiCount: 3, localCount: 4, pickLimit: 5, orderMode: "snake", startOrder: "random" };
+const DEFAULT_SETUP = { aiCount: 3, localCount: 4, pickLimit: 5, orderMode: "snake", startOrder: "random", pickMode: "waiver" };
+/** 入札の呼び名（1巡目は「第1回選択希望」） */
+const bidLabel = round => (round > 1 ? `第${round}巡選択希望` : "第1回選択希望");
 const LOCAL_TEAM_NAMES = ["チームA", "チームB", "チームC", "チームD", "チームE", "チームF", "チームG", "チームH", "チームI", "チームJ"];
 const PAGE = () => 20;
 
@@ -44,7 +46,8 @@ const S = {
     ...(prefs.setup || {}),
     playerName: prefs.playerName || "あなた",
     teamNames: Array.isArray(prefs.teamNames) ? prefs.teamNames : LOCAL_TEAM_NAMES.slice(),
-    limits: E.normalizeLimits(prefs.setup?.limits)
+    limits: E.normalizeLimits(prefs.setup?.limits),
+    limitsOn: prefs.setup?.limitsOn === true
   },
   limitsOpen: "",
   speed: prefs.speed === "fast" ? "fast" : "normal",
@@ -61,7 +64,7 @@ function savePrefs() {
     teamNames: S.setup.teamNames,
     onlineName: S.onlineName || prefs.onlineName || "",
     roomPublic: Boolean(S.roomPublic),
-    setup: { aiCount: S.setup.aiCount, localCount: S.setup.localCount, pickLimit: S.setup.pickLimit, orderMode: S.setup.orderMode, startOrder: S.setup.startOrder, limits: S.setup.limits }
+    setup: { aiCount: S.setup.aiCount, localCount: S.setup.localCount, pickLimit: S.setup.pickLimit, orderMode: S.setup.orderMode, startOrder: S.setup.startOrder, pickMode: S.setup.pickMode, limits: S.setup.limits, limitsOn: S.setup.limitsOn }
   });
 }
 S.onlineName = prefs.onlineName || "";
@@ -211,7 +214,7 @@ function renderHome() {
       <span class="resume-card-mark">${icon("play")}</span>
       <div class="resume-card-copy">
         <strong>${d.mode === "online" ? "オンラインドラフトが進行中です" : "途中のドラフトがあります"}</strong>
-        <span>${esc(MODE_LABEL[d.mode])}・${d.teams.length}チーム・${done}/${total}人指名済み・${d.r1.started ? `${d.round}巡目` : "1巡目"}</span>
+        <span>${esc(MODE_LABEL[d.mode])}・${d.teams.length}チーム・${done}/${total}人指名済み・${d.round}巡目</span>
       </div>
       <div class="resume-card-actions">
         ${d.mode === "online" ? "" : `<button class="btn btn-ghost btn-sm" data-action="discard-resume">破棄</button>`}
@@ -286,7 +289,7 @@ function renderHome() {
         <li class="rule"><h3>チームと人数を決める</h3><p>チーム数と、各チームが指名する人数（1〜8人）を決めます。最初の順番は抽選か設定順。</p></li>
         <li class="rule"><h3>1巡目は入札</h3><p>全チームが「第1回選択希望メンバー」を1人ずつ入札。そろったら順番に発表します。</p></li>
         <li class="rule"><h3>重なったら抽選</h3><p>同じメンバーに入札が重なったら封筒で抽選。外れたチームは、全員が決まるまで再入札。</p></li>
-        <li class="rule"><h3>2巡目からは順番に</h3><p>ウェーバー（前の巡の逆順）か毎巡同じ順で、1人ずつ指名して全員そろったら終了。</p></li>
+        <li class="rule"><h3>2巡目からは順番に</h3><p>ウェーバー（前の巡の逆順）か毎巡同じ順で、1人ずつ指名して全員そろったら終了。設定で「毎巡 入札」にすると、全部の巡を入札と抽選で進めます。</p></li>
       </ol>
     </section>
 
@@ -328,14 +331,18 @@ function rulesFields(settings, { disabled = false } = {}) {
     <div class="setup-row">
       <div class="field"><span class="field-label">各チームの指名人数</span>${stepper("pickLimit", settings.pickLimit, 1, 8, "人", { disabled })}</div>
     </div>
+    <div class="field"><span class="field-label">指名のしかた</span>
+      ${segmented("pickMode", [["waiver", "1巡目だけ入札", "2巡目からは順番に指名"], ["bid", "毎巡 入札", "重なったら毎回抽選"]], settings.pickMode === "bid" ? "bid" : "waiver", { disabled, label: "指名のしかた" })}</div>
     <div class="field"><span class="field-label">1巡目のチーム順</span>
       ${segmented("startOrder", [["random", "開始時にランダム抽選"], ["fixed", "設定した順番のまま"]], settings.startOrder, { disabled, label: "1巡目のチーム順" })}</div>
     <div class="field"><span class="field-label">2巡目以降の指名順</span>
-      ${segmented("orderMode", [["snake", "ウェーバー", "前の巡の逆順"], ["fixed", "毎巡同じ順番", "チーム順で固定"]], settings.orderMode, { disabled, label: "2巡目以降の指名順" })}</div>`;
+      ${segmented("orderMode", [["snake", "ウェーバー", "前の巡の逆順"], ["fixed", "毎巡同じ順番", "チーム順で固定"]], settings.orderMode, { disabled, label: "2巡目以降の指名順" })}
+      ${settings.pickMode === "bid" ? `<p class="field-hint">毎巡入札では、この順番が入札順と抽選の封筒を選ぶ順になります。</p>` : ""}</div>`;
 }
 
 // ---------------------------------------------------------------- 縛り（候補の条件）
-const LIMIT_GROUPS = (() => {
+let limitGroupsCache = null;
+const limitGroups = () => limitGroupsCache || (limitGroupsCache = (() => {
   const count = (fn) => {
     const map = new Map();
     idols.forEach(idol => fn(idol).forEach(value => { if (value && value !== "未公表" && value !== "未確認") map.set(value, (map.get(value) || 0) + 1); }));
@@ -349,16 +356,31 @@ const LIMIT_GROUPS = (() => {
     { key: "nationalities", label: "国籍", items: nationalities, show: 8 },
     { key: "agencies", label: "事務所", items: agencies, show: 12 }
   ];
-})();
+})());
+const NO_LIMITS = { generations: [], nationalities: [], agencies: [] };
+/** 縛り「あり」の時だけ条件を使う */
+const effectiveLimits = settings => (settings?.limitsOn ? E.normalizeLimits(settings.limits) : NO_LIMITS);
+const eligibleCache = new Map();
+const eligibleCount = limits => {
+  const key = JSON.stringify(limits || {});
+  if (!eligibleCache.has(key)) eligibleCache.set(key, E.eligibleCount(limits));
+  return eligibleCache.get(key);
+};
+
+function limitsBlock(settings, opts = {}) {
+  const on = Boolean(settings?.limitsOn);
+  return `${segmented("limitsOn", [["off", "なし", "全員が候補"], ["on", "あり", "条件で絞る"]], on ? "on" : "off", { disabled: opts.disabled, label: "縛り" })}
+    ${on ? limitsFields(E.normalizeLimits(settings.limits), opts) : ""}`;
+}
 
 function limitsFields(limits, { disabled = false, teamCount = 0, pickLimit = 5 } = {}) {
-  const total = E.eligibleCount(limits);
+  const total = eligibleCount(limits);
   const need = teamCount * pickLimit;
   const short = teamCount > 0 && total < need;
   const any = E.hasLimits(limits);
   return `<div class="limits ${disabled ? "is-disabled" : ""}">
     <p class="field-hint">選ぶと、その条件に合うメンバーだけが候補になります。何も選ばなければ全員が候補です。同じ項目の中で複数選ぶと「どれか」に合う人が対象です。</p>
-    ${LIMIT_GROUPS.map(group => {
+    ${limitGroups().map(group => {
       const selected = new Set(limits?.[group.key] || []);
       const open = S.limitsOpen === group.key;
       const items = open ? group.items : group.items.filter(([value], i) => i < group.show || selected.has(value));
@@ -413,7 +435,7 @@ function renderSetup() {
           <p class="field-hint">合計 ${st.aiCount + 1} チームでドラフトします。</p>
         </div>
         <div class="setup-section"><h2>ルール</h2>${rulesFields(st)}</div>
-        <div class="setup-section"><h2>縛り<small>任意</small></h2>${limitsFields(st.limits, { teamCount: st.aiCount + 1, pickLimit: st.pickLimit })}</div>
+        <div class="setup-section"><h2>縛り</h2>${limitsBlock(st, { teamCount: st.aiCount + 1, pickLimit: st.pickLimit })}</div>
         <div class="setup-section"><h2>演出</h2>
           <div class="field"><span class="field-label">発表のテンポ</span>${segmented("speed", [["normal", "じっくり"], ["fast", "テンポよく"]], S.speed, { label: "発表のテンポ" })}</div>
         </div>
@@ -435,7 +457,7 @@ function renderSetup() {
           </div>
         </div>
         <div class="setup-section"><h2>ルール</h2>${rulesFields(st)}</div>
-        <div class="setup-section"><h2>縛り<small>任意</small></h2>${limitsFields(st.limits, { teamCount: st.localCount, pickLimit: st.pickLimit })}</div>
+        <div class="setup-section"><h2>縛り</h2>${limitsBlock(st, { teamCount: st.localCount, pickLimit: st.pickLimit })}</div>
         <div class="setup-section"><h2>演出</h2>
           <div class="field"><span class="field-label">発表のテンポ</span>${segmented("speed", [["normal", "じっくり"], ["fast", "テンポよく"]], S.speed, { label: "発表のテンポ" })}</div>
         </div>
@@ -497,12 +519,13 @@ async function startLocalDraft() {
   const teams = mode === "ai"
     ? [{ name: (st.playerName || "").trim() || "あなた", kind: "human" }, ...Array.from({ length: st.aiCount }, (_, i) => ({ name: `AI${i + 1}`, kind: "ai" }))]
     : Array.from({ length: st.localCount }, (_, i) => ({ name: (st.teamNames[i] || "").trim() || LOCAL_TEAM_NAMES[i], kind: "human" }));
-  if (E.eligibleCount(st.limits) < teams.length * st.pickLimit) {
+  const limits = effectiveLimits(st);
+  if (eligibleCount(limits) < teams.length * st.pickLimit) {
     toast("縛りの候補が足りません。条件を増やすか、指名人数を減らしてください。");
     return;
   }
   savePrefs();
-  beginDraft(E.createDraft({ mode, teams, settings: { pickLimit: st.pickLimit, orderMode: st.orderMode, startOrder: st.startOrder, limits: st.limits } }));
+  beginDraft(E.createDraft({ mode, teams, settings: { pickLimit: st.pickLimit, orderMode: st.orderMode, startOrder: st.startOrder, pickMode: st.pickMode, limits } }));
 }
 
 function beginDraft(state) {
@@ -630,6 +653,8 @@ function announce(s) {
       toast(`${E.teamLabel(s, entry.teamId)} が ${idol?.japaneseName} を指名`, { color: teamColor(E.teamIndex(s, entry.teamId)), duration: 2200, slot: "pick" });
     } else if (entry.kind === "rebid") {
       toast(`外れたチームは再入札です（${entry.attempt}回目）`);
+    } else if (entry.kind === "round" && E.biddingEveryRound(s)) {
+      toast(`${entry.round - 1}巡目が確定しました。${entry.round}巡目も入札です`);
     } else if (entry.kind === "round" && entry.round === 2) {
       toast("1巡目が確定しました。2巡目からは順番に指名します");
     } else if (entry.kind === "departed") {
@@ -662,10 +687,10 @@ function saveHistory(s) {
         const idol = E.idolById.get(pick.idolId);
         return { round: pick.round, name: idol?.japaneseName || "", group: idol?.group || "", agency: idol?.agency || "" };
       }),
-      losses: (s.losses[team.id] || []).map(id => {
+      losses: Array.from({ length: s.settings.pickLimit }, (_, i) => E.lossesFor(s, team.id, i + 1).map(id => {
         const idol = E.idolById.get(id);
-        return { round: 1, name: idol?.japaneseName || "", group: idol?.group || "", agency: idol?.agency || "" };
-      })
+        return { round: i + 1, name: idol?.japaneseName || "", group: idol?.group || "", agency: idol?.agency || "" };
+      })).flat()
     }))
   };
   store.saveHistory([entry, ...list].slice(0, HISTORY_LIMIT));
@@ -732,7 +757,7 @@ function bannerContent(s) {
       else { sub = "ホストが開示すると発表が始まります。"; state = "is-waiting"; }
     } else if (s.mode === "online") {
       if (mine && E.bidPending(s, mine)) {
-        title = S.online?.pending ? "入札を送信中" : `第1回選択希望メンバーを${rebid}してください`;
+        title = S.online?.pending ? "入札しました" : `${bidLabel(s.round)}メンバーを${rebid}してください`;
         sub = `提出済み ${count}/${live}チーム。入札は全員がそろうまで伏せられます。`;
         state = S.online?.pending ? "is-waiting" : "is-mine";
       } else {
@@ -759,7 +784,7 @@ function bannerContent(s) {
     const label = E.teamLabel(s, current);
     if (acting) {
       title = s.mode === "local" ? `${label} の指名番です` : "あなたの指名番です";
-      sub = S.online?.pending ? "指名を送信中…" : `第${s.round}巡選択メンバーを選んでください。`;
+      sub = S.online?.pending ? "指名しました。まもなく発表されます。" : `第${s.round}巡選択メンバーを選んでください。`;
       state = S.online?.pending ? "is-waiting" : "is-mine";
     } else {
       title = isAutoTeam(s, current) ? `${label} が指名中` : `${label} の指名番です`;
@@ -776,7 +801,7 @@ function renderTurn() {
   const box = $("#turnBanner");
   if (!box) return;
   const b = bannerContent(s);
-  const roundLabel = s.r1.started ? `${s.round}巡` : "1巡";
+  const roundLabel = `${s.round}巡`;
   const roundSub = s.r1.started ? `全${s.settings.pickLimit}巡` : (s.r1.attempt > 1 ? `再入札 ${s.r1.attempt}回目` : "入札");
   box.innerHTML = `
     <div class="turn-banner ${b.state}" style="${b.color ? `--turn-color:${b.color}` : ""}" role="status" aria-live="polite">
@@ -811,7 +836,7 @@ function renderOrderStrip() {
   }
   if (!s.r1.started) {
     const order = s.resolution ? s.resolution.batchOrder : s.r1.order;
-    label = s.mode === "online" ? "1巡目（同時入札）" : (s.r1.attempt > 1 ? "再入札の順番" : "1巡目の入札順");
+    label = s.mode === "online" ? `${s.round}巡目（同時入札）` : (s.r1.attempt > 1 ? "再入札の順番" : `${s.round}巡目の入札順`);
     items = order.filter(id => !E.isDeparted(s, id)).map(id => item(id,
       (id in s.r1.bids) || s.resolution ? "done" : (s.mode !== "online" && id === current) ? "now" : "wait"));
     const sep = s.mode === "online" ? '<li class="order-arrow" aria-hidden="true">・</li>' : arrow;
@@ -991,10 +1016,10 @@ function renderDock() {
   const acting = actingTeamId();
   const isBid = !s.r1.started;
   const verb = isBid ? "で入札する" : "を指名する";
-  const who = s.mode === "local" && acting ? `${E.teamLabel(s, acting)}の${isBid ? "入札" : "指名"}` : (isBid ? "第1回選択希望" : `第${s.round}巡選択`);
+  const who = s.mode === "local" && acting ? `${E.teamLabel(s, acting)}の${isBid ? "入札" : "指名"}` : (isBid ? bidLabel(s.round) : `第${s.round}巡選択`);
   let note = "";
   if (!can) {
-    if (S.online?.pending) note = "送信中です…";
+    if (S.online?.pending) note = "送信しました";
     else if (s.r1.awaitingOpen) note = "入札の開示を待っています";
     else if (myTeamId() && isOnline() && !s.r1.started && !E.bidPending(s, myTeamId())) note = "入札は提出済みです";
     else note = "あなたの番になったら指名できます";
@@ -1044,15 +1069,15 @@ function boardModelFromState(s) {
       const cells = [];
       for (let round = 1; round <= s.settings.pickLimit; round += 1) {
         const pick = (s.picks[team.id] || []).find(p => p.round === round);
-        const losses = round === 1 ? (s.losses[team.id] || []).map(id => E.idolById.get(id)).filter(Boolean)
-          .map(l => ({ name: l.japaneseName, agency: agencyShort(l), group: l.group })) : [];
+        const losses = E.lossesFor(s, team.id, round).map(id => E.idolById.get(id)).filter(Boolean)
+          .map(l => ({ name: l.japaneseName, agency: agencyShort(l), group: l.group }));
         if (pick) {
           const idol = E.idolById.get(pick.idolId);
           cells.push({ kind: "filled", name: idol?.japaneseName, agency: agencyShort(idol), group: idol?.group, losses, isNew: s.log.at(-1)?.idolId === pick.idolId && s.log.at(-1)?.teamId === team.id });
           continue;
         }
         if (team.departed) { cells.push({ kind: "empty", text: round === 1 || cells.some(c => c.kind === "filled") ? "退出" : "—", losses }); continue; }
-        if (round === 1 && !s.r1.started) {
+        if (round === s.round && !s.r1.started) {
           if (resolution) {
             const nominated = resolution.nominations.some(n => n.teamId === team.id);
             const revealed = resolution.revealed.includes(team.id);
@@ -1097,7 +1122,7 @@ function boardModelFromHistory(entry) {
       count: (team.picks || []).length,
       cells: Array.from({ length: pickLimit }, (_, i) => {
         const pick = (team.picks || []).find(p => Number(p.round) === i + 1);
-        const losses = i === 0 ? (team.losses || []).map(l => ({ name: l.name, agency: agencyShort(l), group: l.group })) : [];
+        const losses = (team.losses || []).filter(l => (Number(l.round) || 1) === i + 1).map(l => ({ name: l.name, agency: agencyShort(l), group: l.group }));
         return pick
           ? { kind: "filled", name: pick.name, agency: agencyShort(pick), group: pick.group, losses }
           : { kind: "empty", text: "—", losses };
@@ -1149,8 +1174,8 @@ function renderBoardPanel() {
 // ======================================================================
 let revealKey = "";
 function revealTitle(r) {
-  if (r.type === "lottery") return "第1回選択希望 重複指名の抽選";
-  if (r.type === "nomination") return "第1回選択希望メンバー";
+  if (r.type === "lottery") return `${bidLabel(r.round || 1)} 重複指名の抽選`;
+  if (r.type === "nomination") return `${bidLabel(r.round || 1)}メンバー`;
   return `第${r.round}巡選択メンバー`;
 }
 
@@ -1207,7 +1232,7 @@ function renderReveal() {
           <div class="nameplate"><div class="nameplate-inner">
             <div class="nameplate-face nameplate-back"><img src="assets/kdraft-192-v3.png" alt="" width="84" height="84"><span>KDRAFT</span></div>
             <div class="nameplate-face nameplate-front">
-              <small>${r.type === "nomination" ? "第1回選択希望" : `第${r.round}巡選択`}</small>
+              <small>${r.type === "nomination" ? bidLabel(r.round || 1) : `第${r.round}巡選択`}</small>
               <p class="nameplate-name">${esc(idol?.japaneseName)}</p>
               <p class="nameplate-meta"><span>${esc(agencyShort(idol))}</span><span>${esc(idol?.group)}</span></p>
             </div>
@@ -1368,7 +1393,7 @@ function renderResults() {
       <div>
         <small>ドラフト会議 終了</small>
         <h1>${finished ? "最終ドラフト結果" : "ここまでのドラフト結果"}</h1>
-        <p>${esc(MODE_LABEL[s.mode])}・${s.teams.length}チーム・各${s.settings.pickLimit}人・${esc(formatDate(Date.now()))}</p>
+        <p>${esc(MODE_LABEL[s.mode])}・${s.teams.length}チーム・各${s.settings.pickLimit}人${E.biddingEveryRound(s) ? "・毎巡入札" : ""}・${esc(formatDate(Date.now()))}</p>
         ${E.hasLimits(s.settings.limits) ? `<p class="results-limits">縛り：${esc(E.limitsLabel(s.settings.limits))}</p>` : ""}
       </div>
       <div class="results-actions">
@@ -1389,7 +1414,7 @@ function renderResults() {
           <ol>${Array.from({ length: s.settings.pickLimit }, (_, i) => {
             const pick = (s.picks[team.id] || []).find(p => p.round === i + 1);
             const idol = pick && E.idolById.get(pick.idolId);
-            const losses = i === 0 ? (s.losses[team.id] || []).map(id => E.idolById.get(id)).filter(Boolean) : [];
+            const losses = E.lossesFor(s, team.id, i + 1).map(id => E.idolById.get(id)).filter(Boolean);
             const lossHtml = losses.map(l => `<span class="lost"><em>抽選外れ</em><b>${esc(l.japaneseName)}</b><small>${esc(agencyShort(l))}</small><small>${esc(l.group)}</small></span>`).join("");
             return `<li><b>${i + 1}巡</b><span>${lossHtml}${idol
               ? `<strong>${esc(idol.japaneseName)}</strong><small>${esc(agencyShort(idol))}</small><small>${esc(idol.group)}</small>`
@@ -1519,7 +1544,7 @@ function renderAbout() {
       <section class="panel"><h2>このサイトについて</h2>
         <p>KDraft は個人制作の非公式ファン向けゲームです。芸能事務所、グループ、メンバー、ランキング運営元から公式な監修・推薦を受けていません。</p>
         <p>メンバー名、グループ名、事務所名などは候補を識別する目的で表示しています。これらに関する権利が認められる場合、その権利は各権利者に帰属します。公式写真、音源、ロゴ、ランキング記事の本文や表のデザインは掲載していません。</p>
-        <p>誤記や権利に関する連絡は <a href="https://github.com/L1nus2910/kpop-draft/issues" target="_blank" rel="noopener noreferrer">GitHubの問い合わせページ</a> からお願いします。公開の投稿欄には個人情報を書かないでください。</p>
+        <p>誤記や権利に関する連絡、ご意見は、X（旧Twitter）の <a href="https://x.com/Wooian_S2U" target="_blank" rel="noopener noreferrer">@Wooian_S2U</a> へDMでお願いします。</p>
       </section>
       <section class="panel"><h2>ホーム画面に追加</h2>
         <div class="install-card"><img src="assets/kdraft-192-v3.png" alt="" width="56" height="56">
@@ -1560,7 +1585,7 @@ async function createRoom() {
     onlineMessage("ルームを作っています…");
     S.roomPublic = Boolean($("#roomPublic")?.checked);
     savePrefs();
-    const settings = { pickLimit: S.setup.pickLimit, orderMode: S.setup.orderMode, startOrder: S.setup.startOrder, limits: S.setup.limits, public: S.roomPublic };
+    const settings = { pickLimit: S.setup.pickLimit, orderMode: S.setup.orderMode, startOrder: S.setup.startOrder, pickMode: S.setup.pickMode, limits: S.setup.limits, limitsOn: S.setup.limitsOn, public: S.roomPublic };
     const { Room } = await loadOnline();
     const room = await Room.create({ name: S.onlineName, settings });
     attachRoom(room);
@@ -1608,7 +1633,7 @@ function syncLobby() {
   const settings = o.settings || {};
   const listed = settings.public === true && o.status === "lobby" && active.length < MAX_PLAYERS;
   const task = listed
-    ? room.publish({ host: o.players?.[room.uid]?.teamName || S.onlineName, count: active.length, pickLimit: settings.pickLimit, limits: E.limitsLabel(settings.limits) })
+    ? room.publish({ host: o.players?.[room.uid]?.teamName || S.onlineName, count: active.length, pickLimit: settings.pickLimit, limits: E.limitsLabel(effectiveLimits(settings)) })
     : room.unpublish();
   task.catch(error => {
     console.warn("lobby", error);
@@ -1851,9 +1876,9 @@ function renderRoom() {
               ? segmented("roomPublic", [["private", "招待した人だけ"], ["public", "一覧に公開"]], settings.public ? "public" : "private", { label: "ルーム一覧への公開" })
               : `<p class="limit-readonly">${settings.public ? "一覧に公開中（誰でも参加できます）" : "招待した人だけが参加できます"}</p>`}</div>
           ${rulesFields(settings, { disabled: !host || playing })}
-          <div class="field"><span class="field-label">縛り${host ? "（任意）" : ""}</span>${host && !playing
-            ? limitsFields(E.normalizeLimits(settings.limits), { teamCount: active.length, pickLimit: settings.pickLimit })
-            : `<p class="limit-readonly">${E.hasLimits(settings.limits) ? esc(E.limitsLabel(settings.limits)) : "縛りなし（全員が候補）"}</p>`}</div>
+          <div class="field"><span class="field-label">縛り</span>${host && !playing
+            ? limitsBlock(settings, { teamCount: active.length, pickLimit: settings.pickLimit })
+            : `<p class="limit-readonly">${E.hasLimits(effectiveLimits(settings)) ? esc(E.limitsLabel(effectiveLimits(settings))) : "縛りなし（全員が候補）"}</p>`}</div>
         </section>
         <div class="room-actions">
           ${host
@@ -1872,14 +1897,14 @@ async function startOnline() {
   const active = room.activePlayers();
   if (active.length < 2) { toast("2人以上そろうと始められます"); return; }
   const settings = o.settings || { pickLimit: 5, orderMode: "snake", startOrder: "random" };
-  if (E.eligibleCount(settings.limits) < active.length * (Number(settings.pickLimit) || 5)) {
+  if (eligibleCount(effectiveLimits(settings)) < active.length * (Number(settings.pickLimit) || 5)) {
     toast("縛りの候補が足りません。条件を増やすか、指名人数を減らしてください。");
     return;
   }
   const draft = E.createDraft({
     mode: "online",
     teams: active.map(([uid, p]) => ({ name: p.teamName || p.name, kind: "human", uid })),
-    settings
+    settings: { ...settings, limits: effectiveLimits(settings) }
   });
   try {
     await room.clearActions();
@@ -2185,6 +2210,21 @@ function onSegment(name, value) {
   if (name === "boardMode") { S.boardMode = value; renderBoardPanel(); return; }
   if (name === "resultsMode") { S.resultsMode = value; renderResults(); return; }
   if (name === "speed") { S.speed = value; savePrefs(); renderSetup(); return; }
+  if (name === "limitsOn") {
+    const on = value === "on";
+    if (S.route.name === "room") {
+      if (!isHost() || S.online?.status === "playing") return;
+      const next = { ...(S.online.settings || {}), limitsOn: on };
+      S.online.room.setSettings(next);
+      S.online.settings = next;
+      renderRoom();
+      return;
+    }
+    S.setup.limitsOn = on;
+    savePrefs();
+    renderSetup();
+    return;
+  }
   if (name === "roomPublic") {
     if (!isHost() || S.route.name !== "room") return;
     const next = { ...(S.online.settings || {}), public: value === "public" };
@@ -2195,7 +2235,7 @@ function onSegment(name, value) {
     if (value === "public") toast("ルーム一覧に公開しました。誰でも参加できます");
     return;
   }
-  if (["startOrder", "orderMode"].includes(name)) {
+  if (["startOrder", "orderMode", "pickMode"].includes(name)) {
     if (S.route.name === "room") {
       if (!isHost()) return;
       const next = { ...(S.online.settings || {}), [name]: value };

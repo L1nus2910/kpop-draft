@@ -1,5 +1,5 @@
 // 結果画像（SNS共有用）とテキスト
-import { idolById, teamLabel, isDeparted, limitsLabel } from "./engine.js";
+import { idolById, teamLabel, isDeparted, limitsLabel, lossesFor } from "./engine.js";
 import { agencyShort, teamColor } from "./ui.js";
 
 const SITE_URL = "https://l1nus2910.github.io/kpop-draft/";
@@ -42,14 +42,17 @@ export async function createResultImage(state) {
   const pad = 56;
   const roundW = 96;
   const headerH = 92;
-  const lossMax = Math.max(0, ...teams.map(t => (state.losses[t.id] || []).length));
   const rowH = 112;
-  const firstRowH = lossMax ? Math.max(rowH, 84 + lossMax * 58) : rowH;
+  const rowHeights = Array.from({ length: rounds }, (_, i) => {
+    const lossMax = Math.max(0, ...teams.map(t => lossesFor(state, t.id, i + 1).length));
+    return lossMax ? Math.max(rowH, 84 + lossMax * 58) : rowH;
+  });
+  const rowsH = rowHeights.reduce((a, b) => a + b, 0);
   const titleH = 170;
   const footH = 70;
   const tableW = width - pad * 2;
   const colW = (tableW - roundW) / cols;
-  const height = pad + titleH + headerH + firstRowH + (rounds - 1) * rowH + footH;
+  const height = pad + titleH + headerH + rowsH + footH;
   const scale = 1;
   const canvas = document.createElement("canvas");
   canvas.width = width * scale;
@@ -83,14 +86,14 @@ export async function createResultImage(state) {
   const tx = pad;
   const ty = pad + titleH;
   // 表の土台
-  roundRect(ctx, tx, ty, tableW, headerH + firstRowH + (rounds - 1) * rowH, 18);
+  roundRect(ctx, tx, ty, tableW, headerH + rowsH, 18);
   ctx.fillStyle = "#ffffff";
   ctx.fill();
   ctx.save();
   ctx.clip();
 
   ctx.fillStyle = "#f3f0f9";
-  ctx.fillRect(tx, ty, roundW, headerH + firstRowH + (rounds - 1) * rowH);
+  ctx.fillRect(tx, ty, roundW, headerH + rowsH);
   fitText(ctx, "巡目", tx + roundW / 2, ty + headerH / 2, roundW - 10, 16, { color: "#7a7493", align: "center" });
 
   teams.forEach((team, index) => {
@@ -107,7 +110,7 @@ export async function createResultImage(state) {
 
   let y = ty + headerH;
   for (let round = 1; round <= rounds; round += 1) {
-    const h = round === 1 ? firstRowH : rowH;
+    const h = rowHeights[round - 1];
     ctx.fillStyle = "#e3deed";
     ctx.fillRect(tx, y, tableW, 1);
     fitText(ctx, `${round}`, tx + roundW / 2, y + h / 2, roundW - 10, 28, { color: "#463f60", weight: 400, align: "center", family: DISPLAY });
@@ -115,7 +118,7 @@ export async function createResultImage(state) {
       const x = tx + roundW + colW * index;
       if (index > 0 || true) { ctx.fillStyle = "#e3deed"; ctx.fillRect(x, y, 1, h); }
       const pick = (state.picks[team.id] || []).find(p => p.round === round);
-      const losses = round === 1 ? (state.losses[team.id] || []) : [];
+      const losses = lossesFor(state, team.id, round);
       let cy = y + (h - (losses.length * 58 + 70)) / 2 + 4;
       losses.forEach(id => {
         const lost = idolById.get(id);

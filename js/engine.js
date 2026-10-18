@@ -101,8 +101,10 @@ export function createDraft({ mode, teams, settings }) {
       pickLimit: Number(settings.pickLimit) || 5,
       orderMode: settings.orderMode === "fixed" ? "fixed" : "snake",
       startOrder: settings.startOrder === "fixed" ? "fixed" : "random",
-      limits: normalizeLimits(settings.limits)
+      limits: normalizeLimits(settings.limits),
+      pickMode: settings.pickMode === "bid" ? "bid" : "waiver"
     },
+    baseOrder: order.slice(),
     teams: ordered,
     picks: Object.fromEntries(order.map(id => [id, []])),
     losses: Object.fromEntries(order.map(id => [id, []])),
@@ -155,6 +157,20 @@ export function personDrafted(state, idol) {
 
 export function isRevealActive(state) {
   return Boolean(state.reveal) || state.queue.length > 0;
+}
+
+/** その巡の順番（ウェーバーなら奇数巡は最初の順、偶数巡は逆順） */
+export function roundOrder(state, round) {
+  const base = state.baseOrder || state.teams.map(entry => entry.id);
+  if (state.settings.orderMode !== "snake") return base.slice();
+  return round % 2 === 1 ? base.slice() : base.slice().reverse();
+}
+export const biddingEveryRound = state => state.settings.pickMode === "bid";
+
+/** 抽選で外れたメンバー（巡ごと） */
+export function lossesFor(state, teamId, round) {
+  if (round === 1) return state.losses[teamId] || [];
+  return ((state.laterLosses || {})[teamId] || []).filter(item => item.round === round).map(item => item.idolId);
 }
 
 export function isFinished(state) {
@@ -248,6 +264,15 @@ function skipCompletedTurns(state) {
 }
 
 function enterSecondRound(state) {
+  if (biddingEveryRound(state) && !allComplete(state)) {
+    // 毎巡入札：次の巡も全チームが入札する
+    state.round += 1;
+    state.r1.order = roundOrder(state, state.round).filter(id => !teamComplete(state, id));
+    state.r1.bids = {};
+    state.r1.attempt = 1;
+    state.r1.awaitingOpen = false;
+    return;
+  }
   state.r1.started = true;
   state.r1.order = [];
   state.r1.bids = {};
@@ -287,10 +312,11 @@ function completeNomination(state, reveal) {
     return candidate && (candidate.personKey || candidate.id) === key;
   });
   if (sameMember.length !== 1) return;
-  if ((state.picks[reveal.teamId] || []).some(item => item.round === 1)) return;
-  recordPick(state, reveal.teamId, idol, 1);
+  const round = reveal.round || 1;
+  if ((state.picks[reveal.teamId] || []).some(item => item.round === round)) return;
+  recordPick(state, reveal.teamId, idol, round);
   batch.waiting = batch.waiting.filter(id => id !== reveal.teamId);
-  pushLog(state, { kind: "pick", teamId: reveal.teamId, idolId: idol.id, round: 1 });
+  pushLog(state, { kind: "pick", teamId: reveal.teamId, idolId: idol.id, round });
 }
 
 function makeRevealKey(state, item) {
@@ -370,12 +396,19 @@ export function completeLottery(state, now = Date.now()) {
   reveal.winner = winner;
   reveal.stage = "result";
   reveal.stageAt = now;
+  const round = reveal.round || 1;
   reveal.teams.forEach(id => {
     if (id === winner) return;
-    const losses = state.losses[id] || (state.losses[id] = []);
-    if (!losses.includes(idol.id)) losses.push(idol.id);
+    if (round === 1) {
+      const losses = state.losses[id] || (state.losses[id] = []);
+      if (!losses.includes(idol.id)) losses.push(idol.id);
+    } else {
+      const later = state.laterLosses || (state.laterLosses = {});
+      const list = later[id] || (later[id] = []);
+      if (!list.some(item => item.round === round && item.idolId === idol.id)) list.push({ round, idolId: idol.id });
+    }
   });
-  if (!(state.picks[winner] || []).some(item => item.round === 1)) recordPick(state, winner, idol, 1);
+  if (!(state.picks[winner] || []).some(item => item.round === round)) recordPick(state, winner, idol, round);
   if (state.resolution) {
     state.resolution.waiting = state.resolution.waiting.filter(id => id !== winner);
     state.resolution.results.push({ idolId: idol.id, winner });
@@ -433,12 +466,12 @@ export function openBids(state, now = Date.now()) {
   byPerson.forEach(({ idolId, teams }) => {
     if (teams.length < 2) return;
     teams.forEach(id => waiting.add(id));
-    const drawOrder = state.firstRoundOrder.filter(id => teams.includes(id));
+    const drawOrder = (state.round === 1 ? state.firstRoundOrder : roundOrder(state, state.round + 1)).filter(id => teams.includes(id));
     lotteries.push({
       type: "lottery",
       teamId: drawOrder[0] || teams[0],
       idolId,
-      round: 1,
+      round: state.round,
       teams: teams.slice(),
       drawOrder: drawOrder.length === teams.length ? drawOrder : teams.slice()
     });
@@ -453,7 +486,7 @@ export function openBids(state, now = Date.now()) {
   };
   state.r1.order = [];
   state.r1.bids = {};
-  valid.forEach(item => state.queue.push({ type: "nomination", teamId: item.teamId, idolId: item.idolId, round: 1 }));
+  valid.forEach(item => state.queue.push({ type: "nomination", teamId: item.teamId, idolId: item.idolId, round: state.round }));
   lotteries.forEach(item => state.queue.push(item));
   pushLog(state, { kind: "open", count: valid.length, lotteries: lotteries.length });
   startNextReveal(state, now);
@@ -512,7 +545,7 @@ export function boardRows(state) {
       cells: state.teams.map(entry => ({
         teamId: entry.id,
         pick: (state.picks[entry.id] || []).find(item => item.round === round) || null,
-        losses: round === 1 ? (state.losses[entry.id] || []) : []
+        losses: lossesFor(state, entry.id, round)
       }))
     });
   }
@@ -524,8 +557,8 @@ export function statusText(state, viewerTeamId = null) {
   if (state.reveal || state.queue.length) return "指名発表中";
   if (!state.r1.started) {
     if (state.r1.awaitingOpen) return "全員の入札がそろいました";
-    if (state.r1.attempt > 1) return `1巡目 再入札（${state.r1.attempt}回目）`;
-    return "1巡目 入札";
+    if (state.r1.attempt > 1) return `${state.round}巡目 再入札（${state.r1.attempt}回目）`;
+    return `${state.round}巡目 入札`;
   }
   const current = currentTeam(state);
   if (!current) return `${state.round}巡目`;
