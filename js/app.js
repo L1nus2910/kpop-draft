@@ -1578,6 +1578,14 @@ function onlineMessage(message, isError = false) {
   if (line) { line.textContent = message; line.classList.toggle("is-error", isError); }
 }
 
+/** Firebase の英語のエラーを、わかる言葉にする */
+function friendlyError(error, fallback) {
+  const text = String(error?.code || error?.message || "");
+  if (/PERMISSION_DENIED|permission/i.test(text)) return "このルームには入れませんでした。ドラフトが始まったか、ルームが終了した可能性があります。";
+  if (/network|offline|disconnect/i.test(text)) return "通信できませんでした。電波のよいところでもう一度試してください。";
+  return error?.message || fallback;
+}
+
 /** この端末（ブラウザ）で開いたままのルーム。{ code, host, attached } か null */
 async function existingRoom() {
   if (S.online?.room) return { code: S.online.room.code, host: S.online.room.isHost, attached: true };
@@ -1650,7 +1658,7 @@ async function createRoom() {
     attachRoom(room);
     go("room");
   } catch (error) {
-    onlineMessage(error.message || "ルームを作れませんでした。", true);
+    onlineMessage(friendlyError(error, "ルームを作れませんでした。"), true);
   }
 }
 
@@ -1681,7 +1689,8 @@ async function joinRoom(codeValue, { userAction = false } = {}) {
     }
     go("room");
   } catch (error) {
-    onlineMessage(error.message || "参加できませんでした。", true);
+    onlineMessage(friendlyError(error, "参加できませんでした。"), true);
+    if (Array.isArray(publicRooms)) { publicRooms = publicRooms.filter(r => r.code !== code); renderPublicRooms(); }
     if (S.route.name !== "setup") go("setup/online");
   }
 }
