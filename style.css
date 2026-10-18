@@ -1,3 +1,5 @@
+/* legacy layer: 旧デザインはすべてこのレイヤーに入れ、theme.css（レイヤー外）が常に優先されるようにしています */
+@layer legacy {
 :root {
   --ink: #17263b;
   --muted: #63758a;
@@ -10526,4 +10528,6 @@ body::before {
     min-height: 190px;
     padding: 11px;
   }
+}
+
 }

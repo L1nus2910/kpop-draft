@@ -2,29 +2,47 @@
   "id": "./",
   "name": "KDraft — K-POP Draft",
   "short_name": "KDraft",
-  "description": "推しでつくる、夢のドラフト。",
+  "description": "推しでつくる、夢のドラフト。K-POPガールズグループのメンバーを選んで遊ぶ、非公式ファン制作のドラフトゲーム。",
   "lang": "ja",
-  "start_url": "./",
+  "dir": "ltr",
+  "start_url": "./?source=app",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#f4f3fb",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "any",
+  "background_color": "#f6f4ff",
   "theme_color": "#6950df",
-  "categories": [
-    "games",
-    "entertainment"
-  ],
+  "categories": ["games", "entertainment"],
+  "prefer_related_applications": false,
+  "launch_handler": { "client_mode": ["navigate-existing", "auto"] },
   "icons": [
+    { "src": "assets/kdraft-192-v3.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "assets/kdraft-512-v4.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "assets/kdraft-maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "assets/kdraft-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
     {
-      "src": "assets/kdraft-192-v3.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any"
+      "name": "AIドラフトを始める",
+      "short_name": "AIドラフト",
+      "url": "./?source=shortcut#playSettings",
+      "icons": [{ "src": "assets/kdraft-192-v3.png", "sizes": "192x192" }]
     },
     {
-      "src": "assets/kdraft-512-v3.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any"
+      "name": "候補メンバーを見る",
+      "short_name": "候補一覧",
+      "url": "./?source=shortcut#pool",
+      "icons": [{ "src": "assets/kdraft-192-v3.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "過去のドラフト履歴",
+      "short_name": "履歴",
+      "url": "./?source=shortcut&open=history",
+      "icons": [{ "src": "assets/kdraft-192-v3.png", "sizes": "192x192" }]
     }
+  ],
+  "screenshots": [
+    { "src": "assets/screenshot-narrow.png", "sizes": "780x1688", "type": "image/png", "form_factor": "narrow", "label": "スマホでAIとドラフト" },
+    { "src": "assets/screenshot-wide.png", "sizes": "1600x900", "type": "image/png", "form_factor": "wide", "label": "PCでドラフトルームと候補一覧" }
   ]
 }

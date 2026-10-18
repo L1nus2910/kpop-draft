@@ -6220,6 +6220,7 @@ async function shareDraftResultsOnX() {
 }
 
 function renderDraft() {
+  scheduleLocalDraftSnapshot();
   const currentTeam = currentTeamName();
   const ownOnlineTeam = activeMode === "online" ? onlineTeamForUid(onlineUid) : "";
   const ownOnlineSubmitted = Boolean(ownOnlineTeam && r1Nominations.some(item => item.team === ownOnlineTeam));
@@ -6638,3 +6639,178 @@ $('siteInfoDetailsLink').addEventListener('click', event => {
   document.querySelectorAll('.site-notice').forEach(notice => { notice.open = true; });
   requestAnimationFrame(() => $('siteFooter').scrollIntoView({ behavior: 'smooth', block: 'start' }));
 });
+
+
+// ---------------------------------------------------------------------------
+// 途中のドラフトを端末に保存して、アプリを閉じても続きから再開できるようにする。
+// AIドラフトと「友達と1つの端末で」だけが対象（オンラインはルーム側で同期済み）。
+// 抽選演出の途中など不安定な瞬間は保存せず、直前の安定した状態を残す。
+// ---------------------------------------------------------------------------
+function localDraftSnapshotKey() {
+  return "kdraftInProgressDraft";
+}
+
+function scheduleLocalDraftSnapshot() {
+  if (window.__kdraftSnapshotTimer) return;
+  window.__kdraftSnapshotTimer = window.setTimeout(() => {
+    window.__kdraftSnapshotTimer = 0;
+    persistLocalDraftSnapshot();
+  }, 0);
+}
+
+function localDraftIsStable() {
+  return pickRevealPhase === "closed" && !activePickReveal && !pickRevealQueue.length &&
+    !pendingR1Resolution && !r1RevealPending && $("pickReveal").hidden;
+}
+
+function persistLocalDraftSnapshot() {
+  if (!["ai", "local"].includes(activeMode) || !gameStarted) return;
+  try {
+    if (isDraftFinished()) {
+      localStorage.removeItem(localDraftSnapshotKey());
+      return;
+    }
+    if (!localDraftIsStable()) return;
+    const snapshot = {
+      version: 1,
+      savedAt: Date.now(),
+      activeMode,
+      gameSessionId,
+      teamNames,
+      aiTeams: [...aiTeams],
+      aiStrategies: [...aiStrategyByTeam.entries()].map(([team, strategy]) => [team, strategy.style]),
+      picks,
+      drafted: [...drafted],
+      round,
+      r1Started,
+      r1NominationOrder,
+      r1NominationIndex,
+      r1NominationAttempt,
+      r1Nominations,
+      r1Queue,
+      waiverOrder,
+      firstRoundWaiverOrder,
+      turnIndex,
+      lotterySummary,
+      pickLimit,
+      orderMode,
+      startOrderMode,
+      firstRoundLotteryLosses,
+      settings: {
+        aiCount: $("aiCount").value,
+        localTeamCount: $("localTeamCount").value
+      }
+    };
+    localStorage.setItem(localDraftSnapshotKey(), JSON.stringify(snapshot));
+  } catch {
+    // 保存は補助機能なので、失敗してもドラフトは止めない。
+  }
+}
+
+function readLocalDraftSnapshot() {
+  const snapshot = readSaved(localDraftSnapshotKey(), null);
+  if (!snapshot || snapshot.version !== 1 || !["ai", "local"].includes(snapshot.activeMode)) return null;
+  if (!Array.isArray(snapshot.teamNames) || !snapshot.teamNames.length) return null;
+  if (Date.now() - Number(snapshot.savedAt || 0) > 1000 * 60 * 60 * 24 * 14) return null;
+  return snapshot;
+}
+
+function discardLocalDraftSnapshot() {
+  try { localStorage.removeItem(localDraftSnapshotKey()); } catch { /* ignore */ }
+}
+
+function restoreLocalDraftSnapshot(snapshot) {
+  if (aiAdvanceTimer !== null) {
+    clearTimeout(aiAdvanceTimer);
+    aiAdvanceTimer = null;
+  }
+  $("playMode").value = snapshot.activeMode;
+  if (snapshot.settings?.aiCount) $("aiCount").value = snapshot.settings.aiCount;
+  if (snapshot.settings?.localTeamCount) $("localTeamCount").value = snapshot.settings.localTeamCount;
+  $("pickLimit").value = String(snapshot.pickLimit || 5);
+  $("orderMode").value = snapshot.orderMode || "snake";
+  $("startOrderMode").value = snapshot.startOrderMode || "random";
+
+  activeMode = snapshot.activeMode;
+  gameSessionId = snapshot.gameSessionId || gameSessionId;
+  teamNames = snapshot.teamNames.slice();
+  aiTeams = new Set(snapshot.aiTeams || []);
+  aiStrategyByTeam = new Map((snapshot.aiStrategies || []).map(([team, style]) => [
+    team,
+    aiStrategies.find(strategy => strategy.style === style) || aiStrategies[0]
+  ]));
+  gameStarted = true;
+  picks = Object.fromEntries(teamNames.map(team => [team, Array.isArray(snapshot.picks?.[team]) ? snapshot.picks[team] : []]));
+  setDraftedMembers(snapshot.drafted || []);
+  round = Number(snapshot.round || 1);
+  r1Started = Boolean(snapshot.r1Started);
+  r1NominationOrder = snapshot.r1NominationOrder || [];
+  r1NominationIndex = Number(snapshot.r1NominationIndex || 0);
+  r1NominationAttempt = Number(snapshot.r1NominationAttempt || 1);
+  r1Nominations = snapshot.r1Nominations || [];
+  r1Queue = snapshot.r1Queue || [];
+  r1RevealPending = false;
+  pendingR1Resolution = null;
+  waiverOrder = snapshot.waiverOrder || teamNames.slice();
+  firstRoundWaiverOrder = snapshot.firstRoundWaiverOrder || [];
+  turnIndex = Number(snapshot.turnIndex || 0);
+  lotterySummary = snapshot.lotterySummary || "";
+  pickLimit = Number(snapshot.pickLimit || 5);
+  orderMode = snapshot.orderMode || "snake";
+  startOrderMode = snapshot.startOrderMode || "random";
+  firstRoundLotteryLosses = snapshot.firstRoundLotteryLosses ||
+    Object.fromEntries(teamNames.map(team => [team, []]));
+  pickRevealQueue = [];
+  pickRevealPhase = "closed";
+  activePickReveal = null;
+  selectedId = null;
+  pendingDraftPickId = null;
+  finalResultsWasVisible = false;
+  if (snapshot.activeMode === "ai" && teamNames.length) {
+    const playerTeam = teamNames.find(team => !aiTeams.has(team));
+    if (playerTeam) playerTeamNameValue = playerTeam;
+  }
+  $("pickReveal").hidden = true;
+  renderNominations();
+  renderCandidates();
+  updateModeSetup();
+  renderDraft();
+  advanceAI();
+  scrollToCandidatePool();
+}
+
+function offerLocalDraftResume() {
+  if (new URLSearchParams(location.search).get("room")) return;
+  const snapshot = readLocalDraftSnapshot();
+  if (!snapshot) return;
+  const picked = Object.values(snapshot.picks || {}).reduce((sum, list) => sum + (Array.isArray(list) ? list.length : 0), 0);
+  const total = snapshot.teamNames.length * Number(snapshot.pickLimit || 5);
+  const modeLabel = snapshot.activeMode === "ai" ? "AIドラフト" : "友達と1つの端末で";
+  const banner = document.createElement("section");
+  banner.className = "resume-banner";
+  banner.setAttribute("role", "region");
+  banner.setAttribute("aria-label", "前回のドラフトを再開");
+  banner.innerHTML = `
+    <div class="resume-banner-copy">
+      <p class="resume-banner-eyebrow">CONTINUE</p>
+      <p class="resume-banner-title">前回のドラフトが途中で保存されています</p>
+      <p class="resume-banner-meta">${escapeHTML(modeLabel)} ・ ${snapshot.teamNames.length}チーム ・ ${picked}/${total}人指名済み ・ ${Number(snapshot.round || 1)}巡目</p>
+    </div>
+    <div class="resume-banner-actions">
+      <button type="button" class="resume-banner-discard">破棄する</button>
+      <button type="button" class="resume-banner-continue">続きから再開</button>
+    </div>
+  `;
+  banner.querySelector(".resume-banner-continue").addEventListener("click", () => {
+    banner.remove();
+    restoreLocalDraftSnapshot(snapshot);
+  });
+  banner.querySelector(".resume-banner-discard").addEventListener("click", () => {
+    discardLocalDraftSnapshot();
+    banner.remove();
+  });
+  const anchor = $("modePanel");
+  anchor.parentNode.insertBefore(banner, anchor);
+}
+
+offerLocalDraftResume();
