@@ -1030,3 +1030,5 @@ a, button, select, summary, label { touch-action: manipulation; }
 }
 .about .panel p { max-width: 78ch; }
 .page-head > div p { max-width: 60ch; }
+.results-room { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.results-room span { flex: 1; min-width: 220px; }

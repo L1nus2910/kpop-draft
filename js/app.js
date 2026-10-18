@@ -1257,7 +1257,10 @@ function renderResults() {
           }).join("")}</ol>
           <div class="result-team-stats">${teamStats(s, team.id).map(t => `<span class="chip">${esc(t)}</span>`).join("")}</div>
         </article>`).join("")}</div>`}
-    ${isOnline() ? `<p class="notice" style="margin-top:16px">${isHost() ? "「同じ設定で再ドラフト」で、同じルームのまま次のドラフトを始められます。終わったらメニューからルームを終了してください。" : "ホストが再ドラフトを始めると、自動でドラフト画面に移ります。"}</p>` : ""}`;
+    ${isOnline() && S.online?.room ? `<div class="notice results-room" style="margin-top:16px">
+        <span>${isHost() ? "「再ドラフト」で、同じルームのまま次のドラフトを始められます。遊び終わったらルームを終了してください（参加者名や結果が削除されます）。" : "ホストが再ドラフトを始めると、自動でドラフト画面に移ります。"}</span>
+        <button class="btn btn-sm ${isHost() ? "btn-danger" : "btn-secondary"}" data-action="${isHost() ? "close-room" : "leave-room"}">${isHost() ? "ルームを終了する" : "ルームから退出する"}</button>
+      </div>` : ""}`;
 }
 
 // ======================================================================
