@@ -53,6 +53,11 @@ export function normalizeName(value, fallback = "プレイヤー") {
   return cleaned || fallback;
 }
 
+/** ルーム名（任意・20文字まで） */
+export function normalizeRoomName(value) {
+  return String(value || "").replace(/[\u0000-\u001f\u007f]/g, "").replace(/\s+/g, " ").trim().slice(0, 20);
+}
+
 export function normalizeCode(value) {
   return String(value || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8);
 }
@@ -251,6 +256,7 @@ export class Room {
       max: MAX_PLAYERS,
       pickLimit: Number(info.pickLimit) || 5,
       limits: String(info.limits || "").slice(0, 120),
+      ...(normalizeRoomName(info.name) ? { name: normalizeRoomName(info.name) } : {}),
       createdAt: this.publishedAt || (this.publishedAt = this.now()),
       updatedAt: this.now()
     };
@@ -272,7 +278,15 @@ export class Room {
       connectedRef.on("value", cb);
       this.offs.push(() => connectedRef.off("value", cb));
     }
-    await ref.set(entry);
+    try {
+      await ref.set(entry);
+    } catch (error) {
+      // データベースのルールが古い（name を受け付けない）時は、名前なしで載せる
+      if (!entry.name) throw error;
+      const { name, ...withoutName } = entry;
+      this.publishedEntry = withoutName;
+      await ref.set(withoutName);
+    }
   }
   async unpublish() {
     if (!this.publishedEntry && !this.publishedKey) return;

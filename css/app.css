@@ -1321,3 +1321,4 @@ body[data-view="draft"] .appbar-install, body[data-view="results"] .appbar-insta
 .public-room-main span { font-size: 12px; color: var(--muted); line-height: 1.5; }
 .public-room .btn { flex: none; }
 .public-empty { margin: 0; padding: 14px; border-radius: 14px; background: var(--bg-2); color: var(--muted); font-size: 13px; line-height: 1.7; }
+.room-name { margin: 0 0 10px; font-size: 18px; font-weight: 900; color: #fff; line-height: 1.4; word-break: break-all; }

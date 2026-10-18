@@ -52,9 +52,9 @@
       ".read": "auth != null",
       "$roomId": {
         ".write": "auth != null && (root.child('rooms').child($roomId).child('hostUid').val() == auth.uid || (!newData.exists() && !root.child('rooms').child($roomId).exists()))",
-        ".validate": "!newData.exists() || (newData.hasChildren(['host', 'count', 'max', 'pickLimit', 'createdAt', 'updatedAt']) && newData.child('host').isString() && newData.child('host').val().length <= 16 && newData.child('count').isNumber() && newData.child('max').isNumber() && newData.child('pickLimit').isNumber() && (!newData.child('limits').exists() || (newData.child('limits').isString() && newData.child('limits').val().length <= 120)))",
+        ".validate": "!newData.exists() || (newData.hasChildren(['host', 'count', 'max', 'pickLimit', 'createdAt', 'updatedAt']) && newData.child('host').isString() && newData.child('host').val().length <= 16 && newData.child('count').isNumber() && newData.child('max').isNumber() && newData.child('pickLimit').isNumber() && (!newData.child('name').exists() || (newData.child('name').isString() && newData.child('name').val().length <= 20)) && (!newData.child('limits').exists() || (newData.child('limits').isString() && newData.child('limits').val().length <= 120)))",
         "$other": {
-          ".validate": "$other == 'host' || $other == 'count' || $other == 'max' || $other == 'pickLimit' || $other == 'limits' || $other == 'createdAt' || $other == 'updatedAt'"
+          ".validate": "$other == 'host' || $other == 'count' || $other == 'max' || $other == 'pickLimit' || $other == 'limits' || $other == 'name' || $other == 'createdAt' || $other == 'updatedAt'"
         }
       }
     }

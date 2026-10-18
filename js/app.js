@@ -14,6 +14,7 @@ const onlineConfigured = () => {
 };
 const normalizeName = (value, fallback = "プレイヤー") => String(value || "").replace(/[.#$\/\[\]]/g, "").trim().slice(0, 16) || fallback;
 const normalizeCode = value => String(value || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8);
+const normalizeRoomName = value => String(value || "").replace(/[\u0000-\u001f\u007f]/g, "").replace(/\s+/g, " ").trim().slice(0, 20);
 import {
   $, $$, esc, icon, monogram, stars, teamColor, agencyShort, agencyFull, formatDate,
   MODE_LABEL, reducedMotion, toast, confirmDialog, promptDialog, menuDialog
@@ -479,6 +480,8 @@ function renderSetup() {
         <div class="online-choice">
           <div class="panel" ${invite ? 'style="order:2"' : ""}>
             <div><h2 class="panel-title">ルームを作る</h2><p class="panel-sub">あなたがホストになります。ルールはルームで決められます。</p></div>
+            <label class="field"><span class="field-label">ルーム名（任意）</span>
+              <input class="input" id="roomName" maxlength="20" value="${esc(S.roomName || "")}" placeholder="例：4世代縛りで遊ぼう" autocomplete="off"></label>
             <label class="check-row"><input type="checkbox" id="roomPublic" ${S.roomPublic ? "checked" : ""}><span><strong>ルーム一覧に公開する</strong><small>オフなら招待リンクを知っている人だけが参加できます</small></span></label>
             <button class="btn btn-primary" data-action="create-room" ${configured ? "" : "disabled"}>${icon("globe")}ルームを作る</button>
           </div>
@@ -1647,12 +1650,13 @@ async function createRoom() {
   S.onlineName = normalizeName($("#onlineName")?.value || S.onlineName, "ホスト");
   savePrefs();
   const publicChecked = Boolean($("#roomPublic")?.checked);
+  S.roomName = normalizeRoomName($("#roomName")?.value || "");
   if (!(await settlePreviousRoom())) return;
   try {
     onlineMessage("ルームを作っています…");
     S.roomPublic = publicChecked;
     savePrefs();
-    const settings = { pickLimit: S.setup.pickLimit, orderMode: S.setup.orderMode, startOrder: S.setup.startOrder, pickMode: S.setup.pickMode, limits: S.setup.limits, limitsOn: S.setup.limitsOn, public: S.roomPublic };
+    const settings = { pickLimit: S.setup.pickLimit, orderMode: S.setup.orderMode, startOrder: S.setup.startOrder, pickMode: S.setup.pickMode, limits: S.setup.limits, limitsOn: S.setup.limitsOn, public: S.roomPublic, roomName: S.roomName };
     const { Room } = await loadOnline();
     const room = await Room.create({ name: S.onlineName, settings });
     attachRoom(room);
@@ -1704,7 +1708,7 @@ function syncLobby() {
   const settings = o.settings || {};
   const listed = settings.public === true && o.status === "lobby" && active.length < MAX_PLAYERS;
   const task = listed
-    ? room.publish({ host: o.players?.[room.uid]?.teamName || S.onlineName, count: active.length, pickLimit: settings.pickLimit, limits: E.limitsLabel(effectiveLimits(settings)) })
+    ? room.publish({ host: o.players?.[room.uid]?.teamName || S.onlineName, name: settings.roomName, count: active.length, pickLimit: settings.pickLimit, limits: E.limitsLabel(effectiveLimits(settings)) })
     : room.unpublish();
   task.catch(error => {
     console.warn("lobby", error);
@@ -1742,8 +1746,8 @@ function renderPublicRooms() {
     const full = Number(r.count) >= Number(r.max || MAX_PLAYERS);
     return `<li class="public-room">
       <div class="public-room-main">
-        <strong>${esc(r.host)}のルーム</strong>
-        <span>${esc(`${r.count}/${r.max || MAX_PLAYERS}人・各${r.pickLimit}人指名`)}${r.limits ? `・縛り：${esc(r.limits)}` : ""}</span>
+        <strong>${esc(r.name || `${r.host}のルーム`)}</strong>
+        <span>${r.name ? `ホスト：${esc(r.host)}・` : ""}${esc(`${r.count}/${r.max || MAX_PLAYERS}人・各${r.pickLimit}人指名`)}${r.limits ? `・縛り：${esc(r.limits)}` : ""}</span>
       </div>
       <button class="btn btn-sm ${full ? "btn-ghost" : "btn-primary"}" data-action="join-public" data-code="${esc(r.code)}" ${full ? "disabled" : ""}>${full ? "満員" : "参加する"}</button>
     </li>`;
@@ -1907,6 +1911,8 @@ function leaveRoomLocally(message, toSetup = false) {
 }
 
 function renderRoom() {
+  // 入力中のルーム名は、ほかの更新で書き換わらないように保つ
+  const editing = document.activeElement?.id === "roomNameEdit" ? { value: document.activeElement.value, pos: document.activeElement.selectionStart } : null;
   const o = S.online;
   const room = o?.room;
   const view = $("#view-room");
@@ -1921,6 +1927,7 @@ function renderRoom() {
     <a class="back-link" href="#/" >ホームへ</a>
     <div class="room">
       <section class="room-code-card" aria-label="ルームコード">
+        ${settings.roomName ? `<p class="room-name">${esc(settings.roomName)}</p>` : ""}
         <small>ルームコード</small>
         <div class="room-code">${esc(room.code)}</div>
         <p style="color:rgba(255,255,255,.8);font-size:14px">${host ? "招待リンクを友達に送ってください。リンクを開くと、このルームの参加画面になります。" : "ホストがドラフトを始めるまでお待ちください。"}</p>
@@ -1942,6 +1949,8 @@ function renderRoom() {
         </section>
         <section class="panel setup-form">
           <div><h2 class="panel-title">ルール</h2><p class="panel-sub">${host ? "ホストが決めます。" : "ホストが決めたルールです。"}</p></div>
+          ${host && !playing ? `<label class="field"><span class="field-label">ルーム名（任意）</span>
+            <input class="input" id="roomNameEdit" maxlength="20" value="${esc(settings.roomName || "")}" placeholder="例：4世代縛りで遊ぼう" autocomplete="off"></label>` : ""}
           <div class="field"><span class="field-label">ルーム一覧</span>
             ${host && !playing
               ? segmented("roomPublic", [["private", "招待した人だけ"], ["public", "一覧に公開"]], settings.public ? "public" : "private", { label: "ルーム一覧への公開" })
@@ -1959,6 +1968,10 @@ function renderRoom() {
         </div>
       </div>
     </div>`;
+  if (editing) {
+    const input = $("#roomNameEdit");
+    if (input) { input.value = editing.value; input.focus(); try { input.setSelectionRange(editing.pos, editing.pos); } catch { /* ignore */ } }
+  }
 }
 
 async function startOnline() {
@@ -2363,6 +2376,14 @@ document.addEventListener("compositionend", event => {
 
 document.addEventListener("change", event => {
   const el = event.target;
+  if (el.id === "roomNameEdit" && isHost() && S.route.name === "room") {
+    const next = { ...(S.online.settings || {}), roomName: normalizeRoomName(el.value) };
+    S.online.room.setSettings(next);
+    S.online.settings = next;
+    syncLobby();
+    toast(next.roomName ? `ルーム名を「${next.roomName}」にしました` : "ルーム名を消しました");
+    return;
+  }
   if (el.dataset.filter) { S.pool[el.dataset.filter] = el.value; S.pool.limit = PAGE(); updateFilterOptions(); renderCards(); }
   else if (el.dataset.actionSelect === "sort") { S.pool.sort = el.value; renderCards(); }
   else if (el.dataset.actionSelect === "preset") {
