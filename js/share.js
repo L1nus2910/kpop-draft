@@ -43,8 +43,8 @@ export async function createResultImage(state) {
   const roundW = 96;
   const headerH = 92;
   const lossMax = Math.max(0, ...teams.map(t => (state.losses[t.id] || []).length));
-  const rowH = 96;
-  const firstRowH = lossMax ? Math.max(rowH, 70 + lossMax * 30) : rowH;
+  const rowH = 112;
+  const firstRowH = lossMax ? Math.max(rowH, 84 + lossMax * 58) : rowH;
   const titleH = 170;
   const footH = 70;
   const tableW = width - pad * 2;
@@ -115,11 +115,13 @@ export async function createResultImage(state) {
       if (index > 0 || true) { ctx.fillStyle = "#e3deed"; ctx.fillRect(x, y, 1, h); }
       const pick = (state.picks[team.id] || []).find(p => p.round === round);
       const losses = round === 1 ? (state.losses[team.id] || []) : [];
-      let cy = y + (h - (losses.length * 30 + 52)) / 2 + 6;
+      let cy = y + (h - (losses.length * 58 + 70)) / 2 + 4;
       losses.forEach(id => {
         const lost = idolById.get(id);
-        fitText(ctx, `${lost?.japaneseName || ""}（抽選外れ）`, x + colW / 2, cy + 8, colW - 20, 13, { color: "#a9a4bd", align: "center", weight: 500 });
-        cy += 30;
+        fitText(ctx, lost?.japaneseName || "", x + colW / 2, cy + 8, colW - 20, 15, { color: "#a9a4bd", align: "center", weight: 700 });
+        fitText(ctx, agencyShort(lost), x + colW / 2, cy + 26, colW - 20, 11, { color: "#bcb7cc", align: "center", weight: 500 });
+        fitText(ctx, lost?.group || "", x + colW / 2, cy + 41, colW - 20, 11, { color: "#bcb7cc", align: "center", weight: 500 });
+        cy += 58;
       });
       if (!pick) {
         fitText(ctx, "—", x + colW / 2, y + h / 2, colW - 20, 18, { color: "#d3cce3", align: "center" });
@@ -127,7 +129,8 @@ export async function createResultImage(state) {
       }
       const idol = idolById.get(pick.idolId);
       fitText(ctx, idol?.japaneseName || "", x + colW / 2, cy + 14, colW - 20, 22, { color: "#191430", weight: 900, align: "center", min: 11 });
-      fitText(ctx, [agencyShort(idol), idol?.group].filter(Boolean).join(" · "), x + colW / 2, cy + 40, colW - 20, 13, { color: "#7a7493", align: "center", weight: 700 });
+      fitText(ctx, agencyShort(idol), x + colW / 2, cy + 38, colW - 20, 13, { color: "#7a7493", align: "center", weight: 700 });
+      fitText(ctx, idol?.group || "", x + colW / 2, cy + 56, colW - 20, 13, { color: "#7a7493", align: "center", weight: 700 });
     });
     y += h;
   }
