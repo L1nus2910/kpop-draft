@@ -37,7 +37,7 @@ const S = {
   pool: { query: "", generation: "", nationality: "", agency: "", group: "", hideDrafted: true, showExcluded: false, onlyShortlist: false, sort: "recommended", limit: PAGE() },
   selectedId: null,
   tab: "pool",
-  boardMode: window.innerWidth <= 720 ? "teams" : "table",
+  boardMode: "table",
   resultsMode: "teams",
   setup: {
     ...DEFAULT_SETUP,
