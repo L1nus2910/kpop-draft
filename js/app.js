@@ -109,7 +109,9 @@ const draftedKeys = () => new Set(S.draft?.drafted || []);
 // ======================================================================
 // ルーティング
 // ======================================================================
-const VIEWS = ["home", "setup", "room", "draft", "results", "history", "about"];
+const VIEWS = ["home", "setup", "room", "draft", "results", "history", "about", "vote"];
+let pollModule = null;
+const loadPoll = () => import("./poll.js").then(m => (pollModule = m));
 
 function parseRoute() {
   const hash = location.hash.replace(/^#\/?/, "");
@@ -135,6 +137,7 @@ function onRoute() {
   if (route.name === "room" && !S.online?.room) { history.replaceState(null, "", "#/setup/online"); route = { name: "setup", param: "online" }; }
   if (route.name === "setup" && !["ai", "local", "online"].includes(route.param)) route.param = "ai";
   const changed = route.name !== S.route.name || route.param !== S.route.param;
+  if (changed && S.route.name === "vote") pollModule?.leaveVote();
   if (changed && !["history", "about"].includes(S.route.name)) S.returnTo = location.hash && S.route.name ? `${S.route.name}${S.route.param ? `/${S.route.param}` : ""}` : "";
   if (changed) $$('#toasts [data-slot="pick"]').forEach(el => el.remove());
   S.route = route;
@@ -163,7 +166,8 @@ function onRoute() {
       draft: "ドラフト中 — KDraft",
       results: "ドラフト結果 — KDraft",
       history: "過去のドラフト — KDraft",
-      about: "サイト情報 — KDraft"
+      about: "サイト情報 — KDraft",
+      vote: "人気投票 — KDraft"
     }[route.name];
   }
 }
@@ -179,6 +183,7 @@ function render() {
   else if (name === "results") renderResults();
   else if (name === "history") renderHistory();
   else if (name === "about") renderAbout();
+  else if (name === "vote") loadPoll().then(m => { if (S.route.name === "vote") m.renderVote($("#view-vote")); }).catch(() => { $("#view-vote").innerHTML = `<p class="notice notice-warn">投票を読み込めませんでした。通信状態を確認してください。</p>`; });
   renderReveal();
 }
 
@@ -283,6 +288,12 @@ function renderHome() {
         </a>
       </div>
     </section>
+
+    <a class="poll-banner" href="#/vote">
+      <span class="poll-banner-mark" aria-hidden="true">♡</span>
+      <span class="poll-banner-copy"><strong>人気投票</strong><small>好きなグループ・メンバーに1日5票ずつ。今日・今週・今月・累計のランキング</small></span>
+      <span class="poll-banner-go">投票する</span>
+    </a>
 
     <section class="section" id="rules" aria-labelledby="rulesTitle">
       <div class="section-head"><h2 id="rulesTitle">ドラフトの流れ</h2><p>プロ野球のドラフト会議と同じ進め方です。</p></div>
@@ -1562,7 +1573,7 @@ function renderAbout() {
       </section>
       <section class="panel about-wide"><h2>プライバシー・オンラインドラフト</h2>
         <p>メールアドレスやパスワードによるアカウント登録はありません。除外したメンバー、気になるリスト、保存した条件、途中のドラフト、過去の結果（最大${HISTORY_LIMIT}件）は、利用中のブラウザー内にだけ保存されます。</p>
-        <p>オンラインドラフトでは、Firebaseの匿名認証とRealtime Databaseを使用します。匿名の識別子のほか、入力した表示名、ルームコード、参加者、ドラフト設定、指名・抽選を含むゲーム進行情報を同期します。同じルームの参加者には表示名とドラフト結果が表示されます。ホストが「ルーム一覧に公開」を選んだ場合は、ホストの表示名・人数・ルール・縛りが、サイトを開いた人全員に表示され、誰でも参加できるようになります。表示名には本名、住所、学校名、連絡先などを使わず、招待リンクやコードは参加してほしい相手だけに共有してください。</p>
+        <p>オンラインドラフトでは、Firebaseの匿名認証とRealtime Databaseを使用します。匿名の識別子のほか、入力した表示名、ルームコード、参加者、ドラフト設定、指名・抽選を含むゲーム進行情報を同期します。同じルームの参加者には表示名とドラフト結果が表示されます。人気投票では、匿名の識別子ごとに「その日に何票入れたか」と「最後に投票した相手」を記録し、各グループ・メンバーの票数だけを公開します。ホストが「ルーム一覧に公開」を選んだ場合は、ホストの表示名・人数・ルール・縛りが、サイトを開いた人全員に表示され、誰でも参加できるようになります。表示名には本名、住所、学校名、連絡先などを使わず、招待リンクやコードは参加してほしい相手だけに共有してください。</p>
         <p>Realtime Databaseはシンガポール（asia-southeast1）に設定されています。Googleの案内ではFirebase Authenticationは米国内のデータセンターで運用され、サービス提供のためIPアドレスやブラウザー情報等が処理される場合があります。詳しくは <a href="https://firebase.google.com/support/privacy" target="_blank" rel="noopener noreferrer">Firebaseのプライバシー案内</a> をご確認ください。ルーム情報は、ホストが「ルームを終了」を実行するまで残ります。サイトの配信元である <a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement" target="_blank" rel="noopener noreferrer">GitHubのプライバシー説明</a> もご確認ください。</p>
       </section>
     </div>
@@ -2112,6 +2123,7 @@ async function shareInvite() {
 // 操作（イベントの受け口）
 // ======================================================================
 document.addEventListener("click", async event => {
+  if (S.route.name === "vote" && pollModule?.onVoteClick(event)) return;
   const target = event.target.closest("[data-action]");
   const segButton = event.target.closest("[data-seg] button[data-value]");
   const stepButton = event.target.closest("[data-stepper] button[data-step]");
@@ -2350,6 +2362,7 @@ function onStepper(name, step, min, max) {
 }
 
 document.addEventListener("input", event => {
+  if (S.route.name === "vote" && pollModule?.onVoteInput(event)) return;
   const el = event.target;
   if (el.id === "poolSearch") {
     S.pool.query = el.value;
@@ -2368,6 +2381,7 @@ document.addEventListener("input", event => {
 
 // 日本語変換の確定時に検索を反映
 document.addEventListener("compositionend", event => {
+  if (event.target.id === "pollSearch") { pollModule?.onVoteInput({ target: event.target, isComposing: false }); return; }
   if (event.target.id !== "poolSearch") return;
   S.pool.query = event.target.value;
   clearTimeout(event.target._t);

@@ -57,6 +57,40 @@
           ".validate": "$other == 'host' || $other == 'count' || $other == 'max' || $other == 'pickLimit' || $other == 'limits' || $other == 'name' || $other == 'createdAt' || $other == 'updatedAt'"
         }
       }
+    },
+    "polls": {
+      "voters": {
+        "$uid": {
+          ".read": "auth != null && auth.uid == $uid",
+          "$kind": {
+            ".write": "auth != null && auth.uid == $uid && ($kind == 'g' || $kind == 'm')",
+            ".validate": "newData.hasChildren(['day', 'w', 'm', 'dk', 'wk', 'mk', 'n', 'item']) && newData.child('dk').isString() && newData.child('dk').val().matches(/^d[0-9]{1,7}$/) && newData.child('wk').isString() && newData.child('wk').val().matches(/^w[0-9]{1,7}$/) && newData.child('mk').isString() && newData.child('mk').val().matches(/^m[0-9]{1,7}$/) && newData.child('day').isNumber() && newData.child('day').val() * 86400000 - 32400000 <= now + 120000 && now - 120000 < (newData.child('day').val() + 1) * 86400000 - 32400000 && newData.child('w').val() * 7 <= newData.child('day').val() + 3 && newData.child('day').val() + 3 < newData.child('w').val() * 7 + 7 && (newData.child('m').val() - 23640) * 30.436875 - newData.child('day').val() < 35 && newData.child('day').val() - (newData.child('m').val() - 23640) * 30.436875 < 35 && newData.child('item').isString() && newData.child('item').val().length <= 200 && newData.child('n').isNumber() && newData.child('n').val() <= 5 && ((data.exists() && data.child('day').val() == newData.child('day').val() && newData.child('n').val() == data.child('n').val() + 1) || ((!data.exists() || data.child('day').val() != newData.child('day').val()) && newData.child('n').val() == 1))",
+            "$other": {
+              ".validate": "$other == 'day' || $other == 'w' || $other == 'm' || $other == 'dk' || $other == 'wk' || $other == 'mk' || $other == 'n' || $other == 'item'"
+            }
+          }
+        }
+      },
+      "tally": {
+        ".read": "auth != null",
+        "$kind": {
+          "$period": {
+            "$item": {
+              ".write": "auth != null && ($kind == 'g' || $kind == 'm')",
+              ".validate": "newData.isNumber() && ((!data.exists() && newData.val() == 1) || (data.exists() && newData.val() == data.val() + 1)) && (newData.parent().parent().parent().parent().child('voters').child(auth.uid).child($kind).child('n').val() != root.child('polls').child('voters').child(auth.uid).child($kind).child('n').val() || newData.parent().parent().parent().parent().child('voters').child(auth.uid).child($kind).child('day').val() != root.child('polls').child('voters').child(auth.uid).child($kind).child('day').val()) && newData.parent().parent().parent().parent().child('voters').child(auth.uid).child($kind).child('item').val() == $item && ($period == 'all' || $period == newData.parent().parent().parent().parent().child('voters').child(auth.uid).child($kind).child('dk').val() || $period == newData.parent().parent().parent().parent().child('voters').child(auth.uid).child($kind).child('wk').val() || $period == newData.parent().parent().parent().parent().child('voters').child(auth.uid).child($kind).child('mk').val())"
+            }
+          }
+        }
+      },
+      "total": {
+        ".read": "auth != null",
+        "$kind": {
+          "$period": {
+            ".write": "auth != null && ($kind == 'g' || $kind == 'm')",
+            ".validate": "newData.isNumber() && ((!data.exists() && newData.val() == 1) || (data.exists() && newData.val() == data.val() + 1)) && (newData.parent().parent().parent().child('voters').child(auth.uid).child($kind).child('n').val() != root.child('polls').child('voters').child(auth.uid).child($kind).child('n').val() || newData.parent().parent().parent().child('voters').child(auth.uid).child($kind).child('day').val() != root.child('polls').child('voters').child(auth.uid).child($kind).child('day').val()) && ($period == 'all' || $period == newData.parent().parent().parent().child('voters').child(auth.uid).child($kind).child('dk').val() || $period == newData.parent().parent().parent().child('voters').child(auth.uid).child($kind).child('wk').val() || $period == newData.parent().parent().parent().child('voters').child(auth.uid).child($kind).child('mk').val())"
+          }
+        }
+      }
     }
   }
 }
