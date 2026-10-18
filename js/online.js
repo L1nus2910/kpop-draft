@@ -253,3 +253,8 @@ export class Room {
     return url.toString();
   }
 }
+
+/** オンライン画面を開いた時点で接続の準備をしておく（ルーム作成・参加を速くする） */
+export function warmup() {
+  if (onlineConfigured() && navigator.onLine) identity().catch(() => {});
+}

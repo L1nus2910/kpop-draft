@@ -3,8 +3,17 @@ import { idols, normalizeSearchText, agencyFilterName, searchRank, popularityRan
 import * as E from "./engine.js";
 import { chooseAIIdol, preferredPersonCandidates } from "./ai.js";
 import { store, HISTORY_LIMIT } from "./store.js";
-import { shareResult, xIntentUrl, resultText } from "./share.js";
-import { Room, onlineConfigured, normalizeName, normalizeCode, MAX_PLAYERS } from "./online.js";
+// オンライン・画像共有は必要になったときだけ読み込む（最初の表示を軽くする）
+const loadShare = () => import("./share.js");
+let onlineModule = null;
+const loadOnline = () => (onlineModule ||= import("./online.js"));
+const MAX_PLAYERS = 10;
+const onlineConfigured = () => {
+  const config = window.STAGE_PICK_FIREBASE_CONFIG;
+  return Boolean(config?.apiKey && config?.projectId && config?.databaseURL && !JSON.stringify(config).includes("YOUR_"));
+};
+const normalizeName = (value, fallback = "プレイヤー") => String(value || "").replace(/[.#$\/\[\]]/g, "").trim().slice(0, 16) || fallback;
+const normalizeCode = value => String(value || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8);
 import {
   $, $$, esc, icon, monogram, stars, teamColor, agencyShort, agencyFull, formatDate,
   MODE_LABEL, reducedMotion, toast, confirmDialog, promptDialog, menuDialog
@@ -15,7 +24,7 @@ import {
 // ======================================================================
 const DEFAULT_SETUP = { aiCount: 3, localCount: 4, pickLimit: 5, orderMode: "snake", startOrder: "random" };
 const LOCAL_TEAM_NAMES = ["チームA", "チームB", "チームC", "チームD", "チームE", "チームF", "チームG", "チームH", "チームI", "チームJ"];
-const PAGE = () => (window.innerWidth <= 720 ? 24 : 48);
+const PAGE = () => 20;
 
 const prefs = store.prefs();
 const S = {
@@ -118,10 +127,12 @@ function onRoute() {
   if (route.name === "room" && !S.online?.room) { history.replaceState(null, "", "#/setup/online"); route = { name: "setup", param: "online" }; }
   if (route.name === "setup" && !["ai", "local", "online"].includes(route.param)) route.param = "ai";
   const changed = route.name !== S.route.name || route.param !== S.route.param;
+  if (changed && !["history", "about"].includes(S.route.name)) S.returnTo = location.hash && S.route.name ? `${S.route.name}${S.route.param ? `/${S.route.param}` : ""}` : "";
   if (changed) $$('#toasts [data-slot="pick"]').forEach(el => el.remove());
   S.route = route;
   document.body.dataset.view = route.name;
   if (route.name !== "draft") { $("#dockMount").innerHTML = ""; document.body.classList.remove("has-dock"); }
+  closeBoardFull();
   VIEWS.forEach(name => { $(`#view-${name}`).hidden = name !== route.name; });
   $$(".appbar-nav a").forEach(link => {
     if (link.dataset.nav === route.name) link.setAttribute("aria-current", "page");
@@ -369,6 +380,7 @@ function renderSetup() {
   } else {
     const invite = new URLSearchParams(location.search).get("room") || "";
     const configured = onlineConfigured();
+    if (configured) loadOnline().then(m => m.warmup()).catch(() => {});
     const err = S.online?.error || "";
     form = `
       <div class="setup-form">
@@ -594,6 +606,7 @@ function renderDraft() {
   if (!view.querySelector(".draft-layout")) {
     view.innerHTML = `
       <div id="turnBanner"></div>
+      <div class="order-strip" id="orderStrip" aria-label="指名順"></div>
       ${segmented("tab", [["pool", "候補を探す"], ["board", "指名ボード"]], S.tab, { label: "表示の切り替え" }).replace('class="segmented"', 'class="segmented draft-tabs"')}
       <div class="draft-layout" data-tab="${S.tab}">
         <section class="pool" aria-label="候補メンバー">
@@ -609,6 +622,7 @@ function renderDraft() {
   $$('[data-seg="tab"] button', view).forEach(b => b.setAttribute("aria-checked", String(b.dataset.value === S.tab)));
   renderAppbar();
   renderTurn();
+  renderOrderStrip();
   const cardsKey = `${s.id}:${s.drafted.length}`;
   if (S.cardsKey !== cardsKey) { S.cardsKey = cardsKey; renderCards(); updateFilterOptions(); }
   renderBoardPanel();
@@ -639,7 +653,7 @@ function bannerContent(s) {
     const rebid = s.r1.attempt > 1 ? "再入札" : "入札";
     if (s.r1.awaitingOpen) {
       title = "全員の入札がそろいました";
-      if (isHost()) { sub = "準備ができたら開示してください。全員の画面で発表が始まります。"; action = `<button class="btn btn-light" data-action="open-bids">入札を開示する</button>`; }
+      if (isHost()) { sub = "ホストの操作待ちです。右のボタンを押すと、全員の画面で発表が始まります。"; state = "is-host-action"; action = `<button class="btn btn-light btn-attention" data-action="open-bids">${icon("play")}入札を開示する</button>`; }
       else { sub = "ホストが開示すると発表が始まります。"; state = "is-waiting"; }
     } else if (s.mode === "online") {
       if (mine && E.bidPending(s, mine)) {
@@ -701,6 +715,45 @@ function renderTurn() {
     </div>`;
 }
 
+// ---------------------------------------------------------------- 指名順（矢印つき）
+function renderOrderStrip() {
+  const box = $("#orderStrip");
+  const s = S.draft;
+  if (!box || !s) return;
+  const me = myTeamId();
+  const current = E.currentTeam(s);
+  const item = (id, state) => {
+    const t = E.team(s, id);
+    return `<li class="order-item is-${state}${id === me ? " is-me" : ""}" style="--team-color:${teamColor(E.teamIndex(s, id))}">
+      <i aria-hidden="true"></i><span>${esc(t?.name || "")}${id === me && t?.name !== "あなた" ? "<small>（あなた）</small>" : ""}</span>${state === "done" ? '<b aria-label="済み">✓</b>' : ""}</li>`;
+  };
+  const arrow = '<li class="order-arrow" aria-hidden="true">→</li>';
+  let label = "";
+  let items = [];
+  if (E.isFinished(s)) {
+    box.hidden = true;
+    return;
+  }
+  if (!s.r1.started) {
+    const order = s.resolution ? s.resolution.batchOrder : s.r1.order;
+    label = s.mode === "online" ? "1巡目（同時入札）" : (s.r1.attempt > 1 ? "再入札の順番" : "1巡目の入札順");
+    items = order.filter(id => !E.isDeparted(s, id)).map(id => item(id,
+      (id in s.r1.bids) || s.resolution ? "done" : (s.mode !== "online" && id === current) ? "now" : "wait"));
+    const sep = s.mode === "online" ? '<li class="order-arrow" aria-hidden="true">・</li>' : arrow;
+    box.innerHTML = `<span class="order-label">${label}</span><ol class="order-list">${items.join(sep)}</ol>`;
+  } else {
+    label = `${s.round}巡目の指名順`;
+    items = s.order.filter(id => !E.isDeparted(s, id) && (s.picks[id] || []).length <= s.settings.pickLimit).map((id, index) => {
+      const pickedThisRound = (s.picks[id] || []).some(p => p.round === s.round);
+      return item(id, pickedThisRound ? "done" : id === current ? "now" : "wait");
+    });
+    const nextNote = s.round < s.settings.pickLimit ? `<span class="order-note">${s.settings.orderMode === "snake" ? "次の巡は逆順" : "次の巡も同じ順"}</span>` : "";
+    box.innerHTML = `<span class="order-label">${label}</span><ol class="order-list">${items.join(arrow)}</ol>${nextNote}`;
+  }
+  box.hidden = false;
+  box.querySelector(".is-now")?.scrollIntoView({ block: "nearest", inline: "center" });
+}
+
 // ---------------------------------------------------------------- 候補
 function compareCandidates(a, b) {
   const recommended = () =>
@@ -756,8 +809,10 @@ function renderPoolTools() {
       <input class="input" type="search" id="poolSearch" value="${esc(p.query)}" placeholder="名前・グループ・事務所で検索（例：モモ／Momo／모모）" autocomplete="off" enterkeyhint="search">
       <button class="search-clear" type="button" data-action="clear-search" aria-label="検索をクリア" ${p.query ? "" : "hidden"}>×</button>
     </label>
-    <div class="filter-bar" role="group" aria-label="絞り込み">
+    <div class="filter-grid" role="group" aria-label="絞り込み">
       ${FILTERS.map(([key, label]) => `<label class="filter-chip"><span class="sr-only">${label}</span><select data-filter="${key}" class="${p[key] ? "is-set" : ""}"></select></label>`).join("")}
+    </div>
+    <div class="toggle-row" role="group" aria-label="表示の条件">
       <button type="button" class="toggle-chip" data-action="toggle-shortlist-only" aria-pressed="${p.onlyShortlist}">${icon("heart")}気になる ${S.shortlist.size ? `(${S.shortlist.size})` : ""}</button>
       <button type="button" class="toggle-chip" data-action="toggle-hide-drafted" aria-pressed="${p.hideDrafted}">指名済みを隠す</button>
       <button type="button" class="toggle-chip" data-action="toggle-show-excluded" aria-pressed="${p.showExcluded}">除外も表示</button>
@@ -813,27 +868,22 @@ function cardHTML(idol, drafted) {
   </article>`;
 }
 
-let cardObserver = null;
 function renderCards() {
   const grid = $("#cardGrid");
   if (!grid) return;
   const list = candidates();
   const drafted = draftedKeys();
-  const shown = list.slice(0, S.pool.limit);
+  const p = S.pool;
+  // 検索や絞り込みをしているときは当てはまる人を全員、していないときは20人ずつ
+  const filtered = Boolean(p.query.trim() || p.generation || p.nationality || p.agency || p.group || p.onlyShortlist);
+  const shown = filtered ? list : list.slice(0, p.limit);
+  const rest = list.length - shown.length;
   grid.innerHTML = shown.length
     ? shown.map(idol => cardHTML(idol, drafted)).join("") +
-      (list.length > shown.length ? `<button class="btn btn-secondary load-more" data-action="load-more" id="loadMore">さらに表示（あと${list.length - shown.length}人）</button>` : "")
+      (rest > 0 ? `<button class="btn btn-secondary load-more" data-action="load-more" id="loadMore">さらに${Math.min(20, rest)}人を表示<small>（残り${rest}人）</small></button>` : "")
     : `<div class="empty" style="grid-column:1/-1"><strong>条件に合う候補がいません</strong>検索や絞り込みを変えてみてください。<br><button class="btn btn-secondary btn-sm" style="margin-top:12px" data-action="reset-filters">条件をリセット</button></div>`;
   const count = $("#poolCount");
   if (count) count.innerHTML = `<b>${list.length}</b>人の候補`;
-  cardObserver?.disconnect();
-  const more = $("#loadMore");
-  if (more && "IntersectionObserver" in window) {
-    cardObserver = new IntersectionObserver(entries => {
-      if (entries.some(e => e.isIntersecting)) { S.pool.limit += PAGE(); renderCards(); }
-    }, { rootMargin: "600px" });
-    cardObserver.observe(more);
-  }
 }
 
 function refreshCardSelection(previous) {
@@ -1007,7 +1057,7 @@ function renderBoardPanel() {
   const model = boardModelFromState(s);
   const recent = s.log.filter(e => e.kind === "pick" || e.kind === "lottery").slice(-4).reverse();
   box.innerHTML = `
-    <div class="board-head"><h2>指名ボード</h2>${segmented("boardMode", [["table", "表"], ["teams", "チーム別"]], S.boardMode, { label: "ボードの表示" })}</div>
+    <div class="board-head"><h2>指名ボード</h2><button class="icon-btn" data-action="board-full" aria-label="表を広げて全体を見る" title="表を広げて全体を見る">${icon("expand")}</button><span style="flex:1"></span>${segmented("boardMode", [["table", "表"], ["teams", "チーム別"]], S.boardMode, { label: "ボードの表示" })}</div>
     <div class="board-box">${S.boardMode === "table" ? boardTableHTML(model) : `<div style="padding:10px">${teamStackHTML(model)}</div>`}</div>
     ${recent.length ? `<div class="ticker" aria-label="最近の指名">${recent.map(e => {
       const idol = E.idolById.get(e.idolId);
@@ -1080,7 +1130,7 @@ function renderReveal() {
             <div class="nameplate-face nameplate-front">
               <small>${r.type === "nomination" ? "第1回選択希望" : `第${r.round}巡選択`}</small>
               <p class="nameplate-name">${esc(idol?.japaneseName)}</p>
-              <p class="nameplate-meta"><span>${esc(agencyFull(idol))}</span><span>${esc(idol?.group)}</span></p>
+              <p class="nameplate-meta"><span>${esc(agencyShort(idol))}</span><span>${esc(idol?.group)}</span></p>
             </div>
           </div></div>
           <div class="stage-foot"><p class="stage-hint" id="stageHint"></p><div class="stage-actions" id="stageActions"></div></div>
@@ -1108,7 +1158,7 @@ function patchReveal(s, r) {
     } else {
       hint.textContent = remaining ? `このあと ${remaining}件の発表があります` : "";
       actions.innerHTML = director
-        ? `<button class="btn btn-light btn-lg" data-action="reveal-next">${remaining ? "次の発表へ" : "ボードに戻る"}</button>`
+        ? `<button class="btn btn-light btn-lg btn-attention" data-action="reveal-next">${remaining ? "次の発表へ" : "ボードに戻る"}</button>`
         : `<span class="stage-hint">ホストの画面に合わせて自動で進みます</span>`;
     }
     return;
@@ -1159,13 +1209,14 @@ function patchReveal(s, r) {
     const drawerLabel = E.teamLabel(s, drawer);
     const mine = s.mode === "online" ? drawer === me : !isAutoTeam(s, drawer);
     hint.textContent = mine
-      ? (s.mode === "local" ? `${drawerLabel} の番：封筒を1つ選んでください` : "あなたの番です。封筒を1つ選んでください")
+      ? (s.mode === "local" ? `▲ ${drawerLabel} の番：光っている封筒を1つ押してください` : "▲ あなたの番です。光っている封筒を1つ押してください")
       : `${drawerLabel} が封筒を選んでいます…`;
+    hint.classList.toggle("is-attention", Boolean(mine));
     actions.innerHTML = "";
   } else if (r.stage === "ready") {
     hint.textContent = "全員の封筒がそろいました";
     actions.innerHTML = isOnline()
-      ? (isHost() ? `<button class="btn btn-light btn-lg" data-action="open-lottery">${icon("envelope")}一斉に開封する</button>` : `<span class="stage-hint">ホストが開封するのを待っています</span>`)
+      ? (isHost() ? `<span class="host-callout">ホストの操作です</span><button class="btn btn-light btn-lg btn-attention" data-action="open-lottery">${icon("envelope")}一斉に開封する</button>` : `<span class="stage-hint">ホストが開封するのを待っています</span>`)
       : "";
   } else if (r.stage === "opening") {
     hint.textContent = "せーの…！";
@@ -1173,7 +1224,7 @@ function patchReveal(s, r) {
   } else if (r.stage === "result") {
     hint.textContent = remaining ? `このあと ${remaining}件の発表があります` : "外れたチームは再入札します";
     actions.innerHTML = director
-      ? `<button class="btn btn-light btn-lg" data-action="reveal-next">${remaining ? "次の発表へ" : "続ける"}</button>`
+      ? `<button class="btn btn-light btn-lg btn-attention" data-action="reveal-next">${remaining ? "次の発表へ" : "続ける"}</button>`
       : `<span class="stage-hint">まもなく自動で進みます</span>`;
   }
 }
@@ -1250,7 +1301,8 @@ function renderResults() {
     ${S.shareStatus ? `<p class="share-status" role="status">${esc(S.shareStatus)}</p>` : ""}
     ${segmented("resultsMode", [["teams", "チーム別"], ["table", "指名一覧表"]], S.resultsMode, { label: "結果の表示" }).replace('class="segmented"', 'class="segmented results-tabs"')}
     ${S.resultsMode === "table"
-      ? `<div class="board-box">${boardTableHTML(boardModelFromState(s))}</div>`
+      ? `<div class="board-expand-row"><button class="btn btn-secondary btn-sm" data-action="board-full">${icon("expand")}表を広げて全体を見る</button></div>
+         <div class="board-box">${boardTableHTML(boardModelFromState(s))}</div>`
       : `<div class="results-grid">${s.teams.map((team, index) => `
         <article class="result-team" style="--team-color:${teamColor(index)}">
           <header class="result-team-head ${team.id === me && team.name !== "あなた" ? "is-me" : ""}"><small>${index + 1}番目のチーム${team.departed ? "・退出" : ""}</small><h3>${esc(E.teamLabel(s, team.id))}</h3></header>
@@ -1270,12 +1322,70 @@ function renderResults() {
       </div>` : ""}`;
 }
 
+// ---------------------------------------------------------------- 表を全画面で見る
+let boardFullEl = null;
+function openBoardFull(model, title) {
+  closeBoardFull();
+  S.boardFit = true;
+  boardFullEl = document.createElement("div");
+  boardFullEl.className = "board-full";
+  boardFullEl.setAttribute("role", "dialog");
+  boardFullEl.setAttribute("aria-modal", "true");
+  boardFullEl.setAttribute("aria-label", title);
+  boardFullEl.innerHTML = `
+    <div class="board-full-bar">
+      <strong>${esc(title)}</strong>
+      <span class="board-full-hint">横向きにすると大きく見られます</span>
+      <span style="flex:1"></span>
+      <button class="btn btn-ghost btn-sm" data-action="board-full-fit" id="boardFitBtn"></button>
+      <button class="btn btn-light btn-sm" data-action="board-full-close">閉じる</button>
+    </div>
+    <div class="board-full-scroll"><div class="board-full-stage">${boardTableHTML(model)}</div></div>`;
+  document.body.append(boardFullEl);
+  document.body.classList.add("is-locked");
+  fitBoardFull();
+  boardFullEl.querySelector('[data-action="board-full-close"]').focus();
+}
+function fitBoardFull() {
+  if (!boardFullEl) return;
+  const scroll = boardFullEl.querySelector(".board-full-scroll");
+  const stage = boardFullEl.querySelector(".board-full-stage");
+  const table = stage.querySelector("table");
+  table.style.transform = "";
+  stage.style.width = stage.style.height = "";
+  const tw = table.scrollWidth, th = table.scrollHeight;
+  const aw = scroll.clientWidth - 24, ah = scroll.clientHeight - 24;
+  const scale = S.boardFit ? Math.min(1, aw / tw, ah / th) : 1;
+  table.style.transform = `scale(${scale})`;
+  stage.style.width = `${Math.ceil(tw * scale)}px`;
+  stage.style.height = `${Math.ceil(th * scale)}px`;
+  const btn = boardFullEl.querySelector("#boardFitBtn");
+  btn.hidden = scale === 1 && S.boardFit;
+  btn.textContent = S.boardFit ? "実際の大きさで見る" : "画面に合わせる";
+  if (!S.boardFit) btn.hidden = false;
+}
+function closeBoardFull() {
+  if (!boardFullEl) return;
+  boardFullEl.remove();
+  boardFullEl = null;
+  if ($("#reveal").hidden) document.body.classList.remove("is-locked");
+}
+window.addEventListener("resize", () => { if (boardFullEl) fitBoardFull(); });
+
 // ======================================================================
 // 履歴・サイト情報
 // ======================================================================
+function backLinkHTML() {
+  const to = S.returnTo || "";
+  const name = to.split("/")[0];
+  const label = { draft: "ドラフトに戻る", results: "結果に戻る", setup: "設定に戻る", room: "ルームに戻る" }[name] || "ホームに戻る";
+  const target = ["draft", "results"].includes(name) && !S.draft ? "" : to;
+  return `<a class="back-link back-link-strong" href="#/${esc(target)}">${label}</a>`;
+}
+
 function renderHistory() {
   const list = store.history();
-  $("#view-history").innerHTML = `
+  $("#view-history").innerHTML = backLinkHTML() + `
     <div class="page-head"><div><h1>過去のドラフト</h1><p>この端末に保存された最近${HISTORY_LIMIT}件の結果です。</p></div>
       ${list.length ? `<button class="btn btn-ghost btn-sm" data-action="clear-history">履歴をすべて消す</button>` : ""}</div>
     ${list.length ? `<div class="history-list">${list.map((entry, index) => `
@@ -1284,7 +1394,7 @@ function renderHistory() {
           <span>${esc(MODE_LABEL[entry.mode] || "ドラフト")}・${(entry.teams || []).length}チーム・各${entry.pickLimit || "?"}人</span></div></summary>
         <div class="history-body">
           <div class="board-box">${boardTableHTML(boardModelFromHistory(entry))}</div>
-          <div><button class="btn btn-ghost btn-sm" data-action="delete-history" data-id="${esc(entry.id)}">この記録を消す</button></div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-secondary btn-sm" data-action="board-full" data-history="${esc(entry.id)}">${icon("expand")}表を広げて見る</button><button class="btn btn-ghost btn-sm" data-action="delete-history" data-id="${esc(entry.id)}">この記録を消す</button></div>
         </div>
       </details>`).join("")}</div>`
       : `<div class="panel empty"><strong>まだ記録がありません</strong>ドラフトを最後まで終えると、ここに結果が残ります。<br><a class="btn btn-primary" style="margin-top:16px" href="#/setup/ai">AIとドラフトする</a></div>`}`;
@@ -1324,7 +1434,7 @@ function renderAbout() {
     ["Star News 女性アイドル第259回", "https://www.starnewskorea.com/star-ranking/female-idol/259"],
     ["Fannstar 女性スター順位", "https://fannstar.tf.co.kr/rank/view/topic?mode=women"]
   ];
-  $("#view-about").innerHTML = `
+  $("#view-about").innerHTML = backLinkHTML() + `
     <div class="page-head"><div><h1>サイト情報</h1><p>KDraft について、星の評価方法、プライバシー。</p></div></div>
     <div class="about">
       <section class="panel"><h2>このサイトについて</h2>
@@ -1370,6 +1480,7 @@ async function createRoom() {
   try {
     onlineMessage("ルームを作っています…");
     const settings = { pickLimit: S.setup.pickLimit, orderMode: S.setup.orderMode, startOrder: S.setup.startOrder };
+    const { Room } = await loadOnline();
     const room = await Room.create({ name: S.onlineName, settings });
     attachRoom(room);
     go("room");
@@ -1384,6 +1495,7 @@ async function joinRoom(codeValue) {
   savePrefs();
   try {
     onlineMessage("ルームに接続しています…");
+    const { Room } = await loadOnline();
     const { room, rejoined } = await Room.join({ code, name: S.onlineName });
     attachRoom(room);
     if (rejoined) {
@@ -1484,13 +1596,16 @@ function applyRemoteState(snap, { force = false } = {}) {
 let pushTimer = null;
 function pushOnlineState() {
   if (!S.online?.room || !isHost() || !S.draft) return;
-  clearTimeout(pushTimer);
-  pushTimer = window.setTimeout(() => {
+  // 同じ処理の中で何度変わっても、書き込みは1回にまとめてすぐ送る
+  if (pushTimer) return;
+  pushTimer = true;
+  queueMicrotask(() => {
+    pushTimer = null;
     S.online.hostRev += 1;
     S.online.room.writeState({ rev: S.online.hostRev, state: S.draft, acks: S.online.acks }).catch(error => {
       toast(`共有に失敗しました：${error.message || "通信を確認してください"}`);
     });
-  }, 30);
+  });
 }
 
 async function processAction(key, action) {
@@ -1520,7 +1635,7 @@ async function processAction(key, action) {
   }
   if (action?.uid) S.online.acks[action.uid] = { id: key, ok, reason };
   commit();
-  await room.removeAction(key);
+  room.removeAction(key); // 片付けは待たずに次の操作へ
 }
 
 function sendGuestAction(action) {
@@ -1839,6 +1954,7 @@ document.addEventListener("click", async event => {
       S.shareStatus = "画像を作っています…";
       renderResults();
       try {
+        const { shareResult, xIntentUrl } = await loadShare();
         const result = await shareResult(S.draft);
         S.shareStatus = result === "downloaded" ? "結果画像を保存しました。Xなどに添付して投稿できます。" : result === "shared" ? "共有しました。" : "";
         if (result === "downloaded") window.open(xIntentUrl(), "_blank", "noopener,noreferrer");
@@ -1849,7 +1965,7 @@ document.addEventListener("click", async event => {
       break;
     }
     case "copy-result":
-      try { await navigator.clipboard.writeText(resultText(S.draft)); toast("結果をテキストでコピーしました"); }
+      try { const { resultText } = await loadShare(); await navigator.clipboard.writeText(resultText(S.draft)); toast("結果をテキストでコピーしました"); }
       catch { toast("コピーできませんでした"); }
       break;
     case "restart":
@@ -1872,6 +1988,14 @@ document.addEventListener("click", async event => {
     case "leave-room": leaveRoom(); break;
     case "kick": kickPlayer(target.dataset.uid); break;
     case "install": requestInstall(); break;
+    case "board-full": {
+      const entry = target.dataset.history ? store.history().find(h => h.id === target.dataset.history) : null;
+      const model = entry ? boardModelFromHistory(entry) : S.draft ? boardModelFromState(S.draft) : null;
+      if (model) openBoardFull(model, entry ? formatDate(entry.completedAt) : (E.isFinished(S.draft) ? "最終ドラフト結果" : "指名ボード"));
+      break;
+    }
+    case "board-full-close": closeBoardFull(); break;
+    case "board-full-fit": S.boardFit = !S.boardFit; fitBoardFull(); break;
     default: break;
   }
 });
@@ -1952,6 +2076,8 @@ document.addEventListener("keydown", event => {
   if (event.key === "/" && S.route.name === "draft" && !["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement?.tagName)) {
     event.preventDefault();
     $("#poolSearch")?.focus();
+  } else if (event.key === "Escape" && boardFullEl) {
+    closeBoardFull();
   } else if (event.key === "Escape" && S.selectedId && S.route.name === "draft" && !$("#modal").open) {
     const previous = S.selectedId; S.selectedId = null; refreshCardSelection(previous); renderDock();
   } else if (event.key === "Enter" && event.target.id === "roomCode") {
@@ -2007,7 +2133,7 @@ function boot() {
     history.replaceState(null, "", `${location.pathname}?room=${invite}#/setup/online`);
   } else if (savedRoom?.code) {
     // 前回のオンラインルームに自動で戻る（失敗したら忘れる）
-    Room.isMember(savedRoom.code).then(member => {
+    loadOnline().then(({ Room }) => Room.isMember(savedRoom.code)).then(member => {
       if (member) joinRoom(savedRoom.code);
       else store.saveRoom(null);
     }).catch(() => store.saveRoom(null));
