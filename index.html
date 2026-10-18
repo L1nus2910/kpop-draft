@@ -13,7 +13,7 @@
   <meta name="apple-mobile-web-app-title" content="KDraft">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="format-detection" content="telephone=no">
-  <link rel="manifest" href="manifest.webmanifest?v=20261018-v2-12">
+  <link rel="manifest" href="manifest.webmanifest?v=20261018-v2-14">
   <link rel="icon" href="assets/kdraft-48.png" type="image/png" sizes="48x48">
   <link rel="icon" href="assets/kdraft-192-v3.png" type="image/png" sizes="192x192">
   <link rel="apple-touch-icon" sizes="180x180" href="assets/kdraft-apple-touch-icon-v3.png?v=20261015-kdraft-3">
@@ -26,23 +26,23 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Zen+Kaku+Gothic+New:wght@400;700;900&display=swap">
-  <link rel="stylesheet" href="css/app.css?v=20261018-v2-12">
+  <link rel="stylesheet" href="css/app.css?v=20261018-v2-14">
   <!-- JS モジュールの更新時は tools/bump-version.mjs で ?v= をまとめて書き換えます -->
   <script type="importmap">
   {
     "imports": {
-      "./js/data.js": "./js/data.js?v=20261018-v2-12",
-      "./js/engine.js": "./js/engine.js?v=20261018-v2-12",
-      "./js/ai.js": "./js/ai.js?v=20261018-v2-12",
-      "./js/store.js": "./js/store.js?v=20261018-v2-12",
-      "./js/share.js": "./js/share.js?v=20261018-v2-12",
-      "./js/online.js": "./js/online.js?v=20261018-v2-12",
-      "./js/ui.js": "./js/ui.js?v=20261018-v2-12"
+      "./js/data.js": "./js/data.js?v=20261018-v2-14",
+      "./js/engine.js": "./js/engine.js?v=20261018-v2-14",
+      "./js/ai.js": "./js/ai.js?v=20261018-v2-14",
+      "./js/store.js": "./js/store.js?v=20261018-v2-14",
+      "./js/share.js": "./js/share.js?v=20261018-v2-14",
+      "./js/online.js": "./js/online.js?v=20261018-v2-14",
+      "./js/ui.js": "./js/ui.js?v=20261018-v2-14"
     }
   }
   </script>
   <script src="firebase-config.js" defer></script>
-  <script type="module" src="js/app.js?v=20261018-v2-12"></script>
+  <script type="module" src="js/app.js?v=20261018-v2-14"></script>
 </head>
 <body>
   <a class="skip-link" href="#main">本文へ移動</a>
@@ -53,6 +53,7 @@
       <span class="appbar-wordmark">KDraft</span>
     </a>
     <div class="appbar-context" id="appbarContext"></div>
+    <button class="appbar-install" type="button" data-action="install-help" id="appbarInstall" hidden><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="4.5"/><path d="M12 8.5v7M8.5 12h7"/></svg><span class="label-long">ホーム画面に追加</span><span class="label-short">追加</span></button>
     <nav class="appbar-nav" aria-label="サイトメニュー">
       <a href="#/history" data-nav="history">履歴</a>
       <a href="#/about" data-nav="about">サイト情報</a>

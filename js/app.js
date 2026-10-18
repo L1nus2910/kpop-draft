@@ -216,24 +216,38 @@ function renderHome() {
   })() : "";
 
   $("#view-home").innerHTML = `
-    <section class="home-hero">
-      <div class="home-hero-copy">
-        <p class="home-hero-kicker"><i aria-hidden="true"></i>K-POPガールズグループ・ドラフト</p>
-        <h1><span>推しでつくる、</span><span class="holo-text">夢のドラフト。</span></h1>
-        <p class="home-hero-lead">${idols.length.toLocaleString()}人の候補から、1巡目は入札、重なったら封筒で抽選。ドラフト会議のように指名して、あなただけのチームをつくろう。</p>
-        <div class="home-hero-actions">
-          <a class="btn btn-lg btn-light" href="#/setup/ai">${icon("robot")}AIとドラフトする</a>
-          <a class="btn btn-lg btn-secondary" href="#/setup/online">${icon("globe")}友達とオンラインで</a>
+    <section class="kv" aria-labelledby="kvTitle">
+      <div class="kv-bg" aria-hidden="true">
+        <span class="kv-tile t1"></span><span class="kv-tile t2"></span><span class="kv-tile t3"></span><span class="kv-tile t4"></span><span class="kv-tile t5"></span><span class="kv-tile t6"></span>
+        <svg class="kv-ribbon" viewBox="0 0 800 340" preserveAspectRatio="none">
+          <defs>
+            <linearGradient id="kvRib" x1="0" x2="1" y1="0" y2="0">
+              <stop offset="0" stop-color="#ffffff" stop-opacity="0"/>
+              <stop offset=".35" stop-color="#e9d8ff" stop-opacity=".9"/>
+              <stop offset=".6" stop-color="#ffd1ee" stop-opacity=".95"/>
+              <stop offset="1" stop-color="#b9e6ff" stop-opacity="0"/>
+            </linearGradient>
+          </defs>
+          <path class="glow" d="M120 330 C 300 250, 420 330, 560 220 S 760 40, 820 70"/>
+          <path d="M120 330 C 300 250, 420 330, 560 220 S 760 40, 820 70"/>
+          <path class="thin" d="M260 345 C 420 290, 520 320, 640 230 S 780 120, 830 140"/>
+        </svg>
+      </div>
+      <div class="kv-copy">
+        <p class="kv-kicker">K-POP GIRL GROUP <b>DRAFT</b><i aria-hidden="true"></i></p>
+        <h1 id="kvTitle"><span>推しでつくる、</span><span class="kv-shine">夢のドラフト。</span></h1>
+        <p class="kv-lead">条件で絞って、候補を選んで、<br>ドラフトを楽しもう。</p>
+      </div>
+      <div class="kv-card" aria-hidden="true">
+        <div class="kv-card-inner">
+          <img src="assets/kdraft-512-v4.png" alt="" width="200" height="200">
+          <small>K-POP GIRL GROUP DRAFT</small>
         </div>
+        <svg class="kv-spark s1" viewBox="0 0 24 24"><path d="M12 0c.8 6.6 4.4 10.4 12 12-7.6 1.6-11.2 5.4-12 12-.8-6.6-4.4-10.4-12-12C7.6 10.4 11.2 6.6 12 0z"/></svg>
+        <svg class="kv-spark s2" viewBox="0 0 24 24"><path d="M12 0c.8 6.6 4.4 10.4 12 12-7.6 1.6-11.2 5.4-12 12-.8-6.6-4.4-10.4-12-12C7.6 10.4 11.2 6.6 12 0z"/></svg>
+        <svg class="kv-spark s3" viewBox="0 0 24 24"><path d="M12 0c.8 6.6 4.4 10.4 12 12-7.6 1.6-11.2 5.4-12 12-.8-6.6-4.4-10.4-12-12C7.6 10.4 11.2 6.6 12 0z"/></svg>
       </div>
-      <div class="photocard-stack" aria-hidden="true">
-        <div class="photocard photocard-back"><span class="photocard-pattern"></span></div>
-        <div class="photocard photocard-mid"><span class="photocard-pattern"></span></div>
-        <figure class="photocard photocard-front">
-          <img src="assets/kdraft-512-v4.png" alt="" width="180" height="180">
-          <figcaption><strong>第1回選択希望</strong><small>KDRAFT MEMBER CARD</small></figcaption>
-        </figure>
-      </div>
+      <svg class="kv-spark s4" aria-hidden="true" viewBox="0 0 24 24"><path d="M12 0c.8 6.6 4.4 10.4 12 12-7.6 1.6-11.2 5.4-12 12-.8-6.6-4.4-10.4-12-12C7.6 10.4 11.2 6.6 12 0z"/></svg>
     </section>
     ${resumeHtml}
 
@@ -244,13 +258,13 @@ function renderHome() {
           <span class="mode-tile-icon">${icon("robot")}</span>
           <h3>AIとドラフト</h3>
           <p>ひとりで遊ぶならこれ。同世代型・同事務所型など、指名の好みが違うAIと競います。</p>
-          <span class="mode-tile-foot"><span>ひとりで・AI 1〜10人</span><span class="mode-tile-go">設定へ</span></span>
+          <span class="mode-tile-foot"><span>ひとりで・AI 1〜10人</span><span class="mode-tile-go">ドラフトへ</span></span>
         </a>
         <a class="mode-tile" data-mode="local" href="#/setup/local">
           <span class="mode-tile-icon">${icon("users")}</span>
           <h3>1台で対戦</h3>
           <p>1台のスマホやPCを回して、その場の友達と。入札は全員がそろうまで伏せられます。</p>
-          <span class="mode-tile-foot"><span>1〜10チーム</span><span class="mode-tile-go">設定へ</span></span>
+          <span class="mode-tile-foot"><span>1〜10チーム</span><span class="mode-tile-go">ドラフトへ</span></span>
         </a>
         <a class="mode-tile" data-mode="online" href="#/setup/online">
           <span class="mode-tile-icon">${icon("globe")}</span>
@@ -1988,6 +2002,7 @@ document.addEventListener("click", async event => {
     case "leave-room": leaveRoom(); break;
     case "kick": kickPlayer(target.dataset.uid); break;
     case "install": requestInstall(); break;
+    case "install-help": installHelp(); break;
     case "board-full": {
       const entry = target.dataset.history ? store.history().find(h => h.id === target.dataset.history) : null;
       const model = entry ? boardModelFromHistory(entry) : S.draft ? boardModelFromState(S.draft) : null;
@@ -2094,13 +2109,34 @@ const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platfo
 window.addEventListener("beforeinstallprompt", event => { event.preventDefault(); installPrompt = event; refreshInstallUI(); });
 window.addEventListener("appinstalled", () => { installPrompt = null; refreshInstallUI(); });
 function refreshInstallUI() {
+  const barButton = $("#appbarInstall");
+  if (barButton) barButton.hidden = standalone();
   const button = $("#installButton");
   const text = $("#installText");
   if (!button || !text) return;
   if (standalone()) { button.hidden = true; text.textContent = "ホーム画面のアイコンから開いています。"; return; }
-  if (installPrompt) { button.hidden = false; return; }
-  button.hidden = true;
-  if (isIOS) text.textContent = "Safariの共有ボタン（四角から矢印が出ているアイコン）から「ホーム画面に追加」を選ぶと、アイコンから開けます。一度開いたあとは、通信が切れてもAIドラフトを遊べます。";
+  button.hidden = false;
+  button.dataset.action = installPrompt ? "install" : "install-help";
+  if (isIOS) text.textContent = "共有ボタン（四角から矢印が出ているアイコン）から「ホーム画面に追加」を選ぶと、アイコンから開けます。一度開いたあとは、通信が切れてもAIドラフトを遊べます。";
+}
+function installHelp() {
+  if (installPrompt) { requestInstall(); return; }
+  const share = icon("share");
+  const isAndroid = /android/i.test(navigator.userAgent);
+  const steps = isIOS
+    ? [`画面の下（または上）にある共有ボタン ${share} を押します`, "メニューを下にスクロールして「ホーム画面に追加」を選びます", "右上の「追加」を押すと、ホーム画面にKDraftのアイコンができます"]
+    : isAndroid
+      ? ["ブラウザ右上のメニュー（︙）を押します", "「ホーム画面に追加」または「アプリをインストール」を選びます", "「追加」を押すと、ホーム画面にKDraftのアイコンができます"]
+      : ["アドレスバー右側のインストールボタン、またはブラウザのメニューを開きます", "「アプリをインストール」「ホーム画面に追加」「Dockに追加」などを選びます", "追加したアイコンから、いつでもすぐに開けます"];
+  const modal = $("#modal");
+  modal.innerHTML = `
+    <form method="dialog" class="modal-body">
+      <h2 id="modalTitle">ホーム画面に追加</h2>
+      <p>アイコンからすぐ開けるようになります。一度開いたあとは、通信が切れてもAIドラフトと1台での対戦を遊べます。</p>
+      <ol class="install-steps">${steps.map(step => `<li>${step}</li>`).join("")}</ol>
+      <div class="modal-actions"><button class="btn btn-primary" value="ok">わかった</button></div>
+    </form>`;
+  modal.showModal();
 }
 async function requestInstall() {
   if (!installPrompt) return;
@@ -2113,6 +2149,7 @@ async function requestInstall() {
 }
 window.addEventListener("offline", () => toast("オフラインになりました。AIドラフトと1台での対戦はそのまま遊べます", { duration: 5200 }));
 window.addEventListener("online", () => toast("オンラインに戻りました"));
+refreshInstallUI();
 
 if ("serviceWorker" in navigator && (location.protocol === "https:" || ["localhost", "127.0.0.1"].includes(location.hostname))) {
   window.addEventListener("load", () => navigator.serviceWorker.register("sw.js", { scope: "./" }).catch(() => {}));
