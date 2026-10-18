@@ -37,8 +37,8 @@ const S = {
   pool: { query: "", generation: "", nationality: "", agency: "", group: "", hideDrafted: true, showExcluded: false, onlyShortlist: false, sort: "recommended", limit: PAGE() },
   selectedId: null,
   tab: "pool",
-  boardMode: window.innerWidth <= 720 ? "teams" : "table",
-  resultsMode: "teams",
+  boardMode: "table",
+  resultsMode: "table",
   setup: {
     ...DEFAULT_SETUP,
     ...(prefs.setup || {}),
@@ -1299,7 +1299,7 @@ function renderResults() {
       </div>
     </section>
     ${S.shareStatus ? `<p class="share-status" role="status">${esc(S.shareStatus)}</p>` : ""}
-    ${segmented("resultsMode", [["teams", "チーム別"], ["table", "指名一覧表"]], S.resultsMode, { label: "結果の表示" }).replace('class="segmented"', 'class="segmented results-tabs"')}
+    ${segmented("resultsMode", [["table", "指名一覧表"], ["teams", "チーム別"]], S.resultsMode, { label: "結果の表示" }).replace('class="segmented"', 'class="segmented results-tabs"')}
     ${S.resultsMode === "table"
       ? `<div class="board-expand-row"><button class="btn btn-secondary btn-sm" data-action="board-full">${icon("expand")}表を広げて全体を見る</button></div>
          <div class="board-box">${boardTableHTML(boardModelFromState(s))}</div>`
