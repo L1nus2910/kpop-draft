@@ -1531,3 +1531,6 @@ body[data-view="draft"] .appbar-nav { display: none; }
   .appbar-menu { flex-direction: row; gap: 5px; min-height: 40px; padding: 0 10px 0 12px; font-size: 12px; }
 }
 .poll-back { justify-self: start; margin-bottom: 0; }
+.appbar-menu { margin-left: auto; }
+body[data-view="draft"] .appbar-menu { display: none; }
+@media (max-width: 760px) { .appbar-menu { border: 1px solid #dfe2ee; border-radius: 12px; background: #fff; } }

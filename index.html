@@ -13,7 +13,7 @@
   <meta name="apple-mobile-web-app-title" content="KDraft">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="format-detection" content="telephone=no">
-  <link rel="manifest" href="manifest.webmanifest?v=20261019-v2-5">
+  <link rel="manifest" href="manifest.webmanifest?v=20261019-v2-7">
   <link rel="icon" href="assets/kdraft-48.png" type="image/png" sizes="48x48">
   <link rel="icon" href="assets/kdraft-192-v3.png" type="image/png" sizes="192x192">
   <link rel="apple-touch-icon" sizes="180x180" href="assets/kdraft-apple-touch-icon-v3.png?v=20261015-kdraft-3">
@@ -28,29 +28,29 @@
   <!-- 見出し用の書体だけを、表示を止めずに後から読み込む（本文は端末の標準書体で軽く） -->
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&display=swap" media="print" onload="this.media='all'">
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&display=swap"></noscript>
-  <link rel="stylesheet" href="css/app.css?v=20261019-v2-5">
+  <link rel="stylesheet" href="css/app.css?v=20261019-v2-7">
   <!-- JS モジュールの更新時は tools/bump-version.mjs で ?v= をまとめて書き換えます -->
   <script type="importmap">
   {
     "imports": {
-      "./js/data.js": "./js/data.js?v=20261019-v2-5",
-      "./js/engine.js": "./js/engine.js?v=20261019-v2-5",
-      "./js/ai.js": "./js/ai.js?v=20261019-v2-5",
-      "./js/store.js": "./js/store.js?v=20261019-v2-5",
-      "./js/share.js": "./js/share.js?v=20261019-v2-5",
-      "./js/online.js": "./js/online.js?v=20261019-v2-5",
-      "./js/poll.js": "./js/poll.js?v=20261019-v2-5",
-      "./js/ui.js": "./js/ui.js?v=20261019-v2-5"
+      "./js/data.js": "./js/data.js?v=20261019-v2-7",
+      "./js/engine.js": "./js/engine.js?v=20261019-v2-7",
+      "./js/ai.js": "./js/ai.js?v=20261019-v2-7",
+      "./js/store.js": "./js/store.js?v=20261019-v2-7",
+      "./js/share.js": "./js/share.js?v=20261019-v2-7",
+      "./js/online.js": "./js/online.js?v=20261019-v2-7",
+      "./js/poll.js": "./js/poll.js?v=20261019-v2-7",
+      "./js/ui.js": "./js/ui.js?v=20261019-v2-7"
     }
   }
   </script>
-  <link rel="modulepreload" href="./js/data.js?v=20261019-v2-5">
-  <link rel="modulepreload" href="./js/engine.js?v=20261019-v2-5">
-  <link rel="modulepreload" href="./js/ai.js?v=20261019-v2-5">
-  <link rel="modulepreload" href="./js/store.js?v=20261019-v2-5">
-  <link rel="modulepreload" href="./js/ui.js?v=20261019-v2-5">
+  <link rel="modulepreload" href="./js/data.js?v=20261019-v2-7">
+  <link rel="modulepreload" href="./js/engine.js?v=20261019-v2-7">
+  <link rel="modulepreload" href="./js/ai.js?v=20261019-v2-7">
+  <link rel="modulepreload" href="./js/store.js?v=20261019-v2-7">
+  <link rel="modulepreload" href="./js/ui.js?v=20261019-v2-7">
   <script src="firebase-config.js" defer></script>
-  <script type="module" src="js/app.js?v=20261019-v2-5"></script>
+  <script type="module" src="js/app.js?v=20261019-v2-7"></script>
 </head>
 <body>
   <a class="skip-link" href="#main">本文へ移動</a>
@@ -61,9 +61,6 @@
       <span class="appbar-wordmark">KDraft</span>
     </a>
     <div class="appbar-context" id="appbarContext"></div>
-    <nav class="appbar-nav" aria-label="サイトメニュー">
-      <a href="#/vote" data-nav="vote"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/></svg><span>人気投票</span></a>
-    </nav>
     <button class="appbar-menu" type="button" data-action="site-menu" aria-label="メニューを開く"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg><span>メニュー</span></button>
   </header>
 
