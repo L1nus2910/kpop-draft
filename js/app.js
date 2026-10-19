@@ -146,8 +146,9 @@ function onRoute() {
   if (route.name !== "draft") { $("#dockMount").innerHTML = ""; document.body.classList.remove("has-dock"); }
   closeBoardFull();
   VIEWS.forEach(name => { $(`#view-${name}`).hidden = name !== route.name; });
+  const navKey = route.param ? `${route.name}/${route.param}` : route.name;
   $$(".appbar-nav a").forEach(link => {
-    if (link.dataset.nav === route.name) link.setAttribute("aria-current", "page");
+    if (link.dataset.nav === route.name || link.dataset.nav === navKey) link.setAttribute("aria-current", "page");
     else link.removeAttribute("aria-current");
   });
   render();
@@ -263,40 +264,37 @@ function renderHome() {
       </div>
       <svg class="kv-spark s4" aria-hidden="true" viewBox="0 0 24 24"><path d="M12 0c.8 6.6 4.4 10.4 12 12-7.6 1.6-11.2 5.4-12 12-.8-6.6-4.4-10.4-12-12C7.6 10.4 11.2 6.6 12 0z"/></svg>
     </section>
+    <a class="news-strip" href="#/vote">
+      <b>人気投票</b><span>受付中！ グループ・メンバー各1日3票</span><i aria-hidden="true">›</i>
+    </a>
     ${resumeHtml}
 
-    <section class="section" aria-labelledby="modesTitle">
-      <div class="section-head"><h2 id="modesTitle">遊び方を選ぶ</h2><p>どのモードも同じルールで遊べます。</p></div>
-      <div class="mode-grid">
-        <a class="mode-tile" data-mode="ai" href="#/setup/ai">
-          <span class="mode-tile-icon">${icon("robot")}</span>
-          <h3>AIとドラフト</h3>
-          <p>ひとりで遊ぶならこれ。同世代型・同事務所型など、指名の好みが違うAIと競います。</p>
-          <span class="mode-tile-foot"><span>ひとりで・AI 1〜10人</span><span class="mode-tile-go">ドラフトへ</span></span>
+    <section class="home-block" aria-labelledby="modesTitle">
+      <header class="block-head"><p>PLAY</p><h2 id="modesTitle">遊び方を選ぶ</h2><span>どのモードも同じルールで遊べます</span></header>
+      <div class="mode-big-grid">
+        <a class="mode-big" href="#/setup/ai" data-mode="ai">
+          <span class="mode-big-icon">${icon("robot")}</span>
+          <strong>AI DRAFT</strong><span class="mode-big-ja">AIとドラフト</span><small>ひとりで遊ぶ</small>
         </a>
-        <a class="mode-tile" data-mode="local" href="#/setup/local">
-          <span class="mode-tile-icon">${icon("users")}</span>
-          <h3>1台で対戦</h3>
-          <p>1台のスマホやPCを回して、その場の友達と。入札は全員がそろうまで伏せられます。</p>
-          <span class="mode-tile-foot"><span>1〜10チーム</span><span class="mode-tile-go">ドラフトへ</span></span>
+        <a class="mode-big" href="#/setup/local" data-mode="local">
+          <span class="mode-big-icon">${icon("users")}</span>
+          <strong>LOCAL</strong><span class="mode-big-ja">1台で対戦</span><small>その場の友達と</small>
         </a>
-        <a class="mode-tile" data-mode="online" href="#/setup/online">
-          <span class="mode-tile-icon">${icon("globe")}</span>
-          <h3>オンライン</h3>
-          <p>ルームを作って招待リンクを送るだけ。離れた友達と、同じ発表をリアルタイムで見られます。</p>
-          <span class="mode-tile-foot"><span>2〜10人・登録不要</span><span class="mode-tile-go">ルームへ</span></span>
+        <a class="mode-big" href="#/setup/online" data-mode="online">
+          <span class="mode-big-icon">${icon("globe")}</span>
+          <strong>ONLINE</strong><span class="mode-big-ja">オンライン</span><small>離れた友達と</small>
         </a>
+      </div>
+      <div class="menu-tiles">
+        <a class="menu-tile is-hot" href="#/vote">${icon("heart")}<span><b>人気投票</b><small>ランキング</small></span></a>
+        <a class="menu-tile" href="#/history">${icon("refresh")}<span><b>過去の結果</b><small>履歴・共有</small></span></a>
+        <button type="button" class="menu-tile" data-action="scroll-rules">${icon("filter")}<span><b>ドラフトの流れ</b><small>はじめての方へ</small></span></button>
+        <button type="button" class="menu-tile" data-action="install-help">${icon("addHome")}<span><b>ホームに追加</b><small>アイコンから開く</small></span></button>
       </div>
     </section>
 
-    <a class="poll-banner" href="#/vote">
-      <span class="poll-banner-mark" aria-hidden="true">♡</span>
-      <span class="poll-banner-copy"><strong>人気投票</strong><small>好きなグループ・メンバーに1日3票ずつ。今日・今週・今月・累計のランキング</small></span>
-      <span class="poll-banner-go">投票する</span>
-    </a>
-
-    <section class="section" id="rules" aria-labelledby="rulesTitle">
-      <div class="section-head"><h2 id="rulesTitle">ドラフトの流れ</h2><p>プロ野球のドラフト会議と同じ進め方です。</p></div>
+    <section class="home-block" id="rules" aria-labelledby="rulesTitle">
+      <header class="block-head"><p>HOW TO PLAY</p><h2 id="rulesTitle">ドラフトの流れ</h2><span>プロ野球のドラフト会議と同じ進め方です</span></header>
       <ol class="rules">
         <li class="rule"><h3>チームと人数を決める</h3><p>チーム数と、各チームが指名する人数（1〜8人）を決めます。最初の順番は抽選か設定順。</p></li>
         <li class="rule"><h3>1巡目は入札</h3><p>全チームが「第1回選択希望メンバー」を1人ずつ入札。そろったら順番に発表します。</p></li>
@@ -305,8 +303,8 @@ function renderHome() {
       </ol>
     </section>
 
-    ${history.length ? `<section class="section" aria-labelledby="recentTitle">
-      <div class="section-head"><h2 id="recentTitle">最近のドラフト</h2><a class="btn btn-ghost btn-sm" href="#/history">すべて見る</a></div>
+    ${history.length ? `<section class="home-block" aria-labelledby="recentTitle">
+      <header class="block-head"><p>RECENT</p><h2 id="recentTitle">最近のドラフト</h2><a class="block-more" href="#/history">すべて見る ›</a></header>
       <div class="recent-list">${history.map(entry => `
         <a class="recent-item" href="#/history">
           <time>${esc(formatDate(entry.completedAt))}</time>
@@ -2267,6 +2265,8 @@ document.addEventListener("click", async event => {
     case "kick": kickPlayer(target.dataset.uid); break;
     case "install": requestInstall(); break;
     case "install-help": installHelp(); break;
+    case "scroll-rules": $("#rules")?.scrollIntoView({ behavior: reducedMotion() ? "auto" : "smooth", block: "start" }); break;
+    case "site-menu": openSiteMenu(); break;
     case "board-full": {
       const entry = target.dataset.history ? store.history().find(h => h.id === target.dataset.history) : null;
       const model = entry ? boardModelFromHistory(entry) : S.draft ? boardModelFromState(S.draft) : null;
@@ -2441,6 +2441,23 @@ function refreshInstallUI() {
   button.dataset.action = installPrompt ? "install" : "install-help";
   if (isIOS) text.textContent = "共有ボタン（四角から矢印が出ているアイコン）から「ホーム画面に追加」を選ぶと、アイコンから開けます。一度開いたあとは、通信が切れてもAIドラフトを遊べます。";
 }
+async function openSiteMenu() {
+  const items = [
+    { value: "home", label: "ホーム", icon: "home" },
+    { value: "setup/ai", label: "AIとドラフト", icon: "robot" },
+    { value: "setup/local", label: "1台で対戦", icon: "users" },
+    { value: "setup/online", label: "オンライン", icon: "globe" },
+    { value: "vote", label: "人気投票", icon: "heart" },
+    { value: "history", label: "過去のドラフト（履歴）", icon: "refresh" },
+    { value: "about", label: "サイト情報・お問い合わせ", icon: "filter" }
+  ];
+  if (!standalone()) items.push({ value: "#install", label: "ホーム画面に追加", icon: "addHome" });
+  const choice = await menuDialog({ title: "メニュー", items });
+  if (choice === null) return;
+  if (choice === "#install") { installHelp(); return; }
+  go(choice === "home" ? "" : choice);
+}
+
 function installHelp() {
   if (installPrompt) { requestInstall(); return; }
   const share = icon("share");

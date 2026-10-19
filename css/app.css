@@ -1395,3 +1395,130 @@ body[data-view="draft"] .appbar-install, body[data-view="results"] .appbar-insta
 .poll-filters { position: relative; }
 .poll-filter-clear { grid-column: 1 / -1; justify-self: end; }
 @media (max-width: 720px) { .poll-filters { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; } }
+
+/* =============================================================
+   上部メニューとホーム（見やすさ重視：白＋濃紺、アクセントにピンク・紫）
+   ============================================================= */
+:root { --navy: #17205a; --navy-2: #24338a; --navy-soft: #eef0fa; --gold-soft: #fbf3dc; --gold-line: #ead39a; --gold-text: #8a6110; }
+
+/* ---- 上部メニュー ---- */
+.appbar { gap: 12px; background: rgba(255, 255, 255, 0.92); border-bottom: 1px solid #e4e6f0; box-shadow: 0 1px 0 rgba(23, 32, 90, 0.03), 0 6px 18px -16px rgba(23, 32, 90, 0.4); }
+.appbar-wordmark { color: var(--navy); }
+.appbar-nav { display: flex; align-items: stretch; gap: 2px; margin-left: auto; }
+.appbar-nav a {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 12px;
+  color: var(--navy); font-size: 14px; font-weight: 700; text-decoration: none; border-radius: 12px;
+  transition: background-color 140ms ease, color 140ms ease, transform 100ms ease;
+}
+.appbar-nav a .icon { width: 18px; height: 18px; flex: none; }
+.appbar-nav a:hover { background: var(--navy-soft); color: var(--navy); }
+.appbar-nav a:active { transform: scale(0.95); }
+.appbar-nav a[aria-current="page"] { background: var(--navy); color: #fff; }
+.appbar-nav br.sp { display: none; }
+.appbar-menu {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 12px; flex: none;
+  font: inherit; font-size: 13px; font-weight: 700; color: var(--navy);
+  background: #fff; border: 1px solid #dfe2ee; border-radius: 12px; cursor: pointer;
+  transition: background-color 140ms ease, transform 100ms ease;
+}
+.appbar-menu .icon { width: 20px; height: 20px; }
+.appbar-menu:hover { background: var(--navy-soft); }
+.appbar-menu:active { transform: scale(0.94); }
+body[data-view="draft"] .appbar-menu { display: none; }
+body[data-view="draft"] .appbar-nav { display: none; }
+
+@media (max-width: 760px) {
+  .appbar { gap: 6px; padding-top: max(6px, env(safe-area-inset-top)); padding-bottom: 6px; }
+  .appbar-wordmark { display: none; }
+  .appbar-nav { flex: 1; justify-content: space-between; margin-left: 4px; gap: 0; }
+  .appbar-nav .pc-only { display: none; }
+  .appbar-nav a { flex: 1; flex-direction: column; justify-content: center; gap: 2px; min-height: 48px; padding: 4px 2px; font-size: 10.5px; line-height: 1.2; text-align: center; border-radius: 10px; }
+  .appbar-nav a .icon { width: 18px; height: 18px; }
+  .appbar-nav br.sp { display: inline; }
+  .appbar-nav a span { white-space: nowrap; }
+  .appbar-menu { flex-direction: column; justify-content: center; gap: 1px; min-height: 48px; min-width: 48px; padding: 4px 6px; font-size: 10px; border: 0; border-left: 1px solid #e4e6f0; border-radius: 0; background: none; }
+  body[data-view="results"] .appbar-nav, body[data-view="room"] .appbar-nav { display: flex; }
+}
+@media (max-width: 760px) and (min-width: 0px) {
+  body[data-view="draft"] .appbar-nav, body[data-view="draft"] .appbar-menu { display: none; }
+}
+
+/* ---- お知らせの帯 ---- */
+.news-strip {
+  display: flex; align-items: center; gap: 12px; margin-top: 14px; padding: 13px 18px;
+  border-radius: 16px; border: 1px solid var(--gold-line); text-decoration: none;
+  background: linear-gradient(100deg, var(--gold-soft), #fffaf0 60%, var(--gold-soft));
+  color: var(--gold-text); box-shadow: 0 6px 16px -14px rgba(138, 97, 16, 0.7);
+  transition: transform 100ms ease, box-shadow 140ms ease;
+}
+.news-strip b { flex: none; font-size: 16px; font-weight: 900; letter-spacing: 0.06em; }
+.news-strip span { flex: 1; min-width: 0; font-size: 13px; font-weight: 700; color: #6d5523; }
+.news-strip i { flex: none; font-style: normal; font-size: 22px; font-weight: 700; line-height: 1; }
+.news-strip:hover { box-shadow: 0 10px 22px -14px rgba(138, 97, 16, 0.8); }
+.news-strip:active { transform: scale(0.99); }
+
+/* ---- ホームのブロック ---- */
+.home-block { margin-top: 30px; display: grid; gap: 14px; }
+.block-head { display: grid; justify-items: center; gap: 2px; text-align: center; position: relative; }
+.block-head p { margin: 0; font-size: 12px; font-weight: 700; letter-spacing: 0.24em; color: #8a90ad; }
+.block-head h2 { margin: 0; font-family: var(--sans); font-size: clamp(22px, 4vw, 28px); font-weight: 900; color: var(--navy); letter-spacing: 0.02em; }
+.block-head > span { font-size: 13px; color: #6f7593; }
+.block-more { position: absolute; right: 0; bottom: 2px; font-size: 13px; font-weight: 700; color: var(--navy-2); text-decoration: none; }
+
+/* 3つのモード（大きいボタン） */
+.mode-big-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.mode-big {
+  position: relative; display: grid; justify-items: center; align-content: center; gap: 3px;
+  min-height: 132px; padding: 16px 10px 14px; text-align: center; text-decoration: none; color: var(--navy);
+  background: #fff; border: 1px solid #e1e4ef; border-radius: 18px;
+  box-shadow: 0 1px 2px rgba(23, 32, 90, 0.05), 0 10px 22px -18px rgba(23, 32, 90, 0.45);
+  transition: transform 110ms ease, box-shadow 160ms ease, border-color 160ms ease;
+}
+.mode-big:hover { border-color: #c9cee6; box-shadow: 0 2px 4px rgba(23, 32, 90, 0.06), 0 16px 30px -18px rgba(23, 32, 90, 0.55); }
+.mode-big:active { transform: scale(0.97); }
+.mode-big-icon { display: grid; place-items: center; width: 40px; height: 40px; margin-bottom: 4px; border-radius: 12px; color: #fff; background: var(--navy); }
+.mode-big[data-mode="local"] .mode-big-icon { background: linear-gradient(140deg, #e8457f, #c42d6c); }
+.mode-big[data-mode="online"] .mode-big-icon { background: linear-gradient(140deg, #6a4be6, #4b31c4); }
+.mode-big[data-mode="ai"] .mode-big-icon { background: linear-gradient(140deg, #26398f, #17205a); }
+.mode-big-icon .icon { width: 22px; height: 22px; }
+.mode-big strong { font-family: var(--sans); font-size: clamp(17px, 3vw, 22px); font-weight: 900; letter-spacing: 0.04em; line-height: 1.1; }
+.mode-big-ja { font-size: 13px; font-weight: 900; color: var(--navy-2); }
+.mode-big small { font-size: 11px; color: #7a809c; line-height: 1.4; }
+
+/* 4つの小さいメニュー */
+.menu-tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.menu-tile {
+  display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 64px; padding: 10px 12px;
+  font: inherit; color: var(--navy); text-decoration: none; text-align: left; cursor: pointer;
+  background: #fff; border: 1px solid #e1e4ef; border-radius: 16px;
+  transition: transform 110ms ease, background-color 140ms ease, border-color 140ms ease;
+}
+.menu-tile .icon { flex: none; width: 22px; height: 22px; color: var(--navy-2); }
+.menu-tile span { display: grid; gap: 1px; min-width: 0; }
+.menu-tile b { font-size: 14px; font-weight: 900; white-space: nowrap; }
+.menu-tile small { font-size: 11px; color: #7a809c; white-space: nowrap; }
+.menu-tile:hover { border-color: #c9cee6; background: #fafbff; }
+.menu-tile:active { transform: scale(0.97); }
+.menu-tile.is-hot { color: #fff; border-color: transparent; background: linear-gradient(135deg, #f0397f, #c42d8a 60%, #7a3fd6); box-shadow: 0 10px 22px -14px rgba(240, 57, 127, 0.9); }
+.menu-tile.is-hot .icon, .menu-tile.is-hot small { color: rgba(255, 255, 255, 0.9); }
+
+.home-block .rules { margin-top: 2px; }
+
+@media (max-width: 720px) {
+  .news-strip { margin-top: 12px; padding: 11px 14px; gap: 10px; }
+  .news-strip b { font-size: 14px; }
+  .news-strip span { font-size: 12px; }
+  .home-block { margin-top: 24px; gap: 12px; }
+  .mode-big-grid { gap: 8px; }
+  .mode-big { min-height: 118px; padding: 12px 4px 10px; border-radius: 16px; }
+  .mode-big-icon { width: 34px; height: 34px; border-radius: 10px; }
+  .mode-big-icon .icon { width: 19px; height: 19px; }
+  .mode-big-ja { font-size: 12px; }
+  .mode-big small { font-size: 10px; }
+  .menu-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .menu-tile { justify-content: flex-start; min-height: 58px; }
+  .block-more { position: static; }
+}
+.appbar-context:empty { display: none; }
+@media (max-width: 760px) { .appbar-nav a { font-size: 11px; } }
+@media (max-width: 400px) { .news-strip span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } }
