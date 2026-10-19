@@ -13,44 +13,100 @@
   <meta name="apple-mobile-web-app-title" content="KDraft">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="format-detection" content="telephone=no">
-  <link rel="manifest" href="manifest.webmanifest?v=20261019-v2-7">
+  <link rel="manifest" href="manifest.webmanifest?v=20261019-v2-8">
   <link rel="icon" href="assets/kdraft-48.png" type="image/png" sizes="48x48">
   <link rel="icon" href="assets/kdraft-192-v3.png" type="image/png" sizes="192x192">
   <link rel="apple-touch-icon" sizes="180x180" href="assets/kdraft-apple-touch-icon-v3.png?v=20261015-kdraft-3">
   <meta property="og:type" content="website">
   <meta property="og:title" content="KDraft — K-POPガールズグループ・ドラフト">
   <meta property="og:description" content="推しでつくる、夢のドラフト。非公式ファン制作のK-POPドラフトゲーム。">
-  <meta property="og:url" content="https://l1nus2910.github.io/kpop-draft/">
-  <meta property="og:image" content="https://l1nus2910.github.io/kpop-draft/assets/kdraft-og.png">
+  <meta property="og:url" content="https://kdraft.pages.dev/">
+  <meta property="og:image" content="https://kdraft.pages.dev/assets/kdraft-og.png">
+  <link rel="canonical" href="https://kdraft.pages.dev/">
+  <script>
+    // 引っ越し：前のリンク（github.io）を開いたら、端末内の保存データを持って新しいリンクへ移る
+    (function () {
+      var NEW_URL = "https://kdraft.pages.dev/";
+      var KEYS = ["stagePickExcluded", "stagePickPresets", "kdraftCompletedDraftHistory", "kdraftResumeV2", "kdraftShortlist", "kdraftExcludedMembers", "kdraftShortlistMembers", "kdraftPrefs"];
+      var toB64 = function (text) { return btoa(unescape(encodeURIComponent(text))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""); };
+      var fromB64 = function (text) { return decodeURIComponent(escape(atob(text.replace(/-/g, "+").replace(/_/g, "/")))); };
+      try {
+        if (/\.github\.io$/.test(location.hostname)) {
+          var data = {};
+          KEYS.forEach(function (key) { try { var v = localStorage.getItem(key); if (v) data[key] = v; } catch (e) {} });
+          var pack = function () { return JSON.stringify({ v: 1, d: data, r: location.hash || "" }); };
+          // 長すぎる時は履歴を新しい順に減らす
+          while (pack().length > 60000 && data.kdraftCompletedDraftHistory) {
+            var list = JSON.parse(data.kdraftCompletedDraftHistory);
+            if (list.length <= 1) { delete data.kdraftCompletedDraftHistory; break; }
+            data.kdraftCompletedDraftHistory = JSON.stringify(list.slice(0, Math.floor(list.length / 2)));
+          }
+          document.documentElement.style.visibility = "hidden";
+          location.replace(NEW_URL + location.search + "#kdmove=" + toB64(pack()));
+          return;
+        }
+        if (location.hash.indexOf("#kdmove=") === 0) {
+          var moved = JSON.parse(fromB64(location.hash.slice(8)));
+          var incoming = (moved && moved.d) || {};
+          var read = function (key) { try { return JSON.parse(localStorage.getItem(key)); } catch (e) { return null; } };
+          var write = function (key, value) { try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) {} };
+          Object.keys(incoming).forEach(function (key) {
+            if (KEYS.indexOf(key) < 0) return;
+            var value; try { value = JSON.parse(incoming[key]); } catch (e) { return; }
+            var current = read(key);
+            if (Array.isArray(value) && key !== "kdraftCompletedDraftHistory") {
+              var merged = (Array.isArray(current) ? current : []).slice();
+              value.forEach(function (item) { if (merged.indexOf(item) < 0) merged.push(item); });
+              write(key, merged);
+            } else if (key === "kdraftCompletedDraftHistory" && Array.isArray(value)) {
+              var all = (Array.isArray(current) ? current : []).slice();
+              value.forEach(function (entry) { if (entry && !all.some(function (x) { return x && x.id === entry.id; })) all.push(entry); });
+              all.sort(function (a, b) { return (b && b.completedAt || 0) - (a && a.completedAt || 0); });
+              write(key, all.slice(0, 20));
+            } else if (key === "stagePickPresets" && value && typeof value === "object") {
+              var presets = current && typeof current === "object" ? current : {};
+              Object.keys(value).forEach(function (name) { if (!(name in presets)) presets[name] = value[name]; });
+              write(key, presets);
+            } else if (current == null) {
+              write(key, value);
+            }
+          });
+          history.replaceState(null, "", location.pathname + location.search + (moved && moved.r && moved.r.indexOf("#kdmove=") !== 0 ? moved.r : "#/"));
+        }
+      } catch (e) {
+        if (location.hash.indexOf("#kdmove=") === 0) history.replaceState(null, "", location.pathname + location.search + "#/");
+      }
+    })();
+  </script>
   <meta name="twitter:card" content="summary_large_image">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <!-- 見出し用の書体だけを、表示を止めずに後から読み込む（本文は端末の標準書体で軽く） -->
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&display=swap" media="print" onload="this.media='all'">
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&display=swap"></noscript>
-  <link rel="stylesheet" href="css/app.css?v=20261019-v2-7">
+  <link rel="stylesheet" href="css/app.css?v=20261019-v2-8">
   <!-- JS モジュールの更新時は tools/bump-version.mjs で ?v= をまとめて書き換えます -->
   <script type="importmap">
   {
     "imports": {
-      "./js/data.js": "./js/data.js?v=20261019-v2-7",
-      "./js/engine.js": "./js/engine.js?v=20261019-v2-7",
-      "./js/ai.js": "./js/ai.js?v=20261019-v2-7",
-      "./js/store.js": "./js/store.js?v=20261019-v2-7",
-      "./js/share.js": "./js/share.js?v=20261019-v2-7",
-      "./js/online.js": "./js/online.js?v=20261019-v2-7",
-      "./js/poll.js": "./js/poll.js?v=20261019-v2-7",
-      "./js/ui.js": "./js/ui.js?v=20261019-v2-7"
+      "./js/data.js": "./js/data.js?v=20261019-v2-8",
+      "./js/engine.js": "./js/engine.js?v=20261019-v2-8",
+      "./js/ai.js": "./js/ai.js?v=20261019-v2-8",
+      "./js/store.js": "./js/store.js?v=20261019-v2-8",
+      "./js/share.js": "./js/share.js?v=20261019-v2-8",
+      "./js/online.js": "./js/online.js?v=20261019-v2-8",
+      "./js/poll.js": "./js/poll.js?v=20261019-v2-8",
+      "./js/ui.js": "./js/ui.js?v=20261019-v2-8"
     }
   }
   </script>
-  <link rel="modulepreload" href="./js/data.js?v=20261019-v2-7">
-  <link rel="modulepreload" href="./js/engine.js?v=20261019-v2-7">
-  <link rel="modulepreload" href="./js/ai.js?v=20261019-v2-7">
-  <link rel="modulepreload" href="./js/store.js?v=20261019-v2-7">
-  <link rel="modulepreload" href="./js/ui.js?v=20261019-v2-7">
+  <link rel="modulepreload" href="./js/data.js?v=20261019-v2-8">
+  <link rel="modulepreload" href="./js/engine.js?v=20261019-v2-8">
+  <link rel="modulepreload" href="./js/ai.js?v=20261019-v2-8">
+  <link rel="modulepreload" href="./js/store.js?v=20261019-v2-8">
+  <link rel="modulepreload" href="./js/ui.js?v=20261019-v2-8">
   <script src="firebase-config.js" defer></script>
-  <script type="module" src="js/app.js?v=20261019-v2-7"></script>
+  <script type="module" src="js/app.js?v=20261019-v2-8"></script>
 </head>
 <body>
   <a class="skip-link" href="#main">本文へ移動</a>

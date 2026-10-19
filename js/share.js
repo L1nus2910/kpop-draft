@@ -2,7 +2,7 @@
 import { idolById, teamLabel, isDeparted, limitsLabel, lossesFor } from "./engine.js";
 import { agencyShort, teamColor } from "./ui.js";
 
-const SITE_URL = "https://l1nus2910.github.io/kpop-draft/";
+const SITE_URL = "https://kdraft.pages.dev/";
 const DISPLAY = '"Dela Gothic One", "Zen Kaku Gothic New", "Hiragino Sans", "Noto Sans JP", sans-serif';
 const SANS = '"Zen Kaku Gothic New", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Yu Gothic", Meiryo, sans-serif';
 
