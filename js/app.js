@@ -255,7 +255,7 @@ function renderHome() {
       </div>
       <div class="kv-card" aria-hidden="true">
         <div class="kv-card-inner">
-          <img src="assets/kdraft-512-v4.png" alt="" width="200" height="200">
+          <img src="assets/kdraft-280.webp" alt="" width="200" height="200" decoding="async">
           <small>K-POP GIRL GROUP DRAFT</small>
         </div>
         <svg class="kv-spark s1" viewBox="0 0 24 24"><path d="M12 0c.8 6.6 4.4 10.4 12 12-7.6 1.6-11.2 5.4-12 12-.8-6.6-4.4-10.4-12-12C7.6 10.4 11.2 6.6 12 0z"/></svg>
@@ -1242,7 +1242,7 @@ function renderReveal() {
           <h2 class="stage-title">${esc(revealTitle(r))}</h2>
           <div class="stage-team"><small>指名チーム</small><strong>${esc(E.teamLabel(s, r.teamId))}</strong></div>
           <div class="nameplate"><div class="nameplate-inner">
-            <div class="nameplate-face nameplate-back"><img src="assets/kdraft-192-v3.png" alt="" width="84" height="84"><span>KDRAFT</span></div>
+            <div class="nameplate-face nameplate-back"><img src="assets/kdraft-168.webp" alt="" width="84" height="84"><span>KDRAFT</span></div>
             <div class="nameplate-face nameplate-front">
               <small>${r.type === "nomination" ? bidLabel(r.round || 1) : `第${r.round}巡選択`}</small>
               <p class="nameplate-name">${esc(idol?.japaneseName)}</p>
@@ -1559,7 +1559,7 @@ function renderAbout() {
         <p>誤記や権利に関する連絡、ご意見は、X（旧Twitter）の <a href="https://x.com/Wooian_S2U" target="_blank" rel="noopener noreferrer">@Wooian_S2U</a> へDMでお願いします。</p>
       </section>
       <section class="panel"><h2>ホーム画面に追加</h2>
-        <div class="install-card"><img src="assets/kdraft-192-v3.png" alt="" width="56" height="56">
+        <div class="install-card"><img src="assets/kdraft-168.webp" alt="" width="56" height="56" loading="lazy">
           <div><p id="installText">ホーム画面にアイコンを置くと、すぐに開けます。一度開いたあとは、通信が切れてもAIドラフトと1台での対戦を遊べます。</p>
           <button class="btn btn-primary btn-sm" data-action="install" id="installButton" style="margin-top:10px" hidden>ホーム画面に追加</button></div>
         </div>
@@ -2120,6 +2120,14 @@ async function shareInvite() {
 // ======================================================================
 // 操作（イベントの受け口）
 // ======================================================================
+// 押した瞬間（指が触れた時点）に、次の画面で使う部品を先に読み込み始める
+document.addEventListener("pointerdown", event => {
+  const link = event.target.closest?.('a[href="#/vote"], a[href="#/setup/online"]');
+  if (!link) return;
+  if (link.getAttribute("href") === "#/vote") loadPoll().catch(() => {});
+  if (onlineConfigured()) loadOnline().then(m => m.warmup()).catch(() => {});
+}, { passive: true });
+
 document.addEventListener("click", async event => {
   if (S.route.name === "vote" && pollModule?.onVoteClick(event)) return;
   const target = event.target.closest("[data-action]");

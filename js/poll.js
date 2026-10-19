@@ -99,7 +99,7 @@ const matchesFilters = (item, filters, ignore = "") =>
 
 // ---------------------------------------------------------------- 状態
 const P = {
-  kind: "m",
+  kind: "g",
   period: "d",
   query: "",
   filters: emptyFilters(),
@@ -246,6 +246,7 @@ function draw() {
   const info = periodInfo(serverNow());
   viewEl.innerHTML = `
     <div class="poll">
+      <a class="back-link back-link-strong poll-back" href="#/">ホームに戻る</a>
       <header class="poll-hero">
         <p class="poll-kicker">POPULARITY VOTE</p>
         <h1>人気投票</h1>
@@ -254,7 +255,7 @@ function draw() {
       ${P.error ? `<p class="notice notice-warn">${esc(P.error)}</p>` : ""}
       <div class="poll-controls">
         <div class="segmented poll-kind" role="radiogroup" aria-label="投票の種類" data-poll-seg="kind">
-          ${[["m", "メンバー"], ["g", "グループ"]].map(([v, t]) => `<button type="button" role="radio" aria-checked="${P.kind === v}" data-value="${v}">${t}<small>今日の残り ${remaining(v)}票</small></button>`).join("")}
+          ${[["g", "グループ"], ["m", "メンバー"]].map(([v, t]) => `<button type="button" role="radio" aria-checked="${P.kind === v}" data-value="${v}">${t}<small>今日の残り ${remaining(v)}票</small></button>`).join("")}
         </div>
         <div class="poll-tabs" role="tablist" aria-label="集計の期間" data-poll-seg="period">
           ${PERIODS.map(([v, t]) => `<button type="button" role="tab" aria-selected="${P.period === v}" data-value="${v}">${t}</button>`).join("")}

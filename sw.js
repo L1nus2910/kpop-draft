@@ -17,11 +17,9 @@ const CORE_ASSETS = [
   "manifest.webmanifest",
   "firebase-config.js",
   "assets/kdraft-48.png",
-  "assets/kdraft-192-v3.png",
-  "assets/kdraft-512-v4.png",
-  "assets/kdraft-maskable-192.png",
-  "assets/kdraft-maskable-512.png",
-  "assets/kdraft-apple-touch-icon-v3.png"
+  "assets/kdraft-96.webp",
+  "assets/kdraft-168.webp",
+  "assets/kdraft-280.webp"
 ].map(path => new URL(path, SCOPE).href);
 
 function localReferences(html) {
