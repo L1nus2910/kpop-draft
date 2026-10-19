@@ -29,8 +29,8 @@
   --danger: #c93451;
   --holo: linear-gradient(100deg, #ff9fd6, #ffd6a0 22%, #b9f3d6 44%, #a0d8ff 66%, #c9b6ff 86%, #ff9fd6);
 
-  --display: "Dela Gothic One", "Zen Kaku Gothic New", "Hiragino Sans", "Noto Sans JP", sans-serif;
-  --sans: "Zen Kaku Gothic New", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Yu Gothic UI", Meiryo, sans-serif;
+  --display: "Dela Gothic One", system-ui, -apple-system, "Hiragino Sans", "Noto Sans JP", sans-serif;
+  --sans: system-ui, -apple-system, "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Noto Sans CJK JP", "Yu Gothic UI", "Yu Gothic", Meiryo, sans-serif;
 
   --r-xs: 8px;
   --r-sm: 12px;
