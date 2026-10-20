@@ -2276,6 +2276,7 @@ document.addEventListener("click", async event => {
     case "install-help": installHelp(); break;
     case "scroll-rules": $("#rules")?.scrollIntoView({ behavior: reducedMotion() ? "auto" : "smooth", block: "start" }); break;
     case "site-menu": openSiteMenu(); break;
+    case "lang-menu": openLangMenu(); break;
     case "board-full": {
       const entry = target.dataset.history ? store.history().find(h => h.id === target.dataset.history) : null;
       const model = entry ? boardModelFromHistory(entry) : S.draft ? boardModelFromState(S.draft) : null;
@@ -2450,6 +2451,11 @@ function refreshInstallUI() {
   button.dataset.action = installPrompt ? "install" : "install-help";
   if (isIOS) text.textContent = tr("共有ボタン（四角から矢印が出ているアイコン）から「ホーム画面に追加」を選ぶと、アイコンから開けます。一度開いたあとは、通信が切れてもAIドラフトを遊べます。");
 }
+async function openLangMenu() {
+  const picked = await menuDialog({ title: "言語 / 언어 / Language", items: LANGS.map(([code, name]) => ({ value: code, label: `${code === lang ? "✓ " : ""}${name}` })) });
+  if (picked && picked !== lang) setLang(picked);
+}
+
 async function openSiteMenu() {
   const items = [
     { value: "home", label: tr("ホーム"), icon: "home" },
@@ -2465,11 +2471,7 @@ async function openSiteMenu() {
   const choice = await menuDialog({ title: tr("メニュー"), items });
   if (choice === null) return;
   if (choice === "#install") { installHelp(); return; }
-  if (choice === "#lang") {
-    const picked = await menuDialog({ title: "言語 / 언어 / Language", items: LANGS.map(([code, name]) => ({ value: code, label: `${code === lang ? "✓ " : ""}${name}` })) });
-    if (picked && picked !== lang) setLang(picked);
-    return;
-  }
+  if (choice === "#lang") { openLangMenu(); return; }
   go(choice === "home" ? "" : choice);
 }
 
@@ -2517,6 +2519,11 @@ function boot() {
   const menuBtn = $(".appbar-menu");
   if (menuBtn) { menuBtn.setAttribute("aria-label", tr("メニューを開く")); const label = menuBtn.querySelector("span"); if (label) label.textContent = tr("メニュー"); }
   const skip = $(".skip-link"); if (skip) skip.textContent = tr("本文へ移動");
+  const langBtn = $(".appbar-lang");
+  if (langBtn) {
+    langBtn.querySelector(".lang-long").textContent = LANGS.find(([c]) => c === lang)?.[1] || "";
+    langBtn.querySelector(".lang-short").textContent = lang.toUpperCase();
+  }
   // iOS Safari で :active（押した瞬間の見た目）を効かせる
   document.addEventListener("touchstart", () => {}, { passive: true });
   const params = new URLSearchParams(location.search);
