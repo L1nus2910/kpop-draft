@@ -5,9 +5,10 @@
 // polls/total/{kind}/{period}        … 総投票数
 //   kind   … "g"（グループ）/ "m"（メンバー）
 //   period … "d{日}"・"w{週}"・"m{月}"・"all"（日・週・月は日本時間で数える）
+import { tr } from "./i18n.js";
 import { groups, idols, normalizeSearchText, searchRank, shortAgencyName, fullAgencyName, groupAliases, looseSearchText, agencyFilterName } from "./data.js";
 import { identity, onlineConfigured } from "./online.js";
-import { $, esc, icon, toast } from "./ui.js";
+import { $, esc, icon, toast, memberName, valueLabel } from "./ui.js";
 
 export const VOTES_PER_DAY = 3;
 const DAY = 86400000;
@@ -22,7 +23,7 @@ function periodInfo(serverNow) {
   return { day, week, month };
 }
 const PERIODS = [
-  ["d", "今日"], ["w", "今週"], ["m", "今月"], ["all", "累計"]
+  ["d", tr("今日")], ["w", tr("今週")], ["m", tr("今月")], ["all", tr("累計")]
 ];
 function periodKey(type, info) {
   if (type === "d") return `d${info.day}`;
@@ -37,8 +38,8 @@ function periodLabel(type, info) {
   };
   if (type === "d") return fmt(info.day);
   if (type === "w") return `${fmt(info.week * 7 - 3)}〜${fmt(info.week * 7 + 3)}`;
-  if (type === "m") return `${Math.floor(info.month / 12)}年${(info.month % 12) + 1}月`;
-  return "これまでの合計";
+  if (type === "m") return tr("{y}年{m}月", { y: Math.floor(info.month / 12), m: (info.month % 12) + 1 });
+  return tr("これまでの合計");
 }
 
 // ---------------------------------------------------------------- 投票先
@@ -80,7 +81,7 @@ const memberItems = (() => {
       group: [...new Set(list)]
     },
     id: idol.id,
-    name: idol.japaneseName,
+    name: memberName(idol),
     sub: [...new Set(list)].join("・"),
     search: "",
     order: -(idol.popularitySortScore || 0)
@@ -90,8 +91,8 @@ const ITEMS = { g: groupItems, m: memberItems };
 
 // 絞り込みの項目（メンバーとグループで使える項目が違う）
 const FILTER_DEFS = {
-  m: [["generation", "世代"], ["nationality", "国籍"], ["agency", "事務所"], ["group", "グループ"]],
-  g: [["generation", "世代"], ["agency", "事務所"]]
+  m: [["generation", tr("世代")], ["nationality", tr("国籍")], ["agency", tr("事務所")], ["group", tr("グループ")]],
+  g: [["generation", tr("世代")], ["agency", tr("事務所")]]
 };
 const emptyFilters = () => ({ generation: "", nationality: "", agency: "", group: "" });
 const matchesFilters = (item, filters, ignore = "") =>
@@ -120,11 +121,11 @@ let viewEl = null;
 export async function renderVote(view) {
   viewEl = view;
   draw();
-  if (!onlineConfigured()) { P.error = "投票の設定が見つかりません。"; draw(); return; }
+  if (!onlineConfigured()) { P.error = tr("投票の設定が見つかりません。"); draw(); return; }
   try {
     await connect();
   } catch (error) {
-    P.error = error?.message || "投票を読み込めませんでした。";
+    P.error = error?.message || tr("投票を読み込めませんでした。");
     draw();
   }
 }
@@ -164,7 +165,7 @@ function subscribe() {
   const totalRef = db.ref(`polls/total/${key}`);
   const onTally = snap => { if (P.subscribed !== key) return; P.tally = snap.val() || {}; P.ready = true; P.error = ""; drawList(); };
   const onTotal = snap => { if (P.subscribed !== key) return; P.total = Number(snap.val()) || 0; drawHead(); };
-  const onErr = () => { P.error = "ランキングを読み込めませんでした。データベースのルールを確認してください。"; draw(); };
+  const onErr = () => { P.error = tr("ランキングを読み込めませんでした。データベースのルールを確認してください。"); draw(); };
   tallyRef.on("value", onTally, onErr);
   totalRef.on("value", onTotal, onErr);
   P.offs.push(() => tallyRef.off("value", onTally), () => totalRef.off("value", onTotal));
@@ -204,7 +205,7 @@ async function vote(kind, itemKey) {
     P.voter[kind] = prev;
     const snap = await db.ref(`polls/voters/${P.uid}/${kind}`).once("value").catch(() => null);
     if (snap) P.voter[kind] = snap.val();
-    toast(remaining(kind) <= 0 ? "今日の票はもう使い切りました" : "投票できませんでした。もう一度押してください。");
+    toast(remaining(kind) <= 0 ? tr("今日の票はもう使い切りました") : tr("投票できませんでした。もう一度押してください。"));
     P.subscribed = "";
     subscribe();
   } finally {
@@ -246,26 +247,26 @@ function draw() {
   const info = periodInfo(serverNow());
   viewEl.innerHTML = `
     <div class="poll">
-      <a class="back-link back-link-strong poll-back" href="#/">ホームに戻る</a>
+      <a class="back-link back-link-strong poll-back" href="#/">${tr("ホームに戻る")}</a>
       <header class="poll-hero">
         <p class="poll-kicker">POPULARITY VOTE</p>
-        <h1>人気投票</h1>
-        <p>好きなグループとメンバーに投票できます。<b>1日 グループ${VOTES_PER_DAY}票・メンバー${VOTES_PER_DAY}票</b>、毎日0時（日本時間）に戻ります。同じ相手にまとめて入れてもOKです。</p>
+        <h1>${tr("人気投票")}</h1>
+        <p>${tr("好きなグループとメンバーに投票できます。")}<b>${tr("1日 グループ{n}票・メンバー{n}票", { n: VOTES_PER_DAY })}</b>${tr("、毎日0時（日本時間）に戻ります。同じ相手にまとめて入れてもOKです。")}</p>
       </header>
       ${P.error ? `<p class="notice notice-warn">${esc(P.error)}</p>` : ""}
       <div class="poll-controls">
-        <div class="segmented poll-kind" role="radiogroup" aria-label="投票の種類" data-poll-seg="kind">
-          ${[["g", "グループ"], ["m", "メンバー"]].map(([v, t]) => `<button type="button" role="radio" aria-checked="${P.kind === v}" data-value="${v}">${t}<small>今日の残り ${remaining(v)}票</small></button>`).join("")}
+        <div class="segmented poll-kind" role="radiogroup" aria-label="${tr("投票の種類")}" data-poll-seg="kind">
+          ${[["g", tr("グループ")], ["m", tr("メンバー")]].map(([v, t]) => `<button type="button" role="radio" aria-checked="${P.kind === v}" data-value="${v}">${t}<small>${tr("今日の残り {n}票", { n: remaining(v) })}</small></button>`).join("")}
         </div>
-        <div class="poll-tabs" role="tablist" aria-label="集計の期間" data-poll-seg="period">
+        <div class="poll-tabs" role="tablist" aria-label="${tr("集計の期間")}" data-poll-seg="period">
           ${PERIODS.map(([v, t]) => `<button type="button" role="tab" aria-selected="${P.period === v}" data-value="${v}">${t}</button>`).join("")}
         </div>
       </div>
       <div class="poll-head" id="pollHead"></div>
-      <label class="search poll-search">${icon("search")}<span class="sr-only">探す</span>
-        <input class="input" type="search" id="pollSearch" value="${esc(P.query)}" placeholder="${P.kind === "m" ? "メンバー名・グループで探す（例：ウォニョン）" : "グループ名で探す（例：アイヴ／IVE／아이브）"}" autocomplete="off" enterkeyhint="search">
+      <label class="search poll-search">${icon("search")}<span class="sr-only">${tr("探す")}</span>
+        <input class="input" type="search" id="pollSearch" value="${esc(P.query)}" placeholder="${P.kind === "m" ? tr("メンバー名・グループで探す（例：ウォニョン）") : tr("グループ名で探す（例：アイヴ／IVE／아이브）")}" autocomplete="off" enterkeyhint="search">
       </label>
-      <div class="filter-grid poll-filters" role="group" aria-label="絞り込み" id="pollFilters"></div>
+      <div class="filter-grid poll-filters" role="group" aria-label="${tr("絞り込み")}" id="pollFilters"></div>
       <ol class="poll-list" id="pollList"></ol>
       <div class="poll-more" id="pollMore"></div>
     </div>`;
@@ -286,11 +287,11 @@ function drawFilters() {
     const values = [...counts.keys()].sort((a, b) => (key === "generation" ? a.localeCompare(b, "ja") : (counts.get(b) - counts.get(a)) || a.localeCompare(b, "ja")));
     const current = P.filters[key];
     if (current && !values.includes(current)) values.unshift(current);
-    const show = v => (key === "agency" ? shortAgencyName(v) || v : v);
+    const show = v => (key === "agency" ? shortAgencyName(v) || v : valueLabel(v));
     return `<label class="filter-chip"><span class="sr-only">${label}</span><select data-poll-filter="${key}" class="${current ? "is-set" : ""}">
-      <option value="">${label}：すべて</option>${values.map(v => `<option value="${esc(v)}" ${v === current ? "selected" : ""}>${esc(show(v))}（${counts.get(v) || 0}）</option>`).join("")}
+      <option value="">${tr("{label}：すべて", { label })}</option>${values.map(v => `<option value="${esc(v)}" ${v === current ? "selected" : ""}>${esc(show(v))}（${counts.get(v) || 0}）</option>`).join("")}
     </select></label>`;
-  }).join("") + (Object.values(P.filters).some(Boolean) ? `<button type="button" class="btn btn-ghost btn-sm poll-filter-clear" data-poll-clear>条件をクリア</button>` : "");
+  }).join("") + (Object.values(P.filters).some(Boolean) ? `<button type="button" class="btn btn-ghost btn-sm poll-filter-clear" data-poll-clear>${tr("条件をクリア")}</button>` : "");
 }
 
 function drawHead(info = periodInfo(serverNow())) {
@@ -298,16 +299,16 @@ function drawHead(info = periodInfo(serverNow())) {
   if (!box) return;
   const left = remaining(P.kind);
   box.innerHTML = `
-    <div><small>${esc(PERIODS.find(p => p[0] === P.period)[1])}（${esc(periodLabel(P.period, info))}）の${P.kind === "m" ? "メンバー" : "グループ"}投票</small>
-      <strong>総投票数 <b>${P.total.toLocaleString()}</b>票</strong></div>
-    <span class="poll-left ${left ? "" : "is-empty"}">今日の残り <b>${left}</b>/${VOTES_PER_DAY}票</span>`;
+    <div><small>${esc(PERIODS.find(p => p[0] === P.period)[1])}（${esc(periodLabel(P.period, info))}）${P.kind === "m" ? tr("のメンバー投票") : tr("のグループ投票")}</small>
+      <strong>${tr("総投票数")} <b>${P.total.toLocaleString()}</b>${tr("票")}</strong></div>
+    <span class="poll-left ${left ? "" : "is-empty"}">${tr("今日の残り {n}票", { n: `<b>${left}</b>/${VOTES_PER_DAY}` })}</span>`;
 }
 
 function drawList() {
   const list = viewEl?.querySelector("#pollList");
   if (!list) return;
   drawHead();
-  if (!P.ready && !P.error) { list.innerHTML = `<li class="poll-empty">読み込んでいます…</li>`; viewEl.querySelector("#pollMore").innerHTML = ""; return; }
+  if (!P.ready && !P.error) { list.innerHTML = `<li class="poll-empty">${tr("読み込んでいます…")}</li>`; viewEl.querySelector("#pollMore").innerHTML = ""; return; }
   const items = filteredItems();
   const narrowed = P.query.trim() || Object.values(P.filters).some(Boolean);
   const shown = narrowed ? items : items.slice(0, P.limit);
@@ -325,13 +326,13 @@ function drawList() {
         <strong>${esc(item.name)}</strong><small>${esc(item.sub)}</small>
         <span class="poll-bar" aria-hidden="true"><i style="width:${votes ? Math.max(3, Math.round(votes / max * 100)) : 0}%"></i></span>
       </div>
-      <span class="poll-votes"><b>${votes.toLocaleString()}</b>票</span>
-      <button class="btn btn-sm ${left ? "btn-primary" : "btn-ghost"}" data-poll-vote="${esc(item.key)}" ${left ? "" : "disabled"} aria-label="${esc(item.name)}に1票">＋1票</button>
+      <span class="poll-votes"><b>${votes.toLocaleString()}</b>${tr("票")}</span>
+      <button class="btn btn-sm ${left ? "btn-primary" : "btn-ghost"}" data-poll-vote="${esc(item.key)}" ${left ? "" : "disabled"} aria-label="${esc(item.name)}に1票">${tr("＋1票")}</button>
     </li>`;
-  }).join("") : `<li class="poll-empty">見つかりませんでした。</li>`;
+  }).join("") : `<li class="poll-empty">${tr("見つかりませんでした。")}</li>`;
   const more = viewEl.querySelector("#pollMore");
   const rest = items.length - shown.length;
-  more.innerHTML = rest > 0 ? `<button class="btn btn-secondary load-more" data-poll-more>さらに${Math.min(30, rest)}件を表示<small>残り${rest}件</small></button>` : "";
+  more.innerHTML = rest > 0 ? `<button class="btn btn-secondary load-more" data-poll-more>${tr("さらに{n}件を表示", { n: Math.min(30, rest) })}<small>${tr("残り{n}件", { n: rest })}</small></button>` : "";
 }
 
 /** 検索欄を作り直さずに、数字と一覧だけ更新する */
@@ -339,7 +340,7 @@ function refresh() {
   if (!viewEl) return;
   viewEl.querySelectorAll('[data-poll-seg="kind"] button').forEach(button => {
     const small = button.querySelector("small");
-    if (small) small.textContent = `今日の残り ${remaining(button.dataset.value)}票`;
+    if (small) small.textContent = tr("今日の残り {n}票", { n: remaining(button.dataset.value) });
   });
   drawList();
 }

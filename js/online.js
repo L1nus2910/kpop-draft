@@ -13,6 +13,7 @@
 // lobby/{code}    … 「ルーム一覧に公開」にしたルームだけ。ホストが書く
 //   { host, count, max, pickLimit, limits, createdAt, updatedAt }
 
+import { tr } from "./i18n.js";
 const SDK_VERSION = "12.19.0";
 const SDK = ["app", "auth", "database"].map(name => `https://www.gstatic.com/firebasejs/${SDK_VERSION}/firebase-${name}-compat.js`);
 export const MAX_PLAYERS = 10;
@@ -27,7 +28,7 @@ function loadSdk() {
     script.src = src;
     script.async = false;
     script.onload = resolve;
-    script.onerror = () => reject(new Error("オンライン機能を読み込めませんでした。通信状態を確認してください。"));
+    script.onerror = () => reject(new Error(tr("オンライン機能を読み込めませんでした。通信状態を確認してください。")));
     document.head.append(script);
   }))).catch(error => { sdkPromise = null; throw error; });
   return sdkPromise;
@@ -39,8 +40,8 @@ export function onlineConfigured() {
 }
 
 export async function identity() {
-  if (!onlineConfigured()) throw new Error("オンライン機能の設定（firebase-config.js）がありません。");
-  if (!navigator.onLine) throw new Error("オフラインです。インターネットにつないでから試してください。");
+  if (!onlineConfigured()) throw new Error(tr("オンライン機能の設定（firebase-config.js）がありません。"));
+  if (!navigator.onLine) throw new Error(tr("オフラインです。インターネットにつないでから試してください。"));
   await loadSdk();
   if (!window.firebase.apps.length) window.firebase.initializeApp(window.STAGE_PICK_FIREBASE_CONFIG);
   const auth = window.firebase.auth();
@@ -48,7 +49,7 @@ export async function identity() {
   return auth.currentUser.uid;
 }
 
-export function normalizeName(value, fallback = "プレイヤー") {
+export function normalizeName(value, fallback = tr("プレイヤー")) {
   const cleaned = String(value || "").replace(/[.#$\/\[\]]/g, "").trim().slice(0, 16);
   return cleaned || fallback;
 }
@@ -107,7 +108,7 @@ export class Room {
     for (let attempt = 0; attempt < 4 && (await db.ref(`rooms/${code}/status`).once("value")).exists(); attempt += 1) {
       code = makeCode();
     }
-    const teamName = normalizeName(name, "ホスト");
+    const teamName = normalizeName(name, tr("ホスト"));
     await db.ref(`rooms/${code}`).set({
       hostUid: uid,
       status: "lobby",
@@ -121,26 +122,26 @@ export class Room {
   static async join({ code, name }) {
     const uid = await identity();
     const normalized = normalizeCode(code);
-    if (normalized.length !== 8) throw new Error("8文字のルームコードを入力してください。");
+    if (normalized.length !== 8) throw new Error(tr("8文字のルームコードを入力してください。"));
     const db = window.firebase.database();
     const statusSnap = await db.ref(`rooms/${normalized}/status`).once("value");
-    if (!statusSnap.exists()) throw new Error("ルームが見つかりません。コードを確かめるか、ホストに新しいリンクをもらってください。");
+    if (!statusSnap.exists()) throw new Error(tr("ルームが見つかりません。コードを確かめるか、ホストに新しいリンクをもらってください。"));
     const memberSnap = await db.ref(`rooms/${normalized}/players/${uid}`).once("value");
     const member = memberSnap.val();
     if (member) {
-      if (member.kickedByHost) throw new Error("このルームからは退出させられたため、再参加できません。");
-      if (member.departed) throw new Error("このルームはすでに退出しています。");
+      if (member.kickedByHost) throw new Error(tr("このルームからは退出させられたため、再参加できません。"));
+      if (member.departed) throw new Error(tr("このルームはすでに退出しています。"));
       return { room: new Room(normalized, uid, Boolean(member.host)), rejoined: true };
     }
-    if (statusSnap.val() !== "lobby") throw new Error("このルームはすでにドラフトが始まっています。");
+    if (statusSnap.val() !== "lobby") throw new Error(tr("このルームはすでにドラフトが始まっています。"));
     const room = new Room(normalized, uid, false);
     const requestRef = room.ref.child(`joinRequests/${uid}`);
     // 前回の申請（満員・締め切りの返事など）が残っていると新しく出せないので、先に消す
     if ((await requestRef.once("value").catch(() => null))?.exists()) await requestRef.remove().catch(() => {});
     await requestRef.set({ name: normalizeName(name), createdAt: Date.now() }).catch(error => {
       throw new Error(String(error?.code || error?.message || "").includes("PERMISSION")
-        ? "このルームには参加できませんでした。ドラフトが始まったか、ルームが終了した可能性があります。"
-        : (error?.message || "参加できませんでした。"));
+        ? tr("このルームには参加できませんでした。ドラフトが始まったか、ルームが終了した可能性があります。")
+        : (error?.message || tr("参加できませんでした。")));
     });
     return { room, rejoined: false };
   }
@@ -251,7 +252,7 @@ export class Room {
   /** 一覧に載せる・内容を更新する。通信が切れたら自動で消え、つながり直したら載せ直す */
   async publish(info) {
     const entry = {
-      host: normalizeName(info.host, "ホスト"),
+      host: normalizeName(info.host, tr("ホスト")),
       count: Math.max(0, Number(info.count) || 0),
       max: MAX_PLAYERS,
       pickLimit: Number(info.pickLimit) || 5,

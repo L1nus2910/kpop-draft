@@ -1,4 +1,5 @@
 // 画面づくりの小さな部品
+import { tr, lang } from "./i18n.js";
 import { fullAgencyName, shortAgencyName } from "./data.js";
 
 export const TEAM_COLORS = [
@@ -33,6 +34,19 @@ export function groupHue(group) {
 export function monogram(idol, extraClass = "") {
   const first = Array.from(idol?.japaneseName || idol?.name || "?")[0];
   return `<span class="monogram ${extraClass}" style="--h:${groupHue(idol?.group || "")}" aria-hidden="true">${esc(first)}</span>`;
+}
+
+/** 表示する言語でのメンバー名（日本語：カタカナ／韓国語：ハングル／英語：ローマ字） */
+export function memberName(idol) {
+  if (!idol) return "";
+  if (lang === "en") return idol.name || idol.japaneseName;
+  if (lang === "ko") return idol.koreanName || idol.name || idol.japaneseName;
+  return idol.japaneseName || idol.name;
+}
+
+/** 世代・国籍などデータの値を表示用に（「日本・米国」のような組み合わせも訳す） */
+export function valueLabel(value) {
+  return String(value ?? "").split("・").map(part => tr(part)).join("・");
 }
 
 export function agencyShort(idol) {
@@ -80,7 +94,7 @@ export function formatDate(timestamp) {
   }
 }
 
-export const MODE_LABEL = { ai: "AIドラフト", local: "1台で対戦", online: "オンライン" };
+export const MODE_LABEL = { ai: tr("AIドラフト"), local: tr("1台で対戦"), online: tr("オンライン") };
 
 export function reducedMotion() {
   return window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
@@ -106,7 +120,7 @@ export function toast(message, { color = "", duration = 3600, slot = "" } = {}) 
 }
 
 /** window.confirm の代わり（見た目をそろえる） */
-export function confirmDialog({ title, message, ok = "OK", cancel = "キャンセル", danger = false }) {
+export function confirmDialog({ title, message, ok = "OK", cancel = tr("キャンセル"), danger = false }) {
   return new Promise(resolve => {
     const modal = document.getElementById("modal");
     modal.innerHTML = `
@@ -125,7 +139,7 @@ export function confirmDialog({ title, message, ok = "OK", cancel = "キャン�
 }
 
 /** window.prompt の代わり */
-export function promptDialog({ title, label, value = "", ok = "保存", placeholder = "" }) {
+export function promptDialog({ title, label, value = "", ok = tr("保存"), placeholder = "" }) {
   return new Promise(resolve => {
     const modal = document.getElementById("modal");
     modal.innerHTML = `
@@ -134,7 +148,7 @@ export function promptDialog({ title, label, value = "", ok = "保存", placehol
         <label class="field"><span class="field-label">${esc(label)}</span>
           <input class="input" name="value" maxlength="30" value="${esc(value)}" placeholder="${esc(placeholder)}" autocomplete="off"></label>
         <div class="modal-actions">
-          <button class="btn btn-ghost" value="cancel" formnovalidate>キャンセル</button>
+          <button class="btn btn-ghost" value="cancel" formnovalidate>${tr("キャンセル")}</button>
           <button class="btn btn-primary" value="ok">${esc(ok)}</button>
         </div>
       </form>`;
@@ -155,7 +169,7 @@ export function menuDialog({ title, items }) {
         <div class="sheet-list">
           ${items.map(item => `<button value="${esc(item.value)}" class="${item.danger ? "is-danger" : ""}">${item.icon ? icon(item.icon) : ""}${esc(item.label)}</button>`).join("")}
         </div>
-        <div class="modal-actions"><button class="btn btn-ghost" value="">閉じる</button></div>
+        <div class="modal-actions"><button class="btn btn-ghost" value="">${tr("閉じる")}</button></div>
       </form>`;
     modal.addEventListener("close", () => resolve(modal.returnValue || null), { once: true });
     modal.showModal();

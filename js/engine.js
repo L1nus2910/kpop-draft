@@ -11,6 +11,7 @@
 //   以降、ウェーバーは毎巡逆順に、固定は毎巡チーム順。
 // - 指名人数に達したチーム（とオンラインで退出したチーム）は飛ばす。
 
+import { tr } from "./i18n.js";
 import { idols, agencyFilterName } from "./data.js";
 
 export const idolById = new Map(idols.map(idol => [idol.id, idol]));
@@ -37,8 +38,8 @@ export function inLimits(limits, idol) {
   return true;
 }
 export function limitsLabel(limits) {
-  const parts = LIMIT_KEYS.map(key => listOf(limits?.[key]).join("・")).filter(Boolean);
-  return parts.join("／");
+  const parts = LIMIT_KEYS.map(key => listOf(limits?.[key]).map(v => (key === "agencies" ? v : tr(v))).join(tr("・"))).filter(Boolean);
+  return parts.join(" / ");
 }
 /** 縛りの中で指名できる人数（同じ人は1人として数える） */
 export function eligibleCount(limits) {
@@ -59,13 +60,13 @@ export function shuffle(items) {
 }
 
 export const AI_STRATEGIES = [
-  { label: "同世代型", style: "generationFocus" },
-  { label: "世代ミックス型", style: "generationMix" },
-  { label: "同事務所型", style: "agencyFocus" },
-  { label: "事務所ミックス型", style: "agencyMix" },
-  { label: "同国籍型", style: "nationalityFocus" },
-  { label: "国籍ミックス型", style: "nationalityMix" },
-  { label: "ランダム型", style: "random" }
+  { label: tr("同世代型"), style: "generationFocus" },
+  { label: tr("世代ミックス型"), style: "generationMix" },
+  { label: tr("同事務所型"), style: "agencyFocus" },
+  { label: tr("事務所ミックス型"), style: "agencyMix" },
+  { label: tr("同国籍型"), style: "nationalityFocus" },
+  { label: tr("国籍ミックス型"), style: "nationalityMix" },
+  { label: tr("ランダム型"), style: "random" }
 ];
 
 export function strategyLabel(style) {
@@ -433,10 +434,10 @@ export function advanceReveal(state, now = Date.now()) {
  * それ以外はすぐに開示して発表キューを作る。
  */
 export function submitBid(state, teamId, idolId, now = Date.now()) {
-  if (!canAct(state, teamId)) return { ok: false, reason: "いまは入札できません。" };
+  if (!canAct(state, teamId)) return { ok: false, reason: tr("いまは入札できません。") };
   const id = idolId == null ? "" : String(idolId);
-  if (id && idolById.has(id) && !inLimits(state.settings.limits, idolById.get(id))) return { ok: false, reason: "今回の縛りの対象外のメンバーです。" };
-  if (id && !idolAvailable(state, id)) return { ok: false, reason: "このメンバーはすでに指名されています。" };
+  if (id && idolById.has(id) && !inLimits(state.settings.limits, idolById.get(id))) return { ok: false, reason: tr("今回の縛りの対象外のメンバーです。") };
+  if (id && !idolAvailable(state, id)) return { ok: false, reason: tr("このメンバーはすでに指名されています。") };
   state.r1.bids[teamId] = id;
   pushLog(state, { kind: "bid", teamId });
   if (allBidsIn(state)) {
@@ -497,10 +498,10 @@ export function openBids(state, now = Date.now()) {
 
 export function submitPick(state, teamId, idolId, now = Date.now()) {
   if (!state.r1.started) return submitBid(state, teamId, idolId, now);
-  if (!canAct(state, teamId)) return { ok: false, reason: "いまはこのチームの指名番ではありません。" };
+  if (!canAct(state, teamId)) return { ok: false, reason: tr("いまはこのチームの指名番ではありません。") };
   const idol = idolById.get(String(idolId));
-  if (!idol || personDrafted(state, idol)) return { ok: false, reason: "このメンバーはすでに指名されています。" };
-  if (!inLimits(state.settings.limits, idol)) return { ok: false, reason: "今回の縛りの対象外のメンバーです。" };
+  if (!idol || personDrafted(state, idol)) return { ok: false, reason: tr("このメンバーはすでに指名されています。") };
+  if (!inLimits(state.settings.limits, idol)) return { ok: false, reason: tr("今回の縛りの対象外のメンバーです。") };
   const round = state.round;
   recordPick(state, teamId, idol, round);
   pushLog(state, { kind: "pick", teamId, idolId: idol.id, round });
@@ -553,14 +554,14 @@ export function boardRows(state) {
 }
 
 export function statusText(state, viewerTeamId = null) {
-  if (isFinished(state)) return "ドラフト終了";
-  if (state.reveal || state.queue.length) return "指名発表中";
+  if (isFinished(state)) return tr("ドラフト終了");
+  if (state.reveal || state.queue.length) return tr("指名発表中");
   if (!state.r1.started) {
-    if (state.r1.awaitingOpen) return "全員の入札がそろいました";
-    if (state.r1.attempt > 1) return `${state.round}巡目 再入札（${state.r1.attempt}回目）`;
-    return `${state.round}巡目 入札`;
+    if (state.r1.awaitingOpen) return tr("全員の入札がそろいました");
+    if (state.r1.attempt > 1) return tr("{n}巡目 再入札（{a}回目）", { n: state.round, a: state.r1.attempt });
+    return tr("{n}巡目 入札", { n: state.round });
   }
   const current = currentTeam(state);
-  if (!current) return `${state.round}巡目`;
-  return viewerTeamId && current === viewerTeamId ? `${state.round}巡目・あなたの番` : `${state.round}巡目・${teamLabel(state, current)}`;
+  if (!current) return tr("{n}巡目", { n: state.round });
+  return viewerTeamId && current === viewerTeamId ? tr("{n}巡目・あなたの番", { n: state.round }) : tr("{n}巡目・{team}", { n: state.round, team: teamLabel(state, current) });
 }
