@@ -1,6 +1,7 @@
 // 結果画像（SNS共有用）とテキスト
+import { tr } from "./i18n.js";
 import { idolById, teamLabel, isDeparted, limitsLabel, lossesFor } from "./engine.js";
-import { agencyShort, teamColor } from "./ui.js";
+import { agencyShort, teamColor, memberName } from "./ui.js";
 
 const SITE_URL = "https://kdraft.pages.dev/";
 const DISPLAY = '"Dela Gothic One", "Zen Kaku Gothic New", "Hiragino Sans", "Noto Sans JP", sans-serif';
@@ -58,7 +59,7 @@ export async function createResultImage(state) {
   canvas.width = width * scale;
   canvas.height = height * scale;
   const ctx = canvas.getContext("2d");
-  if (!ctx) throw new Error("画像を作れませんでした。");
+  if (!ctx) throw new Error(tr("画像を作れませんでした。"));
 
   // 背景
   const bg = ctx.createLinearGradient(0, 0, width, height);
@@ -77,11 +78,11 @@ export async function createResultImage(state) {
   ctx.fillStyle = holo;
   ctx.fillRect(pad, pad - 8, 120, 4);
 
-  fitText(ctx, "KDRAFT  ドラフト結果", pad, pad + 24, tableW, 20, { color: "#d6b062", weight: 700 });
+  fitText(ctx, tr("KDRAFT  ドラフト結果"), pad, pad + 24, tableW, 20, { color: "#d6b062", weight: 700 });
   const total = teams.reduce((sum, t) => sum + (state.picks[t.id] || []).length, 0);
-  fitText(ctx, "最終ドラフト結果", pad, pad + 84, tableW, 52, { color: "#ffffff", weight: 400, family: DISPLAY });
+  fitText(ctx, tr("最終ドラフト結果"), pad, pad + 84, tableW, 52, { color: "#ffffff", weight: 400, family: DISPLAY });
   const limits = limitsLabel(state.settings.limits);
-  fitText(ctx, `${cols}チーム・${rounds}巡・合計${total}人${limits ? `・縛り：${limits}` : ""}`, pad, pad + 136, tableW, 20, { color: "rgba(255,255,255,0.7)", weight: 700 });
+  fitText(ctx, `${tr("{teams}チーム・{rounds}巡・合計{n}人", { teams: cols, rounds, n: total })}${limits ? `${tr("・縛り：")}${limits}` : ""}`, pad, pad + 136, tableW, 20, { color: "rgba(255,255,255,0.7)", weight: 700 });
 
   const tx = pad;
   const ty = pad + titleH;
@@ -94,7 +95,7 @@ export async function createResultImage(state) {
 
   ctx.fillStyle = "#f3f0f9";
   ctx.fillRect(tx, ty, roundW, headerH + rowsH);
-  fitText(ctx, "巡目", tx + roundW / 2, ty + headerH / 2, roundW - 10, 16, { color: "#7a7493", align: "center" });
+  fitText(ctx, tr("巡目"), tx + roundW / 2, ty + headerH / 2, roundW - 10, 16, { color: "#7a7493", align: "center" });
 
   teams.forEach((team, index) => {
     const x = tx + roundW + colW * index;
@@ -105,7 +106,7 @@ export async function createResultImage(state) {
     ctx.fillStyle = head;
     ctx.fillRect(x, ty, colW, headerH);
     fitText(ctx, teamLabel(state, team.id), x + colW / 2, ty + 38, colW - 18, 21, { color: "#fff", weight: 900, align: "center", min: 11 });
-    fitText(ctx, isDeparted(state, team.id) ? "退出" : `${(state.picks[team.id] || []).length}/${rounds}人`, x + colW / 2, ty + 66, colW - 18, 14, { color: "rgba(255,255,255,0.85)", align: "center" });
+    fitText(ctx, isDeparted(state, team.id) ? tr("退出") : `${(state.picks[team.id] || []).length}/${tr("{n}人", { n: rounds })}`, x + colW / 2, ty + 66, colW - 18, 14, { color: "rgba(255,255,255,0.85)", align: "center" });
   });
 
   let y = ty + headerH;
@@ -122,7 +123,7 @@ export async function createResultImage(state) {
       let cy = y + (h - (losses.length * 58 + 70)) / 2 + 4;
       losses.forEach(id => {
         const lost = idolById.get(id);
-        fitText(ctx, lost?.japaneseName || "", x + colW / 2, cy + 8, colW - 20, 15, { color: "#a9a4bd", align: "center", weight: 700 });
+        fitText(ctx, memberName(lost) || "", x + colW / 2, cy + 8, colW - 20, 15, { color: "#a9a4bd", align: "center", weight: 700 });
         fitText(ctx, agencyShort(lost), x + colW / 2, cy + 26, colW - 20, 11, { color: "#bcb7cc", align: "center", weight: 500 });
         fitText(ctx, lost?.group || "", x + colW / 2, cy + 41, colW - 20, 11, { color: "#bcb7cc", align: "center", weight: 500 });
         cy += 58;
@@ -132,7 +133,7 @@ export async function createResultImage(state) {
         return;
       }
       const idol = idolById.get(pick.idolId);
-      fitText(ctx, idol?.japaneseName || "", x + colW / 2, cy + 14, colW - 20, 22, { color: "#191430", weight: 900, align: "center", min: 11 });
+      fitText(ctx, memberName(idol) || "", x + colW / 2, cy + 14, colW - 20, 22, { color: "#191430", weight: 900, align: "center", min: 11 });
       fitText(ctx, agencyShort(idol), x + colW / 2, cy + 38, colW - 20, 13, { color: "#7a7493", align: "center", weight: 700 });
       fitText(ctx, idol?.group || "", x + colW / 2, cy + 56, colW - 20, 13, { color: "#7a7493", align: "center", weight: 700 });
     });
@@ -140,18 +141,18 @@ export async function createResultImage(state) {
   }
   ctx.restore();
 
-  fitText(ctx, "KDraft — 非公式ファン制作のK-POPドラフトゲーム", pad, height - footH / 2 - 4, tableW - 300, 15, { color: "rgba(255,255,255,0.65)" });
+  fitText(ctx, tr("KDraft — 非公式ファン制作のK-POPドラフトゲーム"), pad, height - footH / 2 - 4, tableW - 300, 15, { color: "rgba(255,255,255,0.65)" });
   fitText(ctx, "#KDraft", width - pad, height - footH / 2 - 4, 300, 18, { color: "#d6b062", align: "right", weight: 900 });
 
-  const blob = await new Promise((resolve, reject) => canvas.toBlob(b => (b ? resolve(b) : reject(new Error("画像を書き出せませんでした。"))), "image/png"));
+  const blob = await new Promise((resolve, reject) => canvas.toBlob(b => (b ? resolve(b) : reject(new Error(tr("画像を書き出せませんでした。")))), "image/png"));
   return new File([blob], "kdraft-result.png", { type: "image/png" });
 }
 
 export function resultText(state) {
-  const lines = ["KDraft ドラフト結果"];
+  const lines = [tr("KDraft ドラフト結果")];
   state.teams.forEach(team => {
     const names = (state.picks[team.id] || []).slice().sort((a, b) => a.round - b.round)
-      .map(p => idolById.get(p.idolId)?.japaneseName).filter(Boolean);
+      .map(p => memberName(idolById.get(p.idolId))).filter(Boolean);
     lines.push(`【${teamLabel(state, team.id)}】${names.join("・")}`);
   });
   lines.push("#KDraft", SITE_URL);
@@ -164,7 +165,7 @@ export async function shareResult(state) {
   const canShareFiles = typeof navigator.share === "function" && (typeof navigator.canShare !== "function" || navigator.canShare({ files: [image] }));
   if (canShareFiles) {
     try {
-      await navigator.share({ files: [image], text, title: "KDraft ドラフト結果" });
+      await navigator.share({ files: [image], text, title: tr("KDraft ドラフト結果") });
       return "shared";
     } catch (error) {
       if (error?.name === "AbortError") return "cancelled";

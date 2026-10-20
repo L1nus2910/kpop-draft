@@ -772,6 +772,7 @@ const koreanNameOverrides = {
 
 // 自動変換では正しくならない名前のハングル表記
 Object.assign(koreanNameOverrides, {
+  "lily": "릴리",
   "solar": "솔라", "sinb": "신비", "umji": "엄지", "exy": "엑시", "dayoung": "다영", "monday": "먼데이", "jaehee": "재희", "yuqi": "우기",
   "sheon": "션", "sullyoon": "설윤", "bae": "배이", "kyujin": "규진", "dayeon": "다연", "heejin": "희진", "jinsoul": "진솔", "choerry": "최리",
   "kaede": "카에데", "xinyu": "신위", "mayu": "마유", "hayeon": "하연", "sophia": "소피아", "gehlee": "겔리", "elisia": "엘리시아", "liv": "리브",

@@ -1534,3 +1534,21 @@ body[data-view="draft"] .appbar-nav { display: none; }
 .appbar-menu { margin-left: auto; }
 body[data-view="draft"] .appbar-menu { display: none; }
 @media (max-width: 760px) { .appbar-menu { border: 1px solid #dfe2ee; border-radius: 12px; background: #fff; } }
+/* 言語の切り替え（メニューの左） */
+.appbar-lang {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 12px; flex: none; margin-left: auto;
+  font: inherit; font-size: 13px; font-weight: 700; color: var(--navy);
+  background: #fff; border: 1px solid #dfe2ee; border-radius: 12px; cursor: pointer;
+  transition: background-color 140ms ease, transform 100ms ease;
+}
+.appbar-lang .icon { width: 18px; height: 18px; }
+.appbar-lang:hover { background: var(--navy-soft); }
+.appbar-lang:active { transform: scale(0.94); }
+.appbar-lang .lang-short { display: none; }
+.appbar-lang + .appbar-menu { margin-left: 0; }
+body[data-view="draft"] .appbar-lang { display: none; }
+@media (max-width: 420px) {
+  .appbar-lang { padding: 0 10px; gap: 4px; }
+  .appbar-lang .lang-long { display: none; }
+  .appbar-lang .lang-short { display: inline; }
+}
